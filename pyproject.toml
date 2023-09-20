@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "robot-payload-id"
+version = "0.1.0"
+description = "Identifying object inertial properties using a robot arm"
+authors = ["Nicholas Pfaff <nepfaff@mit.edu>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+numpy = "^1.25.2"
+black = "^23.9.1"
+pre-commit = "^3.4.0"
+drake = "^1.21.0"
+manipulation = {git = "https://github.com/RussTedrake/manipulation.git"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
