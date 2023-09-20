@@ -12,6 +12,14 @@ black = "^23.9.1"
 pre-commit = "^3.4.0"
 drake = "^1.21.0"
 manipulation = {git = "https://github.com/RussTedrake/manipulation.git"}
+tqdm = "^4.66.1"
+isort = "^5.12.0"
+
+[tool.isort]
+profile = 'black'
+lines_between_types = 1
+combine_as_imports = true
+known_first_party = ['robot_payload_id']
 
 [build-system]
 requires = ["poetry-core"]
