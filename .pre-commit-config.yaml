@@ -1,6 +1,6 @@
 repos:
 - repo: https://github.com/psf/black
-  rev: 22.10.0
+  rev: 23.3.0
   hooks:
   - id: black
     language_version: python3.10
@@ -10,3 +10,8 @@ repos:
   hooks:
     - id: isort
       name: isort (python)
+
+- repo: https://github.com/floatingpurr/sync_with_poetry
+  rev: 1.0.0
+  hooks:
+    - id: sync_with_poetry
