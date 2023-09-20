@@ -30,8 +30,3 @@ Activate the environment:
 ```
 poetry shell
 ```
-
-Install `pre-commit` for automatic black formatting:
-```bash
-pre-commit install
-```
