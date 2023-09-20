@@ -8,11 +8,13 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"
 numpy = "^1.25.2"
-black = "^23.9.1"
-pre-commit = "^3.4.0"
 drake = "^1.21.0"
 manipulation = {git = "https://github.com/RussTedrake/manipulation.git"}
 tqdm = "^4.66.1"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.4.0"
+black = "^23.9.1"
 isort = "^5.12.0"
 
 [tool.isort]
