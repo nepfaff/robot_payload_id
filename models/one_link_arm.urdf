@@ -1,0 +1,49 @@
+<robot name="one-link-arm">
+    <material name="black">
+        <color rgba="0 0 0 1" />
+    </material>
+    <material name="red">
+        <color rgba="1 0.3 0.3 1" />
+    </material>
+    <link name="base">
+        <inertial>
+            <origin xyz="0 0 0" />
+            <mass value="0.01" />
+            <inertia ixx="0" ixy="0" ixz="0" iyy="0" iyz="0" izz="0" />
+        </inertial>
+    </link>
+    <joint name="base_weld" type="fixed">
+        <parent link="world" />
+        <child link="base" />
+    </joint>
+    <link name="link1">
+        <inertial>
+            <origin xyz="0 0 -0.5" rpy="0 0 0" />
+            <mass value="0.6" />
+            <inertia ixx="0.05" ixy="0" ixz="0" iyy="0.05" iyz="0" izz="7.5e-8" />
+        </inertial>
+        <visual>
+            <origin xyz="0 0 -0.5" rpy="0 0 0" />
+            <geometry>
+                <cylinder length="1" radius=".05" />
+            </geometry>
+            <material name="black" />
+        </visual>
+        <visual>
+            <origin xyz="0 0 0"/>
+            <geometry>
+                <sphere radius="0.1"/>
+            </geometry>
+            <material name="red" />
+        </visual>
+    </link>
+    <joint name="shoulder" type="continuous">
+        <parent link="base"/>
+        <child link="link1" />
+        <axis xyz="0 1 0" />
+    </joint>
+    <transmission type="SimpleTransmission" name="shoulder_trans">
+        <actuator name="shoulder" />
+        <joint name="shoulder" />
+    </transmission>
+</robot>

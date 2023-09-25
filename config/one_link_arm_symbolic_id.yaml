@@ -1,0 +1,22 @@
+# Robotic arm
+urdf_path: "models/one_link_arm.urdf"
+time_step: 0.0
+num_joints: 1
+
+# Trajectories
+initial_joint_positions: [3.14]
+num_trajectories: 7
+sinusoidal_amplitude: 1.0
+trajectory_duration_s: 10.0
+
+# GT parameters
+gt_parameters:
+  - _target_: robot_payload_id.utils.dataclasses.JointParameters
+    m: 0.6
+    cx: 0.0
+    cz: -0.5
+    # Transform inertia from CoM frame to origin frame (0.05 + 0.6 * (-0.5) ** 2) / 0.6)
+    Gyy: 0.33333333333333337
+
+# Logging (Paths relative to Hydra log dir)
+log_dir_path: "logs/one_link_arm_symbolic_id"

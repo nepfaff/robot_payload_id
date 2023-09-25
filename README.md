@@ -30,3 +30,9 @@ Activate the environment:
 ```
 poetry shell
 ```
+
+## Symbolic System ID
+
+```bash
+python scripts/symbolic_id.py --config-name one_link_arm_symbolic_id
+```
