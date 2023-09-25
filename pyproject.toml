@@ -13,6 +13,8 @@ manipulation = {git = "https://github.com/RussTedrake/manipulation.git"}
 tqdm = "^4.66.1"
 hydra-core = "^1.3.2"
 omegaconf = "^2.3.0"
+ipython = "^8.15.0"
+pyyaml = "^6.0.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.4.0"
