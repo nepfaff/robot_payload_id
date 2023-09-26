@@ -1,3 +1,5 @@
+import os
+
 from manipulation.station import MakeHardwareStation, Scenario
 from pydrake.all import (
     AbstractValue,
@@ -66,8 +68,16 @@ class HardwareStationDiagram(Diagram):
     "external" station represents hardware and thus only contains LCM logic.
     """
 
-    def __init__(self, scenario: Scenario, use_hardware: bool):
+    def __init__(
+        self,
+        scenario: Scenario,
+        has_wsg: bool,
+        use_hardware: bool,
+    ):
         super().__init__()
+        package_xmls = [
+            os.path.join(os.path.dirname(__file__), "../../models/package.xml")
+        ]
 
         builder = DiagramBuilder()
 
@@ -76,9 +86,10 @@ class HardwareStationDiagram(Diagram):
         self.internal_station = builder.AddNamedSystem(
             "internal_station",
             MakeHardwareStation(
-                scenario,
+                scenario=scenario,
                 meshcat=self.internal_meshcat,
                 hardware=False,
+                package_xmls=package_xmls,
             ),
         )
 
@@ -86,7 +97,12 @@ class HardwareStationDiagram(Diagram):
         self.external_meshcat = StartMeshcat()
         self._external_station = builder.AddNamedSystem(
             "external_station",
-            MakeHardwareStation(scenario, self.external_meshcat, hardware=use_hardware),
+            MakeHardwareStation(
+                scenario=scenario,
+                meshcat=self.external_meshcat,
+                hardware=use_hardware,
+                package_xmls=package_xmls,
+            ),
         )
 
         # Connect the output of external station to the input of internal station
@@ -94,15 +110,16 @@ class HardwareStationDiagram(Diagram):
             self._external_station.GetOutputPort("iiwa.position_commanded"),
             self.internal_station.GetInputPort("iiwa.position"),
         )
-        wsg_state_demux = builder.AddSystem(Demultiplexer(2, 1))
-        builder.Connect(
-            self._external_station.GetOutputPort("wsg.state_measured"),
-            wsg_state_demux.get_input_port(),
-        )
-        builder.Connect(
-            wsg_state_demux.get_output_port(0),
-            self.internal_station.GetInputPort("wsg.position"),
-        )
+        if has_wsg:
+            wsg_state_demux = builder.AddSystem(Demultiplexer(2, 1))
+            builder.Connect(
+                self._external_station.GetOutputPort("wsg.state_measured"),
+                wsg_state_demux.get_input_port(),
+            )
+            builder.Connect(
+                wsg_state_demux.get_output_port(0),
+                self.internal_station.GetInputPort("wsg.position"),
+            )
 
         # Export internal station ports
         builder.ExportOutput(
@@ -112,12 +129,13 @@ class HardwareStationDiagram(Diagram):
         builder.ExportInput(
             self._external_station.GetInputPort("iiwa.position"), "iiwa.position"
         )
-        builder.ExportInput(
-            self._external_station.GetInputPort("wsg.position"), "wsg.position"
-        )
+        if has_wsg:
+            builder.ExportInput(
+                self._external_station.GetInputPort("wsg.position"), "wsg.position"
+            )
         builder.ExportOutput(
-            self._external_station.GetOutputPort("iiwa.position_measured"),
-            "iiwa.position_measured",
+            self._external_station.GetOutputPort("iiwa.position_commanded"),
+            "iiwa.position_commanded",
         )
         builder.ExportOutput(
             self._external_station.GetOutputPort("iiwa.velocity_estimated"),

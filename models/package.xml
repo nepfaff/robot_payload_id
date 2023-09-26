@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<package>
+  <name>robot_payload_id</name>
+  <version>1.0.0</version>
+  <description>
+    This package contains models for Drake simulation in the robot_payload_id repo.
+  </description>
+  <author email="nepfaff@mit.edu">Nicholas Ezra Pfaff</author>
+  <maintainer email="nepfaff@mit.edu">Nicholas Ezra Pfaff</maintainer>
+  <license>BSD</license>
+</package>

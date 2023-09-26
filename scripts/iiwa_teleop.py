@@ -10,22 +10,45 @@ from robot_payload_id.environment import HardwareStationDiagram, IiwaForwardKine
 
 def main():
     use_hardware = False
+    has_wsg = False
 
-    scenario_data = """
+    scenario_data = (
+        """
     directives:
     - add_directives:
         file: package://manipulation/iiwa_and_wsg.dmd.yaml
+    plant_config:
+        time_step: 0.005
+        contact_model: "hydroelastic"
+        discrete_contact_solver: "sap"
     model_drivers:
         iiwa: !IiwaDriver
             hand_model_name: wsg
         wsg: !SchunkWsgDriver {}
     """
+        if has_wsg
+        else """
+    directives:
+    - add_directives:
+        file: package://robot_payload_id/iiwa.dmd.yaml
+    plant_config:
+        # For some reason, this requires a small timestep
+        time_step: 0.0001
+        contact_model: "hydroelastic"
+        discrete_contact_solver: "sap"
+    model_drivers:
+        iiwa: !IiwaDriver {}
+    """
+    )
 
     builder = DiagramBuilder()
 
     scenario = load_scenario(data=scenario_data)
     station: HardwareStationDiagram = builder.AddNamedSystem(
-        "station", HardwareStationDiagram(scenario=scenario, use_hardware=use_hardware)
+        "station",
+        HardwareStationDiagram(
+            scenario=scenario, has_wsg=has_wsg, use_hardware=use_hardware
+        ),
     )
     controller_plant = station.internal_station.GetSubsystemByName(
         "iiwa.controller"
@@ -45,7 +68,6 @@ def main():
     )
 
     # Set up teleop widgets
-    station.internal_meshcat.DeleteAddedControls()
     teleop = builder.AddSystem(
         MeshcatPoseSliders(
             station.internal_meshcat,
@@ -56,24 +78,27 @@ def main():
     builder.Connect(
         teleop.get_output_port(), differential_ik.GetInputPort("X_WE_desired")
     )
-    wsg_pose = builder.AddSystem(
+    iiwa_forward_kinematics = builder.AddSystem(
         IiwaForwardKinematics(station.internal_station.GetSubsystemByName("plant"))
     )
     builder.Connect(
-        station.GetOutputPort("iiwa.position_measured"), wsg_pose.get_input_port()
+        station.GetOutputPort("iiwa.position_commanded"),
+        iiwa_forward_kinematics.get_input_port(),
     )
-    builder.Connect(wsg_pose.get_output_port(), teleop.get_input_port())
-    wsg_teleop = builder.AddSystem(WsgButton(station.internal_meshcat))
-    builder.Connect(wsg_teleop.get_output_port(0), station.GetInputPort("wsg.position"))
+    builder.Connect(iiwa_forward_kinematics.get_output_port(), teleop.get_input_port())
+    if has_wsg:
+        wsg_teleop = builder.AddSystem(WsgButton(station.internal_meshcat))
+        builder.Connect(
+            wsg_teleop.get_output_port(0), station.GetInputPort("wsg.position")
+        )
 
     diagram = builder.Build()
     simulator = Simulator(diagram)
-    simulator.get_mutable_context()
     simulator.set_target_realtime_rate(1.0)
 
     station.internal_meshcat.AddButton("Stop Simulation")
     while station.internal_meshcat.GetButtonClicks("Stop Simulation") < 1:
-        simulator.AdvanceTo(simulator.get_context().get_time() + 2.0)
+        simulator.AdvanceTo(simulator.get_context().get_time() + 0.1)
     station.internal_meshcat.DeleteButton("Stop Simulation")
 
 
