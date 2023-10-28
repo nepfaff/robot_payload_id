@@ -13,7 +13,7 @@ from pydrake.all import (
     TrajectorySource,
 )
 
-from robot_payload_id.utils import ArmComponents
+from robot_payload_id.utils import ArmComponents, get_parser
 
 
 def create_arm(
@@ -32,7 +32,7 @@ def create_arm(
 
     builder = DiagramBuilder()
     plant, scene_graph = AddMultibodyPlantSceneGraph(builder, time_step)
-    parser = Parser(plant)
+    parser = get_parser(plant)
 
     # Add arm
     arm = parser.AddModels(arm_file_path)[0]
