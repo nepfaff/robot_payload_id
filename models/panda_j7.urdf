@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+This was extracted from
+package://drake/manipulation/models/franka_description/urdf/panda_arm.urdf and
+stripped down to only have the last joint.
+The frame `panda_joint7_inboard` was also added.
+-->
+<robot name="panda_j7">
+  <link name="panda_link6">
+    <inertial>
+      <mass value="1.55"/>
+      <origin xyz="0.0510509 0.009108 0.0106343" rpy="0 0 0"/>
+      <inertia ixx="0.00303336450376" ixy="-0.000437276865508" ixz="0.000629257294877" iyy="0.00404479911567" iyz="0.000130472021025" izz="0.00558234286039"/>
+    </inertial>
+    <visual>
+      <origin rpy="1.57079632679 0 0"/>
+      <geometry>
+        <mesh filename="package://drake_models/franka_description/meshes/visual/link6.obj"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0.08 0.03 0.0"/>
+      <geometry>
+        <sphere radius="0.06"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0.04 0.01 0.0"/>
+      <geometry>
+        <sphere radius="0.06"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0.04 0.0 0.0"/>
+      <geometry>
+        <sphere radius="0.06"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 0.01"/>
+      <geometry>
+        <sphere radius="0.06"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0.0 0.0 -0.03"/>
+      <geometry>
+        <sphere radius="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+  <link name="panda_link7">
+    <inertial>
+      <mass value="0.54"/>
+      <origin xyz="0.0109695 0.0107965 0.0650411" rpy="0 0 0"/>
+      <inertia ixx="0.000888868887021" ixy="-0.00012239074652" ixz="3.98699829666e-05" iyy="0.000888001373233" iyz="-9.33825115206e-05" izz="0.0007176834609"/>
+    </inertial>
+    <visual>
+      <origin rpy="1.57079632679 0 0"/>
+      <geometry>
+        <mesh filename="package://drake_models/franka_description/meshes/visual/link7.obj"/>
+      </geometry>
+    </visual>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0.06"/>
+      <geometry>
+        <sphere radius="0.06"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0.01"/>
+      <geometry>
+        <sphere radius="0.05"/>
+      </geometry>
+    </collision>
+  </link>
+  <!-- Blech -->
+  <frame
+      name="panda_joint7_inboard" link="panda_link6"
+      rpy="1.57079632679 0 0" xyz="0.088 0 0"/>
+  <joint name="panda_joint7" type="revolute">
+    <origin rpy="1.57079632679 0 0" xyz="0.088 0 0"/>
+    <parent link="panda_link6"/>
+    <child link="panda_link7"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="12" lower="-2.8973" upper="2.8973" velocity="2.610" drake:acceleration="20.0"/>
+  </joint>
+  <link name="panda_link8">
+    <collision>
+      <origin rpy="0 0 0" xyz="0.042 0.042 -0.02"/>
+      <geometry>
+        <sphere radius="0.04"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="panda_joint8" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.107"/>
+    <parent link="panda_link7"/>
+    <child link="panda_link8"/>
+  </joint>
+  <transmission name="panda_tran7">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="panda_joint7">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="panda_motor7">
+      <hardwareInterface>PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <drake:collision_filter_group name="group_link68">
+    <drake:member link="panda_link6"/>
+    <drake:member link="panda_link8"/>
+    <drake:ignored_collision_filter_group name="group_link68"/>
+  </drake:collision_filter_group>
+</robot>
