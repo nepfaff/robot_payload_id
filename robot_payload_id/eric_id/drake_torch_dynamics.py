@@ -10,6 +10,7 @@ For references numbers, please see `drake_torch_sys_id.py`.
 Some notation may use Drake's multibody notations:
 https://drake.mit.edu/doxygen_cxx/group__multibody__quantities.html
 """
+import logging
 
 import numpy as np
 import torch
@@ -55,6 +56,10 @@ def get_candidate_sys_id_bodies(plant):
         else:
             # Take body with greatest mass and optimize it.
             # TODO(eric.cousineau): Should instead distribute more evenly?
+            logging.warning(
+                "Multiple bodies in subgraph. Taking heaviest. The GT inertial "
+                + "parameters and model computed GT torques will be wrong!"
+            )
             i = np.argmax(masses)
             body = subgraph[i]
         bodies.append(body)

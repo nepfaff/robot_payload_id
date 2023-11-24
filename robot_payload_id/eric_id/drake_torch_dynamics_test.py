@@ -1,9 +1,12 @@
 import hashlib
 import unittest
 
+from typing import List
+
 import numpy as np
 import torch
 
+from pydrake.all import Body
 from pydrake.multibody.parsing import (
     LoadModelDirectives,
     Parser,
@@ -56,6 +59,24 @@ def add_model_acrobot(plant):
         "package://drake/multibody/benchmarks/acrobot/acrobot.sdf"
     )
     Parser(plant).AddModels(model_file)
+    bodies = get_candidate_sys_id_bodies(plant)
+    return bodies
+
+
+def add_model_one_link_arm(plant):
+    model_file = "models/one_link_arm.urdf"
+    Parser(plant).AddModels(model_file)
+    bodies = get_candidate_sys_id_bodies(plant)
+    return bodies
+
+
+def add_model_iiwa(plant: MultibodyPlant) -> List[Body]:
+    # model_file = "models/iiwa.dmd.yaml"
+    parser = Parser(plant)
+    parser.package_map().AddPackageXml("models/package.xml")
+    model_file = "models/iiwa7_with_planar_pusher.dmd.yaml"
+    directives = LoadModelDirectives(model_file)
+    ProcessModelDirectives(directives, parser)
     bodies = get_candidate_sys_id_bodies(plant)
     return bodies
 

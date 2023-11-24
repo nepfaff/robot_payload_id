@@ -1,0 +1,34 @@
+data:
+  loading:
+    data_dir: "data/iiwa_data_10_trajs_0.3_limits" # Path to the directory containing the data
+    state_logs_file_name: "system_id_state_logs.npy"
+    measured_torque_logs_file_name: "system_id_torque_logs.npy"
+    sample_times_file_name: "system_id_log_sample_times.npy"
+  splits:
+    train_ratio: 0.8
+    val_ratio: 0.1
+  preprocessing:
+    filter_accelerations: True
+    acceleration_filter_order: 10
+    acceleration_filter_cutoff_hz: 10
+    filter_measured_torques: True
+    measured_torque_filter_order: 10
+    measured_torque_filter_cutoff_hz: 10
+
+dynamics_model:
+  add_model_func: "${get_method:robot_payload_id.eric_id.drake_torch_dynamics_test.add_model_iiwa}"
+  timestep: 1e-3
+  inertial_param_cls: ${get_class:robot_payload_id.eric_id.drake_torch_dynamics.PseudoInertiaCholeskyInertialParameter}
+  initial_inertial_perturb_scale: 0.5
+
+training:
+  learning_rate: 1e-2
+  regularizer_weight: 1e-2
+  num_epochs: 10
+  batch_size: 1000
+  regularize_towards_GT: False # Whether to regularize towards the ground truth or initial guess
+  save_checkpoint_every_n_epochs: 5
+
+wandb:
+  name: "iiwa_id"
+  mode: "online" # "disabled", "online", "offline"

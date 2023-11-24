@@ -31,8 +31,21 @@ Activate the environment:
 poetry shell
 ```
 
+Install `git lfs`:
+
+```bash
+git lfs install
+git lfs pull
+```
+
 ## Symbolic System ID
 
 ```bash
 python scripts/symbolic_id.py --config-name one_link_arm_symbolic_id
+```
+
+## Reparameterized System ID
+
+```bash
+python scripts/identify_model.py --config-name iiwa_id
 ```

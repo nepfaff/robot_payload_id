@@ -17,6 +17,9 @@ ipython = "^8.15.0"
 pyyaml = "^6.0.1"
 torch = {version = "2.0.1", source = "torch_cuda118"}
 pybind11 = "^2.11.1"
+scipy = "^1.11.4"
+wandb = "^0.16.0"
+plotly = "^5.18.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.4.0"

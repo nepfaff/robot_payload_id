@@ -1,9 +1,12 @@
 import unittest
 
+from typing import Callable, List, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
+from pydrake.all import Body
 from pydrake.multibody.plant import MultibodyPlant
 from torch import nn
 from tqdm import tqdm
@@ -12,13 +15,13 @@ from .containers import dict_items_zip
 from .dair_pll_inertia import parallel_axis_theorem
 from .drake_torch_dynamics import (
     InertialEntropicDivergence,
+    InertialParameter,
     LogCholeskyComInertialParameter,
     LogCholeskyInertialParameter,
     LogCholeskyLinAlgInertialParameter,
     PseudoInertiaCholeskyInertialParameter,
     RawInertialParameter,
     VectorInertialParameter,
-    get_plant_inertial_params,
 )
 from .drake_torch_dynamics_test import (
     add_model_acrobot,
@@ -70,8 +73,12 @@ def param_in(p_check, params):
     return id(p_check) in ids
 
 
-def make_dyn_model(add_model, inertial_param_cls=DEFAULT_INERTIA_CLS):
-    plant = MultibodyPlant(time_step=0.0)
+def make_dyn_model(
+    add_model: Callable[[MultibodyPlant], List[Body]],
+    timestep: float,
+    inertial_param_cls: InertialParameter = DEFAULT_INERTIA_CLS,
+) -> Tuple[DynamicsModel, Callable[[], float]]:
+    plant = MultibodyPlant(time_step=timestep)
     bodies = add_model(plant)
     plant.Finalize()
     dyn_model = DynamicsModel.from_plant(
