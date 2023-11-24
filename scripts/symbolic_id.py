@@ -1,5 +1,3 @@
-import pathlib
-
 from pathlib import Path
 
 import hydra
@@ -12,7 +10,7 @@ from robot_payload_id.symbolic import calc_lumped_parameters, create_symbolic_pl
 
 
 @hydra.main(
-    config_path=str(pathlib.Path(__file__).parent.joinpath("..", "config")),
+    config_path=str(Path(__file__).parent.joinpath("..", "config")),
     version_base=None,
 )
 def main(cfg: OmegaConf):
