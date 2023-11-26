@@ -78,14 +78,14 @@ def main(cfg: OmegaConf):
         mode=cfg.wandb.mode,
     )
 
+    torch.manual_seed(0)
+
     dyn_model, calc_mean_inertial_params_dist = make_dyn_model(
         add_model=cfg.dynamics_model.add_model_func,
         timestep=cfg.dynamics_model.timestep,
         inertial_param_cls=cfg.dynamics_model.inertial_param_cls,
     )
     print(f"GT params:\n{dyn_model.inertial_params()}")
-
-    torch.manual_seed(0)
 
     if cfg.training.regularize_towards_GT:
         # Regularize towards the ground-truth parameters
@@ -155,8 +155,11 @@ def main(cfg: OmegaConf):
         dataset,
         train_ratio=cfg.data.splits.train_ratio,
         val_ratio=cfg.data.splits.val_ratio,
+        shuffle=cfg.data.splits.shuffle_before_split,
     )
-    train_dataloader = DataLoader(train_dataset, batch_size=cfg.training.batch_size)
+    train_dataloader = DataLoader(
+        train_dataset, batch_size=cfg.training.batch_size, shuffle=True
+    )
     val_dataloader = DataLoader(val_dataset, batch_size=len(val_dataset))
     test_dataloader = DataLoader(test_dataset, batch_size=len(train_dataset))
 
