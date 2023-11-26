@@ -49,3 +49,18 @@ python scripts/symbolic_id.py --config-name one_link_arm_symbolic_id
 ```bash
 python scripts/identify_model.py --config-name iiwa_id
 ```
+
+### Sweeping Parameters
+
+A sweep can be started with
+```bash
+sweep config/sweep/iiwa_id_sweep.yaml
+```
+Individual agents for the sweep can be started using the printed `wandb agent` command.
+
+A parallel sweep can be started with
+```bash
+bash scripts/parallel_sweep.sh config/sweep/iiwa_id_sweep.yaml ${NUM_PARALLEL}
+```
+where `NUM_PARALLEL` is a variable containing the number of parallel runs. By default,
+the maximum number of cores is used.

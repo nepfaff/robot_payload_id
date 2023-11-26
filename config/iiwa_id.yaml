@@ -25,10 +25,10 @@ dynamics_model:
 training:
   learning_rate: 1e-2
   regularizer_weight: 1e-2
-  num_epochs: 10
+  num_epochs: 50
   batch_size: 1000
   regularize_towards_GT: False # Whether to regularize towards the ground truth or initial guess
-  save_checkpoint_every_n_epochs: 5
+  save_checkpoint_every_n_epochs: 10
 
 wandb:
   name: "iiwa_id"
