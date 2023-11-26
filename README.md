@@ -64,3 +64,11 @@ bash scripts/parallel_sweep.sh config/sweep/iiwa_id_sweep.yaml ${NUM_PARALLEL}
 ```
 where `NUM_PARALLEL` is a variable containing the number of parallel runs. By default,
 the maximum number of cores is used.
+
+#### MIT Supercloud
+
+A parallel sweep can be run non-interactively on MIT supercloud with
+```bash
+LLsub scripts/parallel_sweep_supercloud.sh -s 48
+```
+The status can be checked with `LLstat`.
