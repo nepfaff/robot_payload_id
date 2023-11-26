@@ -6,16 +6,18 @@ import pickle
 import time
 
 from pathlib import Path
+from typing import Dict, List
 
 import hydra
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import wandb
 
 from omegaconf import OmegaConf, open_dict
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+
+import wandb
 
 from robot_payload_id.eric_id.drake_torch_dynamics_test import torch_uniform
 from robot_payload_id.eric_id.drake_torch_sys_id import (
@@ -37,6 +39,7 @@ from robot_payload_id.utils import (
 def save_checkpoint(
     dynamics_model: DynamicsModel, checkpoint_dir: Path, epoch: int
 ) -> None:
+    """Saves a checkpoint of the dynamics model and inertial parameters."""
     checkpoint_dir.mkdir(exist_ok=True)
 
     torch.save(
@@ -53,6 +56,31 @@ def save_checkpoint(
     pickle.dump(
         inertial_param_dict, open(checkpoint_dir / f"inertial_params_{epoch}.pkl", "wb")
     )
+
+
+def log_loss_plot(
+    losses: np.ndarray,
+    loss_dicts: List[Dict[str, float]],
+    val_tau_losses: np.ndarray,
+    test_tau_losses: np.ndarray,
+    dists: np.ndarray,
+) -> None:
+    """Plots losses and entropic divergence and logs to wandb."""
+    _, axs = plt.subplots(nrows=2)
+    plt.sca(axs[0])
+    loss_keys = list(loss_dicts[0].keys())
+    plt.plot(losses, linewidth=3)
+    for key in loss_keys:
+        plt.plot([loss_dict[key] for loss_dict in loss_dicts])
+    plt.plot(val_tau_losses)
+    plt.plot(test_tau_losses)
+    plt.legend(["sum"] + loss_keys + ["tau_val", "tau_test"])
+    plt.ylabel("Loss")
+    plt.sca(axs[1])
+    plt.plot(dists)
+    plt.ylabel("Entropic Divergence")
+    plt.xlabel("Epoch")
+    wandb.log({"combined_loss_plot": wandb.Image(plt)})
 
 
 @torch.no_grad()
@@ -256,10 +284,17 @@ def main(cfg: OmegaConf):
                     checkpoint_dir=log_dir / "checkpoints",
                     epoch=epoch,
                 )
+                log_loss_plot(
+                    losses=losses,
+                    loss_dicts=loss_dicts,
+                    val_tau_losses=val_tau_losses,
+                    test_tau_losses=test_tau_losses,
+                    dists=dists,
+                )
 
     print(f"Final params:\n{dyn_model.inertial_params()}")
 
-    final_loss, final_loss_dict = dyn_model_loss(q, v, vd, tau_measured)
+    final_loss, _ = dyn_model_loss(q, v, vd, tau_measured)
     print(f"Initial loss: {losses[0]}, Final loss: {final_loss}")
     wandb.log(
         {
@@ -268,23 +303,6 @@ def main(cfg: OmegaConf):
             "optimization_time_s": time.time() - start_time,
         }
     )
-
-    # Plot losses to visualize convergence
-    _, axs = plt.subplots(nrows=2)
-    plt.sca(axs[0])
-    loss_keys = list(final_loss_dict.keys())
-    plt.plot(losses, linewidth=3)
-    for key in loss_keys:
-        plt.plot([loss_dict[key] for loss_dict in loss_dicts])
-    plt.plot(val_tau_losses)
-    plt.plot(test_tau_losses)
-    plt.legend(["sum"] + loss_keys + ["tau_val", "tau_test"])
-    plt.ylabel("Loss")
-    plt.sca(axs[1])
-    plt.plot(dists)
-    plt.ylabel("Entropic Divergence")
-    plt.xlabel("Epoch")
-    wandb.log({"combined_loss_plot": wandb.Image(plt)})
 
 
 if __name__ == "__main__":
