@@ -2,7 +2,7 @@
 
 source /etc/profile
 
-module load anaconda/2022b
+module load anaconda/2023a-pytorch
 
 . .venv/bin/activate
 
