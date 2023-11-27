@@ -251,6 +251,7 @@ def main(cfg: OmegaConf):
                 f"{key}_loss_epoch": mean_loss_dict[key]
                 for key in mean_loss_dict.keys()
             }
+            wandb_logs_epoch["epoch"] = epoch
             wandb_logs_epoch["combined_loss_epoch"] = losses[-1]
 
             loss_dicts.append(mean_loss_dict)
