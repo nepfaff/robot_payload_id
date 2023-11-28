@@ -43,6 +43,11 @@ class UnconstrainedScalar(nn.Module):
 
 class PositiveScalar(nn.Module):
     def __init__(self, x, b=0):
+        """
+        Args:
+            x: The initial value of the scalar. Must be greater than `b`.
+            b: The minimum value of the scalar.
+        """
         super().__init__()
         self.b = b
         x = torch.as_tensor(x)
@@ -83,6 +88,8 @@ class RangeConstrainedScalar(nn.Module):
 
 
 class JointDryFriction(nn.Module):
+    """See `calc_joint_dry_friction` for math details."""
+
     @staticmethod
     def make_initial_guess(N=()):
         # N.B. Need non-zero value for u-max.
@@ -142,7 +149,9 @@ class JointFriction(nn.Module):
 
     def __init__(self, *, dry, b):
         super().__init__()
+        # Dry friction model
         self.dry = dry
+        # Viscous friction coefficient
         self.b = PositiveScalar(b)
 
     def forward(self, v):
