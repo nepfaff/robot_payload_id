@@ -41,13 +41,15 @@ class SymJointStateVariables:
     """
 
     q: np.ndarray
-    """Variables for the joint positions."""
+    """
+    Variables for the joint positions of shape (N,) where N is the number of joints.
+    """
     q_dot: np.ndarray
-    """Variables for the joint velocities."""
+    """Variables for the joint velocities of shape (N,)."""
     q_ddot: np.ndarray
-    """Variables for the joint accelerations."""
+    """Variables for the joint accelerations of shape (N,)."""
     tau: np.ndarray
-    """Variables for the joint torques."""
+    """Variables for the joint torques of shape (N,)."""
 
 
 @dataclass
@@ -90,6 +92,18 @@ class JointParameters:
         if self.Gzz is not None:
             param_list.append(self.Gzz)
         return param_list
+
+    def get_inertia_matrix(self) -> np.ndarray:
+        """
+        Returns the inertia matrix of the joint.
+        """
+        return self.m * np.array(
+            [
+                [self.Gxx, self.Gxy, self.Gxz],
+                [self.Gxy, self.Gyy, self.Gyz],
+                [self.Gxz, self.Gyz, self.Gzz],
+            ]
+        )
 
 
 @dataclass
