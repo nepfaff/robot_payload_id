@@ -20,7 +20,7 @@ def calculate_lumped_parameters(
     """Returns a symbolic factorization of the joint torques tau into an equivalent
     "data matrix", W, which depends only on the non-parameter variables, and a "lumped
     parameter vector", α, which depends only on parameters:
-    tau = W(n)*α(parameters) + w0(n).
+    W(n)*α(parameters) + w0(n) = 0.
 
     Args:
         sym_arm_plant_components (SymbolicArmPlantComponents): The symbolic plant and
@@ -115,6 +115,7 @@ def calc_lumped_parameters(
         Tuple[np.ndarray, np.ndarray, Union[np.ndarray, None]]: A tuple of (alpha_sym,
         alpha_estimated, alpha_gt) where alpha refers to the lumped parameters.
     """
+    # w0 is just the symbolic form of tau such that W_sym + w0_sym = 0
     W_sym, alpha_sym, w0_sym = calculate_lumped_parameters(sym_arm_plant_components)
     print(f"Lumped parameters: {alpha_sym}")
 
