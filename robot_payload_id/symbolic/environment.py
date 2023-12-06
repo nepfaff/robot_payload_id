@@ -1,8 +1,9 @@
-from typing import List
+from functools import partial
+from typing import List, Optional
 
 import pydrake.symbolic as sym
 
-from pydrake.all import SpatialInertia_, UnitInertia_
+from pydrake.all import MathematicalProgram, RigidBody, SpatialInertia_, UnitInertia_
 
 from robot_payload_id.utils import (
     ArmComponents,
@@ -14,11 +15,14 @@ from robot_payload_id.utils import (
 
 def create_symbolic_plant(
     arm_components: ArmComponents,
+    prog: Optional[MathematicalProgram] = None,
 ) -> SymbolicArmPlantComponents:
     """Creates a symbolic plant for a robotic arm system.
 
     Args:
         arm_components (ArmComponents): The components of the robotic arm system.
+        prog (MathematicalProgram): An optional MathematicalProgram to use for variable
+            creation.
 
     Returns:
         SymbolicArmPlantComponents: The symbolic plant and associated symbolic
@@ -28,10 +32,13 @@ def create_symbolic_plant(
     sym_plant_context = sym_plant.CreateDefaultContext()
 
     # Create the state variables
-    q = sym.MakeVectorVariable(arm_components.num_joints, "q")
-    q_dot = sym.MakeVectorVariable(arm_components.num_joints, "\dot{q}")
-    q_ddot = sym.MakeVectorVariable(arm_components.num_joints, "\ddot{q}")
-    tau = sym.MakeVectorVariable(arm_components.num_joints, "\tau")
+    make_vec_variable_func = (
+        prog.NewContinuousVariables if prog is not None else sym.MakeVectorVariable
+    )
+    q = make_vec_variable_func(arm_components.num_joints, "q")
+    q_dot = make_vec_variable_func(arm_components.num_joints, "\dot{q}")
+    q_ddot = make_vec_variable_func(arm_components.num_joints, "\ddot{q}")
+    tau = make_vec_variable_func(arm_components.num_joints, "\tau")
     sym_state_variables = SymJointStateVariables(
         q=q, q_dot=q_dot, q_ddot=q_ddot, tau=tau
     )
@@ -41,31 +48,53 @@ def create_symbolic_plant(
     sym_plant.SetVelocities(sym_plant_context, q_dot)
 
     # Create the parameters
+    make_variable_func = (
+        partial(prog.NewContinuousVariables, 1)
+        if prog is not None
+        else partial(sym.MakeVectorVariable, 1)
+    )
     sym_parameters: List[JointParameters] = []
     for i in range(arm_components.num_joints):
-        m = sym.Variable(f"m_{i + 1}")
-        cx = sym.Variable(f"c_{{x_{i + 1}}}")
-        cz = sym.Variable(f"c_{{z_{i + 1}}}")
-        Gyy = sym.Variable(f"G_{{yy_{i + 1}}}")
-        sym_parameters.append(JointParameters(m=m, cx=cx, cz=cz, Gyy=Gyy))
+        m = make_variable_func(f"m_{i}")[0]
+        cx = make_variable_func(f"c_{{x_{i}}}")[0]
+        cy = make_variable_func(f"c_{{y_{i}}}")[0]
+        cz = make_variable_func(f"c_{{z_{i}}}")[0]
+        Gxx = make_variable_func(f"G_{{xx_{i}}}")[0]
+        Gxy = make_variable_func(f"G_{{xy_{i}}}")[0]
+        Gxz = make_variable_func(f"G_{{xz_{i}}}")[0]
+        Gyy = make_variable_func(f"G_{{yy_{i}}}")[0]
+        Gyz = make_variable_func(f"G_{{yz_{i}}}")[0]
+        Gzz = make_variable_func(f"G_{{zz_{i}}}")[0]
 
-        link = sym_plant.GetBodyByName(f"link{i + 1}")
+        sym_parameters.append(
+            JointParameters(
+                m=m,
+                cx=cx,
+                cy=cy,
+                cz=cz,
+                Gxx=Gxx,
+                Gxy=Gxy,
+                Gxz=Gxz,
+                Gyy=Gyy,
+                Gyz=Gyz,
+                Gzz=Gzz,
+            )
+        )
+
+        link: RigidBody = sym_plant.GetBodyByName(f"iiwa_link_{i}")
+        # link: RigidBody = sym_plant.GetBodyByName(f"link{i + 1}")
 
         link.SetMass(sym_plant_context, m)
 
         # Set CoM and moment of inertia
-        current_spatial_inertia = link.CalcSpatialInertiaInBodyFrame(sym_plant_context)
-        com = current_spatial_inertia.get_com()
-        com[0] = cx
-        com[2] = cz
-        unit_inertia = current_spatial_inertia.get_unit_inertia().get_moments()
-        unit_inertia[1] = Gyy
+        com = [cx, cy, cz]
+        unit_inertia = UnitInertia_[sym.Expression](
+            Ixx=Gxx, Ixy=Gxy, Ixz=Gxz, Iyy=Gyy, Iyz=Gyz, Izz=Gzz
+        )
         inertia = SpatialInertia_[sym.Expression](
             m,
             com,
-            UnitInertia_[sym.Expression](
-                unit_inertia[0], unit_inertia[1], unit_inertia[2]
-            ),
+            unit_inertia,
             skip_validity_check=False,
         )
         link.SetSpatialInertiaInBodyFrame(sym_plant_context, inertia)
