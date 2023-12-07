@@ -1,5 +1,6 @@
 """
-Computation for (Coulomb) dry friction.
+Computation for (Coulomb) dry friction. This only modeles dynamic dry friction and does
+not model stiction (static friction).
 
 No fancy things are done (yet), like Stribeck.
 Viscous friction is explicitly left out (because it's simply u = -c * v).
@@ -9,9 +10,9 @@ properties:
 
 - r(0) = 0
 - r'(0) > 0
-- r(inf) = 1, r(-inf) = 1
+- r(inf) = 1, r(-inf) = -1
 - r'(inf) = 0, r'(-inf) = 0
-- r(1) = m  (a user-supplied constant)
+- r(1) = m  (a user-supplied constant that controls smoothness)
 
 An ideal regularizer should capture dry friction that is could be directly
 modeled as `r(s) = sign(s)`, but with sufficient smoothness to make
