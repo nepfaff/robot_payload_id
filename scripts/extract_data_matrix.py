@@ -71,10 +71,19 @@ def symbolic_decomposition_with_dynamic_substitution(
     return W_data, alpha_sym, tau_data
 
 
-def extract_data_matrix_symbolic(prog: Optional[MathematicalProgram] = None):
-    urdf_path = "./models/iiwa.dmd.yaml"  # "./models/one_link_arm.urdf"
-    num_joints = 7
-    time_step = 1e-3
+def extract_data_matrix_symbolic(
+    prog: Optional[MathematicalProgram] = None,
+    use_implicit_dynamics: bool = False,
+    use_w0: bool = False,
+    use_one_link_arm: bool = False,
+):
+    assert not use_w0 or use_implicit_dynamics, "Can only use w0 with implicit dynamics"
+
+    urdf_path = (
+        "./models/one_link_arm.urdf" if use_one_link_arm else "./models/iiwa.dmd.yaml"
+    )
+    num_joints = 1 if use_one_link_arm else 7
+    time_step = 0 if use_implicit_dynamics else 1e-3
 
     arm_components = create_arm(
         arm_file_path=urdf_path, num_joints=num_joints, time_step=time_step
@@ -83,21 +92,40 @@ def extract_data_matrix_symbolic(prog: Optional[MathematicalProgram] = None):
         arm_components=arm_components, prog=prog
     )
 
-    forces = MultibodyForces_[Expression](sym_plant_components.plant)
-    sym_plant_components.plant.CalcForceElementsContribution(
-        sym_plant_components.plant_context, forces
-    )
-    sym_torques = sym_plant_components.plant.CalcInverseDynamics(
-        sym_plant_components.plant_context,
-        sym_plant_components.state_variables.q_ddot.T,
-        forces,
-    )
     sym_parameters_arr = np.concatenate(
         [params.get_param_list() for params in sym_plant_components.parameters]
     )
-    W_sym, alpha_sym, w0_sym = DecomposeLumpedParameters(
-        sym_torques, sym_parameters_arr
-    )
+    if use_implicit_dynamics:
+        derivatives = (
+            sym_plant_components.plant_context.Clone().get_mutable_continuous_state()
+        )
+        derivatives.SetFromVector(
+            np.hstack(
+                (
+                    0 * sym_plant_components.state_variables.q_dot,
+                    sym_plant_components.state_variables.q_ddot,
+                )
+            )
+        )
+        residual = sym_plant_components.plant.CalcImplicitTimeDerivativesResidual(
+            sym_plant_components.plant_context, derivatives
+        )
+        W_sym, alpha_sym, w0_sym = DecomposeLumpedParameters(
+            residual[int(len(residual) / 2) :], sym_parameters_arr
+        )
+    else:
+        forces = MultibodyForces_[Expression](sym_plant_components.plant)
+        sym_plant_components.plant.CalcForceElementsContribution(
+            sym_plant_components.plant_context, forces
+        )
+        sym_torques = sym_plant_components.plant.CalcInverseDynamics(
+            sym_plant_components.plant_context,
+            sym_plant_components.state_variables.q_ddot.T,
+            forces,
+        )
+        W_sym, alpha_sym, w0_sym = DecomposeLumpedParameters(
+            sym_torques, sym_parameters_arr
+        )
 
     print("W:\n", W_sym)
     print("alpha:\n", alpha_sym)
@@ -106,8 +134,9 @@ def extract_data_matrix_symbolic(prog: Optional[MathematicalProgram] = None):
     # Substitute data values and compute least squares fit
     joint_data = get_data(num_q=num_joints, plant=arm_components.plant)
     num_timesteps = len(joint_data.sample_times_s)
-    num_lumped_params = num_joints * 10
+    num_lumped_params = num_joints * (3 if use_one_link_arm else 10)
     W_data = np.zeros((num_timesteps * num_joints, num_lumped_params))
+    w0_data = np.zeros(num_timesteps * num_joints)
     tau_data = joint_data.joint_torques.flatten()
 
     state_variables = sym_plant_components.state_variables
@@ -117,10 +146,20 @@ def extract_data_matrix_symbolic(prog: Optional[MathematicalProgram] = None):
             sym_to_val[state_variables.q[j]] = joint_data.joint_positions[i, j]
             sym_to_val[state_variables.q_dot[j]] = joint_data.joint_velocities[i, j]
             sym_to_val[state_variables.q_ddot[j]] = joint_data.joint_accelerations[i, j]
+            if use_implicit_dynamics:
+                sym_to_val[state_variables.tau[j]] = joint_data.joint_torques[i, j]
         W_data[i * num_joints : (i + 1) * num_joints, :] = Evaluate(W_sym, sym_to_val)
+        if use_w0:
+            w0_data[i * num_joints : (i + 1) * num_joints] = Evaluate(
+                w0_sym, sym_to_val
+            )
 
     print(f"Condition number: {np.linalg.cond(W_data)}")
-    alpha_fit = np.linalg.lstsq(W_data, tau_data)[0]
+
+    if use_w0:
+        alpha_fit = np.linalg.lstsq(W_data, -w0_data)[0]
+    else:
+        alpha_fit = np.linalg.lstsq(W_data, tau_data)[0]
     print(f"alpha_fit: {alpha_fit}")
 
     return W_data, alpha_sym, tau_data, sym_plant_components
