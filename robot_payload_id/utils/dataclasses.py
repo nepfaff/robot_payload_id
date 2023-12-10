@@ -71,7 +71,25 @@ class JointParameters:
     Gyz: Union[sym.Variable, float, None] = None
     Gzz: Union[sym.Variable, float, None] = None
 
-    def get_param_list(self) -> List[sym.Variable]:
+    # Lumped parameters that the dynamics are linear in (h=mc, I=mG)
+    hx: Union[sym.Variable, float, None] = None
+    hy: Union[sym.Variable, float, None] = None
+    hz: Union[sym.Variable, float, None] = None
+    Ixx: Union[sym.Variable, float, None] = None
+    Ixy: Union[sym.Variable, float, None] = None
+    Ixz: Union[sym.Variable, float, None] = None
+    Iyy: Union[sym.Variable, float, None] = None
+    Iyz: Union[sym.Variable, float, None] = None
+    Izz: Union[sym.Variable, float, None] = None
+
+    def get_base_param_list(self) -> List[sym.Variable]:
+        """
+        Returns a list of Drake's base inertial parameters for the joint.
+        The output is of form [m, cx, cy, cz, Gxx, Gxy, Gxz, Gyy, Gyz, Gzz], where m is
+        the mass, cx, cy, and cz are the center of mass, and Gxx, Gxy, Gxz, Gyy, Gyz,
+        and Gzz are the rotational unit inertia matrix elements. Note that elements
+        that are None are not included in the output.
+        """
         param_list = [self.m]
         if self.cx is not None:
             param_list.append(self.cx)
@@ -93,9 +111,39 @@ class JointParameters:
             param_list.append(self.Gzz)
         return param_list
 
+    def get_lumped_param_list(self) -> List[sym.Variable]:
+        """
+        Returns a list of the lumped parameters that the dynamics are linear in for the
+        joint.
+        The output is of form [m, hx, hy, hz, Ixx, Ixy, Ixz, Iyy, Iyz, Izz], where m is
+        the mass, hx, hy, and hz are the mass times the center of mass, and Ixx, Ixy,
+        Ixz, Iyy, Iyz, and Izz are the rotational inertia matrix elements. Note that
+        elements that are None are not included in the output.
+        """
+        param_list = [self.m]
+        if self.hx is not None:
+            param_list.append(self.hx)
+        if self.hy is not None:
+            param_list.append(self.hy)
+        if self.hz is not None:
+            param_list.append(self.hz)
+        if self.Ixx is not None:
+            param_list.append(self.Ixx)
+        if self.Ixy is not None:
+            param_list.append(self.Ixy)
+        if self.Ixz is not None:
+            param_list.append(self.Ixz)
+        if self.Iyy is not None:
+            param_list.append(self.Iyy)
+        if self.Iyz is not None:
+            param_list.append(self.Iyz)
+        if self.Izz is not None:
+            param_list.append(self.Izz)
+        return param_list
+
     def get_inertia_matrix(self) -> np.ndarray:
         """
-        Returns the inertia matrix of the joint.
+        Returns the rotational inertia matrix of the joint.
         """
         return self.m * np.array(
             [
