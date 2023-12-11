@@ -7,15 +7,15 @@ from pydrake.all import MultibodyForces_
 from tqdm import tqdm
 
 from robot_payload_id.utils import (
+    ArmPlantComponents,
     JointData,
     JointParameters,
-    SymbolicArmPlantComponents,
     SymJointStateVariables,
 )
 
 
 def calculate_lumped_parameters(
-    sym_arm_plant_components: SymbolicArmPlantComponents,
+    sym_arm_plant_components: ArmPlantComponents,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Returns a symbolic factorization of the joint torques tau into an equivalent
     "data matrix", W, which depends only on the non-parameter variables, and a "lumped
@@ -40,7 +40,7 @@ def calculate_lumped_parameters(
         forces,
     )
     sym_parameters_arr = np.concatenate(
-        [params.get_param_list() for params in sym_arm_plant_components.parameters]
+        [params.get_base_param_list() for params in sym_arm_plant_components.parameters]
     )
     W, alpha, w0 = sym.DecomposeLumpedParameters(sym_torques, sym_parameters_arr)
     return W, alpha, w0
@@ -98,7 +98,7 @@ def construct_data_matrix(
 
 
 def calc_lumped_parameters(
-    sym_arm_plant_components: SymbolicArmPlantComponents,
+    sym_arm_plant_components: ArmPlantComponents,
     joint_data: JointData,
     gt_parameters: Optional[List[JointParameters]] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -138,8 +138,8 @@ def calc_lumped_parameters(
         for sym_params, gt_params in zip(
             sym_arm_plant_components.parameters, gt_parameters
         ):
-            sym_params_lst = sym_params.get_param_list()
-            gt_params_lst = gt_params.get_param_list()
+            sym_params_lst = sym_params.get_base_param_list()
+            gt_params_lst = gt_params.get_base_param_list()
             assert len(sym_params_lst) == len(
                 gt_params_lst
             ), "The number of GT parameters must equal the number of symbolic parameters!"

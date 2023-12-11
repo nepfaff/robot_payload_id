@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Union
+from typing import List, Optional, Union
 
 import numpy as np
 import pydrake.symbolic as sym
@@ -145,12 +145,39 @@ class JointParameters:
         """
         Returns the rotational inertia matrix of the joint.
         """
-        return self.m * np.array(
-            [
-                [self.Gxx, self.Gxy, self.Gxz],
-                [self.Gxy, self.Gyy, self.Gyz],
-                [self.Gxz, self.Gyz, self.Gzz],
-            ]
+        if (
+            self.Ixx is not None
+            and self.Iyy is not None
+            and self.Izz is not None
+            and self.Ixy is not None
+            and self.Ixz is not None
+            and self.Iyz is not None
+        ):
+            return np.array(
+                [
+                    [self.Ixx, self.Ixy, self.Ixz],
+                    [self.Ixy, self.Iyy, self.Iyz],
+                    [self.Ixz, self.Iyz, self.Izz],
+                ]
+            )
+        elif (
+            self.Gxx is not None
+            and self.Gyy is not None
+            and self.Gzz is not None
+            and self.Gxy is not None
+            and self.Gxz is not None
+            and self.Gyz is not None
+        ):
+            return self.m * np.array(
+                [
+                    [self.Gxx, self.Gxy, self.Gxz],
+                    [self.Gxy, self.Gyy, self.Gyz],
+                    [self.Gxz, self.Gyz, self.Gzz],
+                ]
+            )
+        raise NotImplementedError(
+            "Currently only supporting all rotational inertia or all rotational "
+            + "unit inertia."
         )
 
 
@@ -171,17 +198,16 @@ class ArmComponents:
 
 
 @dataclass
-class SymbolicArmPlantComponents:
+class ArmPlantComponents:
     """
-    A dataclass that contains everything that goes with a symbolic plant of a robotics
-    arm.
+    A dataclass that contains everything that goes with a plant of a robotics arm.
     """
 
     plant: MultibodyPlant
-    """The symbolic plant."""
+    """The plant."""
     plant_context: Context
-    """The context of the symbolic plant."""
-    state_variables: SymJointStateVariables
-    """The symbolic plant state variables."""
+    """The context of the plant."""
     parameters: List[JointParameters]
-    """The symbolic plant parameters."""
+    """The plant parameters."""
+    state_variables: Optional[SymJointStateVariables] = None
+    """The symbolic plant state variables."""
