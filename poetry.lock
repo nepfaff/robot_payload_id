@@ -606,17 +606,18 @@ six = ">=1.4.0"
 
 [[package]]
 name = "drake"
-version = "1.21.0"
+version = "1.23.0"
 description = "Model-based design and verification for robotics"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "drake-1.21.0-cp310-cp310-manylinux_2_31_x86_64.whl", hash = "sha256:3ffed0de4dc23765783a28e9313e106e15d583e314998cec855fdd404555aee9"},
-    {file = "drake-1.21.0-cp311-cp311-macosx_12_0_arm64.whl", hash = "sha256:3ef514ef474c64f22e6494c3b1d35fe24a1f1ec7d846538616ff52d7f3d4811b"},
-    {file = "drake-1.21.0-cp311-cp311-macosx_12_0_x86_64.whl", hash = "sha256:77d8f82d5cbf299baf4dacda80dbc6231d55f3744f899f0c7bf6d9372897f80f"},
-    {file = "drake-1.21.0-cp311-cp311-manylinux_2_31_x86_64.whl", hash = "sha256:74809796b3e28cc793c7eb1a01e973fecd8a201343346d2db9227d3912e5df40"},
-    {file = "drake-1.21.0-cp38-cp38-manylinux_2_31_x86_64.whl", hash = "sha256:b6f774589c9c48bcf7e5696db73a6c13c897ca9dd2a87ccd61ae1fbd84def508"},
-    {file = "drake-1.21.0-cp39-cp39-manylinux_2_31_x86_64.whl", hash = "sha256:1c64546569c9ff9e205a95d9a4f458b7b2c2cda971fe39ae246bbb1122fa9f27"},
+    {file = "drake-1.23.0-cp310-cp310-manylinux_2_31_x86_64.whl", hash = "sha256:311212e0aa9b1163145159a00c289c89988d5440874ffe33a5e24b5c0a9973f2"},
+    {file = "drake-1.23.0-cp311-cp311-macosx_12_0_x86_64.whl", hash = "sha256:6fa75f5c9b3cf24f25261861ac3530894e8784344d56c352a31998f855908eb3"},
+    {file = "drake-1.23.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:12a547679d5a98704f86597ec9a749e8f91dbaa0c8e93fb098ce87a9755c00d9"},
+    {file = "drake-1.23.0-cp311-cp311-manylinux_2_31_x86_64.whl", hash = "sha256:d8ca14e8df26b19626a44528ac01cf21bd9537dcf4685ef21d22eebce5ed4979"},
+    {file = "drake-1.23.0-cp312-cp312-manylinux_2_31_x86_64.whl", hash = "sha256:fd41bfcdb791bcd7950a88e849b912fc9bdd8af838b6c0bd94e3dd65c3194948"},
+    {file = "drake-1.23.0-cp38-cp38-manylinux_2_31_x86_64.whl", hash = "sha256:4e86ac1ae365fd183b6ce789d72cbe2e61d07f4ae131f5451a8b21ba2cc72c87"},
+    {file = "drake-1.23.0-cp39-cp39-manylinux_2_31_x86_64.whl", hash = "sha256:ea94cb5797b66616b55a13660607ed845aeb74416c516d8b33e9dfe6d96b24f9"},
 ]
 
 [package.dependencies]
