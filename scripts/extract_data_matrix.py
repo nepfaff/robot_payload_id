@@ -189,10 +189,9 @@ def get_data(plant, num_q, N=100, add_noise: bool = False) -> JointData:
         tau_gt[i] = plant.CalcInverseDynamics(context, v_dot_curr, forces)
 
     if add_noise:
-        q += 0.01 * np.random.normal(size=dim_q)
+        q += 0.001 * np.random.normal(size=dim_q)
         v += 0.01 * np.random.normal(size=dim_q)
-        vd += 0.01 * np.random.normal(size=dim_q)
-        tau_gt += 0.01 * np.random.normal(size=dim_q)
+        vd += 0.05 * np.random.normal(size=dim_q)
 
     joint_data = JointData(
         joint_positions=q,
@@ -241,7 +240,7 @@ def extract_data_matrix_autodiff(use_one_link_arm: bool = False):
         arm_file_path=urdf_path, num_joints=num_joints, time_step=time_step
     )
     joint_data = get_data(
-        num_q=num_joints, plant=arm_components.plant, N=1000, add_noise=False
+        num_q=num_joints, plant=arm_components.plant, N=500, add_noise=True
     )
 
     ad_plant_components = create_autodiff_plant(arm_components=arm_components)
@@ -366,13 +365,9 @@ def main_symbolic():
         prog.AddPositiveSemidefiniteConstraint(pseudo_inertia - 1e-3 * np.identity(4))
 
 
-def main_ad():
-    use_one_link_arm = False
-    num_links = 1 if use_one_link_arm else 7
-    W_data, tau_data, _ = extract_data_matrix_autodiff(
-        use_one_link_arm=use_one_link_arm
-    )
-
+def solve_sdp(
+    num_links, W_data, tau_data, identifiable, inverse_covariance_matrix=None
+):
     prog = MathematicalProgram()
 
     # Create decision variables
@@ -432,9 +427,31 @@ def main_ad():
 
     # Solve constrained SDP
     variable_list = np.concatenate([var.get_lumped_param_list() for var in variables])
-    # TODO: Define norm with respect to error covariance matrix from unconstrained fit
-    # (This will probably require AddQuadraticCost)
-    prog.Add2NormSquaredCost(A=W_data, b=tau_data, vars=variable_list)
+    variable_names = np.array([var.get_name() for var in variable_list])
+
+    if identifiable is not None:
+        # Remove unidentifiable parameters
+        W_data = W_data[:, identifiable]
+        variable_list = variable_list[identifiable]
+        variable_names = variable_names[identifiable]
+
+    if inverse_covariance_matrix is None:
+        prog.Add2NormSquaredCost(A=W_data, b=tau_data, vars=variable_list)
+        # print(
+        #     (W_data @ variable_list - tau_data).T @ (W_data @ variable_list - tau_data)
+        # )
+    else:
+        prog.AddQuadraticCost(
+            (W_data @ variable_list - tau_data).T
+            @ inverse_covariance_matrix
+            @ (W_data @ variable_list - tau_data),
+            is_convex=True,
+        )
+        # print(
+        #     (W_data @ variable_list - tau_data).T
+        #     @ inverse_covariance_matrix
+        #     @ (W_data @ variable_list - tau_data)
+        # )
     # TODO: Replace this with geometric regularization
     regularization_weight = 1e-3
     prog.AddQuadraticCost(
@@ -450,19 +467,122 @@ def main_ad():
 
     result = Solve(prog, None, options)
     if result.is_success():
-        print("SDP result:\n", result.GetSolution(variable_list))
+        var_sol_dict = dict(zip(variable_names, result.GetSolution(variable_list)))
+        print("SDP result:\n", var_sol_dict)
+
+        ## NOTE: All these inverse covariance matrix lead to worse results than without
+        # scaling (numerics get worse not better...)
+
+        # # Compute error covariance matrix
+        # alpha = result.GetSolution(variable_list)
+        # error = W_data @ alpha - tau_data
+        # simga_squared = error.T @ error / (len(tau_data) - len(alpha))
+        # # Can't compute error_covariance as W is not full column rank as not all
+        # # parameters are identifiable and thus W.T @ W is not invertible
+        # # error_covariance = simga_squared * np.linalg.inv(W_data.T @ W_data)
+        # inverse_error_covariance = W_data.T @ W_data / simga_squared
+
+        # Compute sample covariance matrix from https://www.sciencedirect.com/topics/mathematics/sample-covariance-matrix
+        # alpha = result.GetSolution(variable_list)
+        # error = (W_data @ alpha - tau_data).reshape((-1, 1))
+        # mean_error = np.mean(error)
+        # normalized_error = error - mean_error
+        # sample_covariance = (normalized_error @ normalized_error.T) / len(error)
+        # inverse_error_covariance = np.linalg.inv(sample_covariance)
+
+        # From ChatGPT, similar to "Inertial Parameter Identification in Robotics: A Survey"
+        # Covariance matrix diagonal with diagonal variances being equal to the squared
+        # error
+        # alpha = result.GetSolution(variable_list)
+        # error = W_data @ alpha - tau_data
+        # sample_covariance = np.zeros((len(tau_data), len(tau_data)))
+        # for i in range(len(tau_data)):
+        #     sample_covariance[i, i] = error[i] ** 2
+        # inverse_error_covariance = np.linalg.inv(sample_covariance)
+
+        # Sample covariance matrix associated with the torque observations (Optimal
+        # excitation trajectories for mechanical system identification)
+        # tau_data_mean = np.mean(tau_data)
+        # tau_data_normalized = (tau_data - tau_data_mean).reshape((-1, 1))
+        # sample_covariance = (tau_data_normalized @ tau_data_normalized.T) / (len(tau_data)-1)
+        # inverse_error_covariance = np.linalg.inv(sample_covariance)
+
+        # Diagonal sample covariance matrix associated with the torque observations
+        # sample_covariance = np.zeros((len(tau_data), len(tau_data)))
+        # tau_data_mean = np.mean(tau_data)
+        # tau_data_normalized = tau_data - tau_data_mean
+        # for i in range(len(tau_data)):
+        #     sample_covariance[i, i] = tau_data_normalized[i] ** 2
+        # inverse_error_covariance = np.linalg.inv(sample_covariance)
+
+        # Diagonal error covariance matrix from "Inertial Parameter Identification in
+        # Robotics: A Survey" and repeating it for each observation
+        alpha = result.GetSolution(variable_list)
+        errors = W_data @ alpha - tau_data
+        errors_per_joint = errors.reshape(
+            (-1, num_links)
+        ).T  # Shape (num_links, num_timesteps)
+        num_samples = len(tau_data) / num_links
+        variance_per_link = np.empty(num_links)
+        for i in range(num_links):
+            variance_per_link[i] = np.linalg.norm(errors_per_joint[i]) / (
+                num_samples - len(alpha)
+            )
+        variances = np.repeat(variance_per_link, num_samples)
+        inverse_error_covariance = np.diag(1 / variances)
+
+        # print(inverse_error_covariance)
     else:
         print("Failed to solve")
+        print(prog)
         print(result.get_solution_result())
         print(
             result.get_solver_details().rescode,
             result.get_solver_details().solution_status,
         )
 
-    with open("iiwa_id_sdp_latex.txt", "w") as f:
+    name = (
+        "iiwa_id_sdp_latex.txt"
+        if inverse_covariance_matrix is None
+        else "iiwa_id_sdp_rescaled_latex.txt"
+    )
+    with open(name, "w") as f:
         f.write(prog.ToLatex())
 
-    print(np.linalg.eigvalsh(W_data.T @ W_data))
+    # Singular values of W_data
+    # print(np.linalg.eigvalsh(W_data.T @ W_data))
+
+    return alpha, inverse_error_covariance
+
+
+def main_ad():
+    use_one_link_arm = False
+    remove_unidentifiable_params = False
+    num_links = 1 if use_one_link_arm else 7
+    W_data, tau_data, _ = extract_data_matrix_autodiff(
+        use_one_link_arm=use_one_link_arm
+    )
+
+    identifiable = None
+    if remove_unidentifiable_params:
+        # Identify the identifiable parameters using the QR decomposition
+        _, R = np.linalg.qr(W_data)
+        tolerance = 1e-12
+        identifiable = np.abs(np.diag(R)) > tolerance
+
+    print("Solving the first time")
+    alpha, inverse_error_covariance = solve_sdp(
+        num_links=num_links, W_data=W_data, tau_data=tau_data, identifiable=identifiable
+    )
+
+    # print("Solving the second time")
+    # alpha1, inverse_error_covariance1 = solve_sdp(
+    #     num_links=num_links,
+    #     W_data=W_data,
+    #     tau_data=tau_data,
+    #     identifiable=identifiable,
+    #     inverse_covariance_matrix=inverse_error_covariance,
+    # )
 
 
 if __name__ == "__main__":
