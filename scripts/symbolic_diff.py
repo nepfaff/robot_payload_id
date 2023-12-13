@@ -135,5 +135,83 @@ def extract_data_matrix_symbolic(
     return W_data, sym_parameters_arr, tau_data, sym_plant_components
 
 
+def extract_data_matrix_symbolic_Wensing_trick(
+    prog: Optional[MathematicalProgram] = None,
+    use_one_link_arm: bool = False,
+):
+    """
+    Wensing's trick for computing W_sym by setting lumped parameters equal to one at a
+    time. This doesn't work as Drake doesn't simplify the expressions and thus throws a
+    division by zero error for terms such as m * hx/m when setting m = 0.
+    Simplifying using sympy should be possible but faces the same slowness issues as
+    `extract_data_matrix_symbolic`.
+    """
+    urdf_path = (
+        "./models/one_link_arm.urdf" if use_one_link_arm else "./models/iiwa.dmd.yaml"
+    )
+    num_joints = 1 if use_one_link_arm else 7
+    time_step = 1e-3
+
+    arm_components = create_arm(
+        arm_file_path=urdf_path, num_joints=num_joints, time_step=time_step
+    )
+    sym_plant_components = create_symbolic_plant(
+        arm_components=arm_components, prog=prog
+    )
+
+    sym_parameters_arr = np.concatenate(
+        [params.get_lumped_param_list() for params in sym_plant_components.parameters]
+    )
+
+    forces = MultibodyForces_[Expression](sym_plant_components.plant)
+    sym_plant_components.plant.CalcForceElementsContribution(
+        sym_plant_components.plant_context, forces
+    )
+    sym_torques = sym_plant_components.plant.CalcInverseDynamics(
+        sym_plant_components.plant_context,
+        sym_plant_components.state_variables.q_ddot.T,
+        forces,
+    )
+
+    W_column_vectors = []
+    for i in range(len(sym_parameters_arr)):
+        param_values = np.zeros(len(sym_parameters_arr))
+        param_values[i] = 1.0
+        W_column_vector = []
+        expression: Expression
+        for expression in sym_torques:
+            W_column_vector.append(
+                expression.EvaluatePartial(dict(zip(sym_parameters_arr, param_values)))
+            )
+        W_column_vectors.append(W_column_vector)
+    W_sym = np.hstack(W_column_vectors)
+
+    print("W_sym:\n", W_sym)
+
+    # Substitute data values and compute least squares fit
+    joint_data = get_data(num_q=num_joints, plant=arm_components.plant)
+    num_timesteps = len(joint_data.sample_times_s)
+    num_lumped_params = num_joints * 10
+    W_data = np.zeros((num_timesteps * num_joints, num_lumped_params))
+    tau_data = joint_data.joint_torques.flatten()
+
+    state_variables = sym_plant_components.state_variables
+    for i in tqdm(range(num_timesteps), desc="Computing W from W_sym"):
+        sym_to_val = {}
+        for j in range(num_joints):
+            sym_to_val[state_variables.q[j]] = joint_data.joint_positions[i, j]
+            sym_to_val[state_variables.q_dot[j]] = joint_data.joint_velocities[i, j]
+            sym_to_val[state_variables.q_ddot[j]] = joint_data.joint_accelerations[i, j]
+        W_data[i * num_joints : (i + 1) * num_joints, :] = Evaluate(W_sym, sym_to_val)
+
+    print(f"Condition number: {np.linalg.cond(W_data)}")
+
+    alpha_fit = np.linalg.lstsq(W_data, tau_data, rcond=None)[0]
+    print(f"alpha_fit: {alpha_fit}")
+
+    return W_data, sym_parameters_arr, tau_data, sym_plant_components
+
+
 if __name__ == "__main__":
     extract_data_matrix_symbolic(use_one_link_arm=False)
+    # extract_data_matrix_symbolic_Wensing_trick(use_one_link_arm=True)
