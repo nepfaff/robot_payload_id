@@ -3,6 +3,7 @@ import time
 from typing import List, Optional
 
 import numpy as np
+import sympy
 
 from pydrake.all import (
     Evaluate,
@@ -12,7 +13,6 @@ from pydrake.all import (
     from_sympy,
     to_sympy,
 )
-from sympy import simplify
 from tqdm import tqdm
 
 from robot_payload_id.environment import create_arm
@@ -94,7 +94,9 @@ def extract_data_matrix_symbolic(
         expression_sympy = to_sympy(expression, memo=memo)
         print("Start simplify")
         start_simplify = time.time()
-        simplified_expression_sympy = simplify(expression_sympy)
+        # Cancel should be sufficient here
+        # simplified_expression_sympy = sympy.simplify(expression_sympy)
+        simplified_expression_sympy = sympy.cancel(expression_sympy)
         print(f"Simplification took {time.time() - start_simplify} seconds")
         simplified_expression: Expression = from_sympy(
             simplified_expression_sympy, memo=memo
@@ -106,10 +108,11 @@ def extract_data_matrix_symbolic(
     print("W_sym:\n", W_sym)
 
     print("Saving to disk")
-    for i, expression in enumerate(W_sym):
-        memo = {}
-        expression_sympy = to_sympy(expression, memo=memo)
-        np.save(f"W{i}_sympy.npy", expression_sympy)
+    for i, row in enumerate(W_sym):
+        for j, expression in enumerate(row):
+            memo = {}
+            expression_sympy = to_sympy(expression, memo=memo)
+            np.save(f"W_{i}_{j}_sympy.npy", expression_sympy)
 
     # Substitute data values and compute least squares fit
     joint_data = get_data(num_q=num_joints, plant=arm_components.plant)
