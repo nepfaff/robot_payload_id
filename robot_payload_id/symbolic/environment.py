@@ -26,6 +26,7 @@ from robot_payload_id.utils import (
 def create_symbolic_plant(
     arm_components: ArmComponents,
     prog: Optional[MathematicalProgram] = None,
+    use_lumped_parameters: bool = False,
 ) -> ArmPlantComponents:
     """Creates a symbolic plant for a robotic arm system.
 
@@ -33,6 +34,9 @@ def create_symbolic_plant(
         arm_components (ArmComponents): The components of the robotic arm system.
         prog (MathematicalProgram): An optional MathematicalProgram to use for variable
             creation.
+        use_lumped_parameters (bool): Whether to create symbolic parameters for the
+            lumped parameters h = m * c and I = m * G that the inverse dynamics are
+            linear in. If False, creates symbolic parameters for m, c, and G.
 
     Returns:
         ArmPlantComponents: The symbolic plant and associated symbolic components.
@@ -66,15 +70,46 @@ def create_symbolic_plant(
     sym_parameters: List[JointParameters] = []
     for i in range(arm_components.num_joints):
         m = make_variable_func(f"m_{i}")[0]
-        cx = make_variable_func(f"c_{{x_{i}}}")[0]
-        cy = make_variable_func(f"c_{{y_{i}}}")[0]
-        cz = make_variable_func(f"c_{{z_{i}}}")[0]
-        Gxx = make_variable_func(f"G_{{xx_{i}}}")[0]
-        Gxy = make_variable_func(f"G_{{xy_{i}}}")[0]
-        Gxz = make_variable_func(f"G_{{xz_{i}}}")[0]
-        Gyy = make_variable_func(f"G_{{yy_{i}}}")[0]
-        Gyz = make_variable_func(f"G_{{yz_{i}}}")[0]
-        Gzz = make_variable_func(f"G_{{zz_{i}}}")[0]
+        if use_lumped_parameters:
+            hx = make_variable_func(f"h_{{x_{i}}}")[0]
+            hy = make_variable_func(f"h_{{y_{i}}}")[0]
+            hz = make_variable_func(f"h_{{z_{i}}}")[0]
+            Ixx = make_variable_func(f"I_{{xx_{i}}}")[0]
+            Ixy = make_variable_func(f"I_{{xy_{i}}}")[0]
+            Ixz = make_variable_func(f"I_{{xz_{i}}}")[0]
+            Iyy = make_variable_func(f"I_{{yy_{i}}}")[0]
+            Iyz = make_variable_func(f"I_{{yz_{i}}}")[0]
+            Izz = make_variable_func(f"I_{{zz_{i}}}")[0]
+
+            cx = hx / m
+            cy = hy / m
+            cz = hz / m
+            Gxx = Ixx / m
+            Gxy = Ixy / m
+            Gxz = Ixz / m
+            Gyy = Iyy / m
+            Gyz = Iyz / m
+            Gzz = Izz / m
+        else:
+            cx = make_variable_func(f"c_{{x_{i}}}")[0]
+            cy = make_variable_func(f"c_{{y_{i}}}")[0]
+            cz = make_variable_func(f"c_{{z_{i}}}")[0]
+            Gxx = make_variable_func(f"G_{{xx_{i}}}")[0]
+            Gxy = make_variable_func(f"G_{{xy_{i}}}")[0]
+            Gxz = make_variable_func(f"G_{{xz_{i}}}")[0]
+            Gyy = make_variable_func(f"G_{{yy_{i}}}")[0]
+            Gyz = make_variable_func(f"G_{{yz_{i}}}")[0]
+            Gzz = make_variable_func(f"G_{{zz_{i}}}")[0]
+
+            hx = m * cx
+            hy = m * cy
+            hz = m * cz
+            Ixx = m * Gxx
+            Ixy = m * Gxy
+            Ixz = m * Gxz
+            Iyy = m * Gyy
+            Iyz = m * Gyz
+            Izz = m * Gzz
 
         sym_parameters.append(
             JointParameters(
@@ -88,6 +123,15 @@ def create_symbolic_plant(
                 Gyy=Gyy,
                 Gyz=Gyz,
                 Gzz=Gzz,
+                hx=hx,
+                hy=hy,
+                hz=hz,
+                Ixx=Ixx,
+                Ixy=Ixy,
+                Ixz=Ixz,
+                Iyy=Iyy,
+                Iyz=Iyz,
+                Izz=Izz,
             )
         )
 

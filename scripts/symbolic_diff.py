@@ -68,7 +68,7 @@ def extract_data_matrix_symbolic(
         arm_file_path=urdf_path, num_joints=num_joints, time_step=time_step
     )
     sym_plant_components = create_symbolic_plant(
-        arm_components=arm_components, prog=prog
+        arm_components=arm_components, prog=prog, use_lumped_parameters=True
     )
 
     sym_parameters_arr = np.concatenate(
@@ -159,7 +159,7 @@ def extract_data_matrix_symbolic_Wensing_trick(
         arm_file_path=urdf_path, num_joints=num_joints, time_step=time_step
     )
     sym_plant_components = create_symbolic_plant(
-        arm_components=arm_components, prog=prog
+        arm_components=arm_components, prog=prog, use_lumped_parameters=True
     )
 
     sym_parameters_arr = np.concatenate(
