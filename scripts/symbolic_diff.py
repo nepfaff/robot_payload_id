@@ -1,5 +1,6 @@
 import time
 
+from datetime import timedelta
 from typing import List, Optional
 
 import numpy as np
@@ -90,29 +91,36 @@ def extract_data_matrix_symbolic(
     expression: Expression
     start_time = time.time()
     for expression in tqdm(sym_torques, desc="Computing W_sym"):
-        memo = {}
-        expression_sympy = to_sympy(expression, memo=memo)
-        print("Start simplify")
-        start_simplify = time.time()
-        # Cancel should be sufficient here
-        # simplified_expression_sympy = sympy.simplify(expression_sympy)
-        simplified_expression_sympy = sympy.cancel(expression_sympy)
-        print(f"Simplification took {time.time() - start_simplify} seconds")
-        simplified_expression: Expression = from_sympy(
-            simplified_expression_sympy, memo=memo
-        )
-        W_sym.append(simplified_expression.Jacobian(sym_parameters_arr))
+        # Simplification not needed if using lumped parameters in Drake's inverse\
+        # dynamics computation
+        # memo = {}
+        # expression_sympy = to_sympy(expression, memo=memo)
+        # print("Start simplify")
+        # start_simplify = time.time()
+        # # Cancel should be sufficient here
+        # # simplified_expression_sympy = sympy.simplify(expression_sympy)
+        # simplified_expression_sympy = sympy.cancel(expression_sympy)
+        # print(f"Simplification took {time.time() - start_simplify} seconds")
+        # simplified_expression: Expression = from_sympy(
+        #     simplified_expression_sympy, memo=memo
+        # )
+        # W_sym.append(simplified_expression.Jacobian(sym_parameters_arr))
+
+        W_sym.append(expression.Jacobian(sym_parameters_arr))
     W_sym = np.vstack(W_sym)
-    print("Time to compute W_sym:", time.time() - start_time)
+    print("Time to compute W_sym:", timedelta(seconds=time.time() - start_time))
 
-    print("W_sym:\n", W_sym)
+    # print("W_sym:\n", W_sym)
 
-    print("Saving to disk")
-    for i, row in enumerate(W_sym):
-        for j, expression in enumerate(row):
+    start_time = time.time()
+    for i, row in tqdm(enumerate(W_sym), total=len(W_sym), desc="Saving to disk (row)"):
+        for j, expression in tqdm(
+            enumerate(row), total=len(row), desc="    Saving to disk (column)"
+        ):
             memo = {}
             expression_sympy = to_sympy(expression, memo=memo)
             np.save(f"W_{i}_{j}_sympy.npy", expression_sympy)
+    print("Time to save to disk:", timedelta(seconds=time.time() - start_time))
 
     # Substitute data values and compute least squares fit
     joint_data = get_data(num_q=num_joints, plant=arm_components.plant)
