@@ -21,6 +21,7 @@ wandb = "^0.16.0"
 plotly = "^5.18.0"
 sympy = "^1.12"
 drake = "^1.23.0"
+nevergrad = "^1.0.1"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.4.0"
