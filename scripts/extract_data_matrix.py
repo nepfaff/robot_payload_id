@@ -23,6 +23,7 @@ from robot_payload_id.utils import (
     ArmPlantComponents,
     JointData,
     JointParameters,
+    SymJointStateVariables,
 )
 
 
@@ -203,6 +204,64 @@ def get_data(plant, num_q, N=100, add_noise: bool = False) -> JointData:
     return joint_data
 
 
+def compute_joint_data_from_traj_params(
+    plant, num_timesteps: int, a: np.ndarray, b: np.ndarray
+) -> JointData:
+    # qi(t) = ai * sin(ω*i*t) + bi
+    # qi_dot(t) = ai * ω * i * cos(ω*i*t)
+    # qi_ddot(t) = ai * (ω*i)**2 * cos(ω*i*t)
+
+    omega = 0.5
+    q = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
+    q_dot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
+    q_ddot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
+    for t in range(num_timesteps):
+        for i in range(len(a)):
+            q[t, i] = a[i] * np.sin(omega * (1 + i) * t) + b[i]
+            q_dot[t, i] = a[i] * omega * (1 + i) * np.cos(omega * (1 + i) * t)
+            q_ddot[t, i] = a[i] * ((omega * (1 + i)) ** 2) * np.cos(omega * (1 + i) * t)
+
+    tau_gt = np.empty((num_timesteps, len(a)))
+    context = plant.CreateDefaultContext()
+    for i, (q_curr, v_curr, v_dot_curr) in enumerate(zip(q, q_dot, q_ddot)):
+        plant.SetPositions(context, q_curr)
+        plant.SetVelocities(context, v_curr)
+        forces = MultibodyForces_(plant)
+        plant.CalcForceElementsContribution(context, forces)
+        tau_gt[i] = plant.CalcInverseDynamics(context, v_dot_curr, forces)
+
+    joint_data = JointData(
+        joint_positions=q,
+        joint_velocities=q_dot,
+        joint_accelerations=q_ddot,
+        joint_torques=tau_gt,
+        sample_times_s=np.arange(num_timesteps) * 1e-3,
+    )
+    return joint_data
+
+
+def create_data_matrix_from_traj_samples(
+    W_sym: np.ndarray,
+    sym_state_variables: SymJointStateVariables,
+    q: np.ndarray,
+    q_dot: np.ndarray,
+    q_ddot: np.ndarray,
+) -> np.ndarray:
+    num_joints = q.shape[1]
+    W_data = np.empty((len(q), W_sym.shape[1]), dtype=Expression)
+    for i in range(len(q)):
+        sym_to_val = {}
+        for j in range(num_joints):
+            sym_to_val[sym_state_variables.q[j]] = q[i, j]
+            sym_to_val[sym_state_variables.q_dot[j]] = q_dot[i, j]
+            sym_to_val[sym_state_variables.q_ddot[j]] = q_ddot[i, j]
+
+        for m in range(num_joints):
+            for n in range(W_sym.shape[1]):
+                W_data[i * num_joints + m, n] = W_sym[m, n].Substitute(sym_to_val)
+    return W_data
+
+
 def extract_data_matrix_andy_iteration(prog: Optional[MathematicalProgram] = None):
     num_q = 7
     plant = MultibodyPlant(time_step=1e-3)
@@ -230,7 +289,9 @@ def extract_data_matrix_andy_iteration(prog: Optional[MathematicalProgram] = Non
     return W_data, alpha_sym, tau_data, sym_plant_components
 
 
-def extract_data_matrix_autodiff(use_one_link_arm: bool = False):
+def extract_data_matrix_autodiff(
+    use_one_link_arm: bool = False, num_data_points: int = 100
+):
     num_joints = 1 if use_one_link_arm else 7
     time_step = 0
     urdf_path = (
@@ -239,8 +300,14 @@ def extract_data_matrix_autodiff(use_one_link_arm: bool = False):
     arm_components = create_arm(
         arm_file_path=urdf_path, num_joints=num_joints, time_step=time_step
     )
-    joint_data = get_data(
-        num_q=num_joints, plant=arm_components.plant, N=500, add_noise=True
+    # joint_data = get_data(
+    #     num_q=num_joints, plant=arm_components.plant, N=num_data_points, add_noise=True
+    # )
+    joint_data = compute_joint_data_from_traj_params(
+        plant=arm_components.plant,
+        num_timesteps=num_data_points,
+        a=38.879 * np.ones(num_joints),
+        b=1.753 * np.zeros(num_joints),
     )
 
     ad_plant_components = create_autodiff_plant(arm_components=arm_components)
@@ -435,6 +502,10 @@ def solve_sdp(
         variable_list = variable_list[identifiable]
         variable_names = variable_names[identifiable]
 
+        print(
+            f"Condition number after removing unidentifiable params: {np.linalg.cond(W_data)}"
+        )
+
     if inverse_covariance_matrix is None:
         prog.Add2NormSquaredCost(A=W_data, b=tau_data, vars=variable_list)
         # print(
@@ -556,11 +627,12 @@ def solve_sdp(
 
 
 def main_ad():
-    use_one_link_arm = False
-    remove_unidentifiable_params = False
+    use_one_link_arm = True
+    remove_unidentifiable_params = True
+    num_data_points = 50000
     num_links = 1 if use_one_link_arm else 7
     W_data, tau_data, _ = extract_data_matrix_autodiff(
-        use_one_link_arm=use_one_link_arm
+        use_one_link_arm=use_one_link_arm, num_data_points=num_data_points
     )
 
     identifiable = None
