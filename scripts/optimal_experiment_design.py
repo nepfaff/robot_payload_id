@@ -391,9 +391,10 @@ def optimize_traj_black_box(use_one_link_arm: bool = False):
         condition_number = max_eig / min_eig
         return condition_number
 
-    # optimizer = ng.optimizers.NGOpt(parametrization=2, budget=50000, num_workers=16)
+    # NOTE: Cost function must be pickable for parallelization
+    # optimizer = ng.optimizers.NGOpt(parametrization=2, budget=500000, num_workers=16)
     # # Optimize in parallel
-    # with futures.ThreadPoolExecutor(max_workers=optimizer.num_workers) as executor:
+    # with futures.ProcessPoolExecutor(max_workers=optimizer.num_workers) as executor:
     #     recommendation = optimizer.minimize(
     #         condition_number_cost, executor=executor, batch_mode=True
     #     )
