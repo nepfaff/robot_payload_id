@@ -56,8 +56,10 @@ def load_W_sym(
         name_to_var[tau.get_name()] = tau
 
     W_sym = np.empty((num_joints, num_params), dtype=Expression)
-    for i in range(num_joints):
-        for j in range(num_params):
+    for i in tqdm(range(num_joints), total=num_joints, desc="Loading W_sym (joints)"):
+        for j in tqdm(
+            range(num_params), total=num_params, desc="   Loading W_sym (params)"
+        ):
             memo = pickle_load(dir_path / f"W_{i}_{j}_memo.pkl")
             for key, val in memo.items():
                 memo[key] = name_to_var[val]
@@ -82,7 +84,9 @@ def compute_joint_params_from_traj_params(
     q = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
     q_dot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
     q_ddot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
-    for t in range(num_timesteps):
+    for t in tqdm(
+        range(num_timesteps), total=num_timesteps, desc="Computing joint params"
+    ):
         for i in range(len(a)):
             q[t, i] = a[i] * np.sin(omega * (1 + i) * t) + b[i]
             q_dot[t, i] = a[i] * omega * (1 + i) * np.cos(omega * (1 + i) * t)
@@ -99,7 +103,10 @@ def create_data_matrix_from_traj_samples(
 ) -> np.ndarray:
     num_joints = q.shape[1]
     W_data = np.empty((len(q), W_sym.shape[1]), dtype=Expression)
-    for i in range(len(q)):
+    num_q = len(q)
+    for i in tqdm(
+        range(num_q), total=num_q, desc="Creating data matrix from traj samples"
+    ):
         sym_to_val = {}
         for j in range(num_joints):
             sym_to_val[sym_state_variables.q[j]] = q[i, j]
@@ -213,7 +220,7 @@ def optimize_traj(use_one_link_arm: bool = False):
     symbolic_vars = np.concatenate([a, b])
 
     q, q_dot, q_ddot = compute_joint_params_from_traj_params(
-        num_timesteps=100, a=a, b=b
+        num_timesteps=1000, a=a, b=b
     )
     W_data = create_data_matrix_from_traj_samples(
         W_sym=W_sym,
