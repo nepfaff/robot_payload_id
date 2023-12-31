@@ -1,8 +1,10 @@
 import pickle
 
+from concurrent import futures
 from pathlib import Path
 from typing import Tuple
 
+import nevergrad as ng
 import numpy as np
 import sympy
 
@@ -27,64 +29,6 @@ from tqdm import tqdm
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import create_autodiff_plant
 from robot_payload_id.utils import ArmPlantComponents, SymJointStateVariables
-
-# def extract_data_matrix(
-#     ad_plant_components: ArmPlantComponents,
-#     q: np.ndarray,
-#     q_dot: np.ndarray,
-#     q_ddot: np.ndarray,
-# ) -> np.ndarray:
-#     num_joints = q.shape[1]
-#     num_params_per_link = 10
-#     num_lumped_params = num_joints * num_params_per_link
-#     W_data = np.zeros((len(q) * num_joints, num_lumped_params))
-
-#     for i in tqdm(range(len(q))):
-#         # Set joint data
-#         # ad_plant_components.plant.get_actuation_input_port().FixValue(
-#         #     ad_plant_components.plant_context, joint_data.joint_torques[i]
-#         # )
-#         ad_plant_components.plant.SetPositions(ad_plant_components.plant_context, q[i])
-#         ad_plant_components.plant.SetVelocities(
-#             ad_plant_components.plant_context, q_dot[i]
-#         )
-
-#         # Inverse dynamics
-#         forces = MultibodyForces_[AutoDiffXd](ad_plant_components.plant)
-#         ad_plant_components.plant.CalcForceElementsContribution(
-#             ad_plant_components.plant_context, forces
-#         )
-#         sym_torques = ad_plant_components.plant.CalcInverseDynamics(
-#             ad_plant_components.plant_context,
-#             q_ddot[i],
-#             forces,
-#         )
-#         import IPython; IPython.embed(); exit(1)
-
-#         # Differentiate w.r.t. parameters
-#         sym_torques_derivative = np.vstack(
-#             [joint_torques.derivatives() for joint_torques in sym_torques]
-#         )
-#         W_data[i * num_joints : (i + 1) * num_joints, :] = sym_torques_derivative
-
-#     return W_data
-
-
-def determinant(matrix):
-    # Base case for 2x2 matrix
-    if matrix.shape[0] == 2 and matrix.shape[1] == 2:
-        return matrix[0, 0] * matrix[1, 1] - matrix[0, 1] * matrix[1, 0]
-
-    det = 0
-    for c in range(matrix.shape[1]):
-        submatrix = np.delete(np.delete(matrix, 0, axis=0), c, axis=1)
-        det += ((-1) ** c) * matrix[0, c] * determinant(submatrix)
-    return det
-
-
-def log_determinant(matrix):
-    det = determinant(matrix)
-    return log(det)
 
 
 def pickle_load(file_path: Path):
@@ -141,8 +85,8 @@ def compute_joint_params_from_traj_params(
     for t in range(num_timesteps):
         for i in range(len(a)):
             q[t, i] = a[i] * np.sin(omega * (1 + i) * t) + b[i]
-            q_dot[t, i] = a[i] * omega * (1 + i) * np.cos(omega * i * t)
-            q_ddot[t, i] = a[i] * (omega * (1 + i)) ** 2 * np.cos(omega * i * t)
+            q_dot[t, i] = a[i] * omega * (1 + i) * np.cos(omega * (1 + i) * t)
+            q_ddot[t, i] = a[i] * ((omega * (1 + i)) ** 2) * np.cos(omega * (1 + i) * t)
     return q, q_dot, q_ddot
 
 
@@ -166,27 +110,6 @@ def create_data_matrix_from_traj_samples(
             for n in range(W_sym.shape[1]):
                 W_data[i * num_joints + m, n] = W_sym[m, n].Substitute(sym_to_val)
     return W_data
-
-
-# def expression_mat_to_expression_cost_mat(expression_mat: np.ndarray) -> np.ndarray:
-#     expression_cost_mat = np.empty(expression_mat.shape, dtype=ExpressionCost)
-#     for i in range(expression_mat.shape[0]):
-#         for j in range(expression_mat.shape[1]):
-#             if expression_mat[i, j].get_kind() == ExpressionKind.Constant:
-#                 expression_cost_mat[i, j] = expression_mat[i, j].Evaluate()
-#             else:
-#                 expression_cost_mat[i, j] = ExpressionCost(expression_mat[i, j])
-#     return expression_cost_mat
-
-
-# def eval_expression_cost_mat(
-#     expression_cost_mat: np.ndarray, vars: np.ndarray
-# ) -> np.ndarray:
-#     evaluated_mat = np.empty(expression_cost_mat.shape, dtype=Expression)
-#     for i in range(expression_cost_mat.shape[0]):
-#         for j in range(expression_cost_mat.shape[1]):
-#             evaluated_mat[i, j] = expression_cost_mat[i, j].Eval(vars)[0]
-#     return evaluated_mat
 
 
 def eval_expression_mat(
@@ -218,31 +141,31 @@ def eval_expression_mat_derivative(
     return derivatives
 
 
-def expression_mat_to_autodiff_mat(
-    expression_mat: np.ndarray, symbolic_vars: np.ndarray, ad_vars: np.ndarray
-) -> np.ndarray:
-    # Symbolic vars and ad vals must have same order!
-    ad_var_values = np.array([ad_var.value() for ad_var in ad_vars])
-    ad_mat = np.empty(expression_mat.shape, dtype=AutoDiffXd)
-    for i in range(expression_mat.shape[0]):
-        for j in range(expression_mat.shape[1]):
-            expr: Expression = expression_mat[i, j]
-            expr_val = expr.Evaluate(dict(zip(symbolic_vars, ad_var_values)))
-            gradients = []
-            for k in range(len(ad_vars)):
-                gradients.append(
-                    expr.EvaluatePartial(
-                        dict(
-                            zip(
-                                np.delete(symbolic_vars, k), np.delete(ad_var_values, k)
-                            )
-                        )
-                    )
-                    .Differentiate(symbolic_vars[k])
-                    .Evaluate({symbolic_vars[k]: ad_var_values[k]})
-                )
-            ad_mat[i, j] = AutoDiffXd(expr_val, gradients)
-    return ad_mat
+# def expression_mat_to_autodiff_mat(
+#     expression_mat: np.ndarray, symbolic_vars: np.ndarray, ad_vars: np.ndarray
+# ) -> np.ndarray:
+#     # Symbolic vars and ad vals must have same order!
+#     ad_var_values = np.array([ad_var.value() for ad_var in ad_vars])
+#     ad_mat = np.empty(expression_mat.shape, dtype=AutoDiffXd)
+#     for i in range(expression_mat.shape[0]):
+#         for j in range(expression_mat.shape[1]):
+#             expr: Expression = expression_mat[i, j]
+#             expr_val = expr.Evaluate(dict(zip(symbolic_vars, ad_var_values)))
+#             gradients = []
+#             for k in range(len(ad_vars)):
+#                 gradients.append(
+#                     expr.EvaluatePartial(
+#                         dict(
+#                             zip(
+#                                 np.delete(symbolic_vars, k), np.delete(ad_var_values, k)
+#                             )
+#                         )
+#                     )
+#                     .Differentiate(symbolic_vars[k])
+#                     .Evaluate({symbolic_vars[k]: ad_var_values[k]})
+#                 )
+#             ad_mat[i, j] = AutoDiffXd(expr_val, gradients)
+#     return ad_mat
 
 
 def remove_structurally_unidentifiable(
@@ -370,12 +293,17 @@ def optimize_traj(use_one_link_arm: bool = False):
 
     # Need some initial guess for reasonable results
     # TODO: How to determine a good guess?
-    prog.SetInitialGuess(a, 2 * np.ones(num_joints))
-    prog.SetInitialGuess(b, 3 * np.ones(num_joints))
+    prog.SetInitialGuess(a, 38 * np.ones(num_joints))
+    prog.SetInitialGuess(b, 2 * np.ones(num_joints))
 
     solver = SnoptSolver()
+    snopt = solver.solver_id()
     options = SolverOptions()
     options.SetOption(CommonSolverOption.kPrintToConsole, 1)
+    # prog.SetSolverOption(snopt, "Major Optimality Tolerance", 1e-1)
+    # prog.SetSolverOption(snopt, "Minor Optimality Tolerance", 1e-1)
+    prog.SetSolverOption(snopt, "Print file", "snopt.out")
+    # options.SetOption(snopt, "Major print level", 1)
     res: MathematicalProgramResult = solver.Solve(prog)
     # res: MathematicalProgramResult = Solve(prog)
     if res.is_success():
@@ -385,10 +313,97 @@ def optimize_traj(use_one_link_arm: bool = False):
     else:
         print("Failed to solve")
         print(prog)
-        print(res.get_solution_result())
-        print(res.get_optimal_cost())
+        print("Solution result:", res.get_solution_result())
         print("Snopt info:", res.get_solver_details().info)
+        print("Final loss:", res.get_optimal_cost())
+        print("a:", res.GetSolution(a))
+        print("b:", res.GetSolution(b))
+
+
+def optimize_traj_black_box(use_one_link_arm: bool = False):
+    num_joints = 1 if use_one_link_arm else 7
+    data_matrix_dir_path = Path(
+        "symbolic_data_matrix_one_link_arm"
+        if use_one_link_arm
+        else "symbolic_data_matrix_iiwa"
+    )
+
+    q_var = MakeVectorVariable(num_joints, "q")
+    q_dot_var = MakeVectorVariable(num_joints, "\dot{q}")
+    q_ddot_var = MakeVectorVariable(num_joints, "\ddot{q}")
+    tau_var = MakeVectorVariable(num_joints, "\tau")
+    sym_state_variables = SymJointStateVariables(
+        q=q_var, q_dot=q_dot_var, q_ddot=q_ddot_var, tau=tau_var
+    )
+
+    W_sym = load_W_sym(
+        dir_path=data_matrix_dir_path,
+        sym_state_variables=sym_state_variables,
+        num_joints=num_joints,
+        num_params=num_joints * 10,
+    )
+
+    a = MakeVectorVariable(num_joints, "a")
+    b = MakeVectorVariable(num_joints, "b")
+    symbolic_vars = np.concatenate([a, b])
+
+    q, q_dot, q_ddot = compute_joint_params_from_traj_params(
+        num_timesteps=100, a=a, b=b
+    )
+    W_data = create_data_matrix_from_traj_samples(
+        W_sym=W_sym,
+        sym_state_variables=sym_state_variables,
+        q=q,
+        q_dot=q_dot,
+        q_ddot=q_ddot,
+    )
+
+    # Remove structurally unidentifiable columns to prevent SolutionResult.kUnbounded
+    W_data = remove_structurally_unidentifiable(W_data, symbolic_vars)
+
+    W_dataTW_data = W_data.T @ W_data
+
+    # A-Optimality
+    # NOTE: Can't symbolically compute matrix inverse for matrices bigger than 4x4
+    # prog.AddCost(np.trace(W_dataTW_data_inv))
+
+    # D-Optimality
+    # NOTE: This doesn't seem to work atm as the det is 0, logdet is inf
+    # prog.AddCost(-log_determinant(W_dataTW_data))
+
+    # Can't use AddMaximizeLogDeterminantCost because it requires W_dataTW_data to be
+    # polynomial to ensure convexity. We don't care about the convexity
+    # prog.AddMaximizeLogDeterminantCost(W_dataTW_data)
+
+    def condition_number_cost(var_values):
+        W_dataTW_data_numeric = eval_expression_mat(
+            W_dataTW_data, symbolic_vars, var_values
+        )
+        eigenvalues, eigenvectors = np.linalg.eigh(W_dataTW_data_numeric)
+        min_eig_idx = np.argmin(eigenvalues)
+        max_eig_idx = np.argmax(eigenvalues)
+        min_eig = eigenvalues[min_eig_idx]
+        max_eig = eigenvalues[max_eig_idx]
+
+        if min_eig <= 0:
+            return np.inf
+
+        condition_number = max_eig / min_eig
+        return condition_number
+
+    # optimizer = ng.optimizers.NGOpt(parametrization=2, budget=50000, num_workers=16)
+    # # Optimize in parallel
+    # with futures.ThreadPoolExecutor(max_workers=optimizer.num_workers) as executor:
+    #     recommendation = optimizer.minimize(
+    #         condition_number_cost, executor=executor, batch_mode=True
+    #     )
+
+    optimizer = ng.optimizers.NGOpt(parametrization=2, budget=1000)
+    recommendation = optimizer.minimize(condition_number_cost)
+    print("Final param values", recommendation.value)
+    print("Final loss", recommendation.loss)
 
 
 if __name__ == "__main__":
-    optimize_traj(use_one_link_arm=True)
+    # optimize_traj(use_one_link_arm=True)
+    optimize_traj_black_box(use_one_link_arm=True)
