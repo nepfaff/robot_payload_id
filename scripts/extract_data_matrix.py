@@ -306,8 +306,8 @@ def extract_data_matrix_autodiff(
     joint_data = compute_joint_data_from_traj_params(
         plant=arm_components.plant,
         num_timesteps=num_data_points,
-        a=38.879 * np.ones(num_joints),
-        b=1.753 * np.zeros(num_joints),
+        a=-40.2049 * np.ones(num_joints),
+        b=20.8 * np.zeros(num_joints),
     )
 
     ad_plant_components = create_autodiff_plant(arm_components=arm_components)

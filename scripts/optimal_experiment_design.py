@@ -363,23 +363,11 @@ def optimize_traj_black_box(use_one_link_arm: bool = False):
 
     W_dataTW_data = W_data.T @ W_data
 
-    # A-Optimality
-    # NOTE: Can't symbolically compute matrix inverse for matrices bigger than 4x4
-    # prog.AddCost(np.trace(W_dataTW_data_inv))
-
-    # D-Optimality
-    # NOTE: This doesn't seem to work atm as the det is 0, logdet is inf
-    # prog.AddCost(-log_determinant(W_dataTW_data))
-
-    # Can't use AddMaximizeLogDeterminantCost because it requires W_dataTW_data to be
-    # polynomial to ensure convexity. We don't care about the convexity
-    # prog.AddMaximizeLogDeterminantCost(W_dataTW_data)
-
     def condition_number_cost(var_values):
         W_dataTW_data_numeric = eval_expression_mat(
             W_dataTW_data, symbolic_vars, var_values
         )
-        eigenvalues, eigenvectors = np.linalg.eigh(W_dataTW_data_numeric)
+        eigenvalues, _ = np.linalg.eigh(W_dataTW_data_numeric)
         min_eig_idx = np.argmin(eigenvalues)
         max_eig_idx = np.argmax(eigenvalues)
         min_eig = eigenvalues[min_eig_idx]
@@ -391,6 +379,47 @@ def optimize_traj_black_box(use_one_link_arm: bool = False):
         condition_number = max_eig / min_eig
         return condition_number
 
+    def condition_number_and_d_optimality_cost(var_values):
+        W_dataTW_data_numeric = eval_expression_mat(
+            W_dataTW_data, symbolic_vars, var_values
+        )
+        eigenvalues, _ = np.linalg.eigh(W_dataTW_data_numeric)
+        min_eig_idx = np.argmin(eigenvalues)
+        max_eig_idx = np.argmax(eigenvalues)
+        min_eig = eigenvalues[min_eig_idx]
+        max_eig = eigenvalues[max_eig_idx]
+
+        if min_eig <= 0:
+            return np.inf
+
+        condition_number = max_eig / min_eig
+        log_det = np.log(np.prod(eigenvalues))
+        d_optimality = -log_det
+
+        d_optimality_weight = 1e-1
+        cost = condition_number + d_optimality_weight * d_optimality
+        return cost
+
+    def condition_number_and_e_optimality_cost(var_values):
+        W_dataTW_data_numeric = eval_expression_mat(
+            W_dataTW_data, symbolic_vars, var_values
+        )
+        eigenvalues, _ = np.linalg.eigh(W_dataTW_data_numeric)
+        min_eig_idx = np.argmin(eigenvalues)
+        max_eig_idx = np.argmax(eigenvalues)
+        min_eig = eigenvalues[min_eig_idx]
+        max_eig = eigenvalues[max_eig_idx]
+
+        if min_eig <= 0:
+            return np.inf
+
+        condition_number = max_eig / min_eig
+        e_optimality = -min_eig
+
+        e_optimality_weight = 1e-3
+        cost = condition_number + e_optimality_weight * e_optimality
+        return cost
+
     # NOTE: Cost function must be pickable for parallelization
     # optimizer = ng.optimizers.NGOpt(parametrization=2, budget=500000, num_workers=16)
     # # Optimize in parallel
@@ -400,7 +429,7 @@ def optimize_traj_black_box(use_one_link_arm: bool = False):
     #     )
 
     optimizer = ng.optimizers.NGOpt(parametrization=2, budget=1000)
-    recommendation = optimizer.minimize(condition_number_cost)
+    recommendation = optimizer.minimize(condition_number_and_e_optimality_cost)
     print("Final param values", recommendation.value)
     print("Final loss", recommendation.loss)
 
