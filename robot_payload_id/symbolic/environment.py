@@ -10,6 +10,7 @@ from pydrake.all import (
     MathematicalProgram,
     MultibodyPlant,
     RigidBody,
+    RotationalInertia_,
     SpatialInertia,
     SpatialInertia_,
     UnitInertia_,
@@ -62,6 +63,8 @@ def create_symbolic_plant(
     sym_plant.SetVelocities(sym_plant_context, q_dot)
 
     # Create the symbolic inertial parameters
+    # NOTE: Using sym.Variable instead of partial(sym.MakeVectorVariable, 1) would lead
+    # to less notation clutter but is harder to combine with MathematicalProgram variables
     make_variable_func = (
         partial(prog.NewContinuousVariables, 1)
         if prog is not None
@@ -141,14 +144,30 @@ def create_symbolic_plant(
         except:
             link: RigidBody = sym_plant.GetBodyByName(f"link{i + 1}")
 
+        # m_val = link.get_mass(sym_plant_context)
+        # cx_val, cy_val, cz_val = link.CalcCenterOfMassInBodyFrame(sym_plant_context)
+        # spatial_inertia: SpatialInertia = link.CalcSpatialInertiaInBodyFrame(
+        #     sym_plant_context
+        # )
+        # print(m_val, cx_val, cy_val, cz_val, "\n",spatial_inertia.get_unit_inertia().CopyToFullMatrix3(),"\n",spatial_inertia.CalcRotationalInertia().CopyToFullMatrix3())
+        # print("-----------------")
+
         # Add the symbolic parameters to the plant
-        com = [cx, cy, cz]
-        unit_inertia = UnitInertia_[sym.Expression](
-            Ixx=Gxx, Ixy=Gxy, Ixz=Gxz, Iyy=Gyy, Iyz=Gyz, Izz=Gzz
+        # com = [cx, cy, cz]
+        # unit_inertia = UnitInertia_[sym.Expression](
+        #     Ixx=Gxx, Ixy=Gxy, Ixz=Gxz, Iyy=Gyy, Iyz=Gyz, Izz=Gzz
+        # )
+        # inertia = SpatialInertia_[sym.Expression](
+        #     m, com, unit_inertia, skip_validity_check=False
+        # )
+        inertia: SpatialInertia = SpatialInertia_[
+            sym.Expression
+        ]().MakeFromLumpedParameters(
+            m,
+            [hx, hy, hz],
+            RotationalInertia_[sym.Expression](Ixx, Iyy, Izz, Ixy, Ixz, Iyz),
         )
-        inertia = SpatialInertia_[sym.Expression](
-            m, com, unit_inertia, skip_validity_check=False
-        )
+        # print("Calling SetSpatialInertiaInBodyFrame with inertia:\n", inertia)
         link.SetSpatialInertiaInBodyFrame(sym_plant_context, inertia)
 
     return ArmPlantComponents(

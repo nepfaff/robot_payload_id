@@ -44,6 +44,15 @@ git lfs pull
 python scripts/symbolic_id.py --config-name one_link_arm_symbolic_id
 ```
 
+## SDP System ID
+
+Generates data, constructs the data matrix and solves the SDP using posidefinite
+constraints on the pseudo inertias.
+
+```bash
+python scripts/solve_inertial_param_sdp.py --use_one_link_arm --remove_unidentifiable_params
+```
+
 ## Reparameterized System ID
 
 ```bash

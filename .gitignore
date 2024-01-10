@@ -4,5 +4,5 @@ __pycache__
 outputs
 logs
 *.csv
-data/
+/data/
 wandb/
