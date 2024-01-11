@@ -5,7 +5,7 @@ import numpy as np
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_simple_sinusoidal_traj_params,
-    extract_data_matrix_autodiff,
+    extract_numeric_data_matrix_autodiff,
 )
 from robot_payload_id.environment import create_arm
 from robot_payload_id.optimization import solve_inertial_param_sdp
@@ -68,7 +68,7 @@ def main():
         b=20.8 * np.zeros(num_joints),
         omega=0.5,
     )
-    W_data, tau_data = extract_data_matrix_autodiff(
+    W_data, tau_data = extract_numeric_data_matrix_autodiff(
         arm_components=arm_components, joint_data=joint_data
     )
 

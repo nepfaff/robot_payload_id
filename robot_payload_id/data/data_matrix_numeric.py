@@ -1,3 +1,8 @@
+"""
+Methods for computing the numeric form of the inertial parameter least-squares data
+matrix.
+"""
+
 import logging
 
 from typing import Optional, Tuple
@@ -19,7 +24,7 @@ from robot_payload_id.symbolic import create_autodiff_plant, create_symbolic_pla
 from robot_payload_id.utils import ArmPlantComponents, JointData
 
 
-def extract_data_matrix_symbolic(
+def extract_numeric_data_matrix_symbolic(
     joint_data: JointData,
     prog: Optional[MathematicalProgram] = None,
     use_implicit_dynamics: bool = False,
@@ -108,7 +113,7 @@ def extract_data_matrix_symbolic(
     return W_data, alpha_sym, tau_data
 
 
-def symbolic_decomposition_with_dynamic_substitution(
+def extract_numeric_data_matrix_through_symbolic_decomposition_with_dynamic_substitution(
     symbolic_plant_components: ArmPlantComponents, joint_data: JointData
 ):
     """Algorithm 1 from Andy's thesis for extracting the numeric data matrix using
@@ -162,7 +167,7 @@ def symbolic_decomposition_with_dynamic_substitution(
     return W_data, alpha_sym, tau_data
 
 
-def extract_data_matrix_autodiff(
+def extract_numeric_data_matrix_autodiff(
     arm_components: ArmPlantComponents, joint_data: JointData
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Extracts the numeric data matrix using autodiff. This scales to a large number of
