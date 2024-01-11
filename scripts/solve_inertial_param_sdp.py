@@ -3,7 +3,11 @@ import logging
 
 import numpy as np
 
-from robot_payload_id.data import extract_data_matrix_autodiff
+from robot_payload_id.data import (
+    compute_autodiff_joint_data_from_simple_sinusoidal_traj_params,
+    extract_data_matrix_autodiff,
+)
+from robot_payload_id.environment import create_arm
 from robot_payload_id.optimization import solve_inertial_param_sdp
 
 
@@ -43,14 +47,29 @@ def main():
 
     logging.basicConfig(level=args.log_level)
 
+    # Create arm
     num_joints = 1 if args.use_one_link_arm else 7
     urdf_path = (
         "./models/one_link_arm.urdf"
         if args.use_one_link_arm
         else "./models/iiwa.dmd.yaml"
     )
+    arm_components = create_arm(
+        arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
+    )
+
+    # Generate data matrix
+    # TODO: Make configurable (parameterization + parameters)
+    joint_data = compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
+        plant=arm_components.plant,
+        num_timesteps=args.num_data_points,
+        timestep=1.0,
+        a=-40.2049 * np.ones(num_joints),
+        b=20.8 * np.zeros(num_joints),
+        omega=0.5,
+    )
     W_data, tau_data = extract_data_matrix_autodiff(
-        num_joints=num_joints, urdf_path=urdf_path, num_data_points=args.num_data_points
+        arm_components=arm_components, joint_data=joint_data
     )
 
     identifiable = None

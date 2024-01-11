@@ -1,36 +1,22 @@
 import logging
 
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 
 from pydrake.all import (
     AutoDiffXd,
-    CommonSolverOption,
     DecomposeLumpedParameters,
     Evaluate,
     Expression,
-    ForceElementIndex,
     MathematicalProgram,
-    MathematicalProgramResult,
     MultibodyForces_,
-    MultibodyPlant,
-    Solve,
-    SolverOptions,
 )
 from tqdm import tqdm
 
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import create_autodiff_plant, create_symbolic_plant
-from robot_payload_id.utils import (
-    ArmComponents,
-    ArmPlantComponents,
-    JointData,
-    JointParameters,
-    SymJointStateVariables,
-)
-
-from .joint_data import compute_autodiff_joint_data_from_simple_sinusoidal_traj_params
+from robot_payload_id.utils import ArmPlantComponents, JointData
 
 
 def extract_data_matrix_symbolic(
@@ -177,38 +163,24 @@ def symbolic_decomposition_with_dynamic_substitution(
 
 
 def extract_data_matrix_autodiff(
-    num_joints: int, urdf_path: str, num_data_points: int
+    arm_components: ArmPlantComponents, joint_data: JointData
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Extracts the numeric data matrix using autodiff. This scales to a large number of
     links.
 
     Args:
-        num_joints (int): The number of joints in the robot.
-        urdf_path (str): The path to the robot URDF file.
-        num_data_points (int): The number of data points to generate.
+        arm_components (ArmPlantComponents): The arm components.
+        joint_data (JointData): The joint data.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: A tuple containing the numeric data matrix and
             the numeric torque data.
     """
-    # Create arm
-    arm_components = create_arm(
-        arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
-    )
+    # Create autodiff arm
     ad_plant_components = create_autodiff_plant(arm_components=arm_components)
 
-    # Generate data
-    # TODO: Make configurable (parameterization + parameters)
-    joint_data = compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
-        plant=arm_components.plant,
-        num_timesteps=num_data_points,
-        timestep=1.0,
-        a=-40.2049 * np.ones(num_joints),
-        b=20.8 * np.zeros(num_joints),
-        omega=0.5,
-    )
-
     # Extract data matrix
+    num_joints = joint_data.joint_positions.shape[1]
     num_timesteps = len(joint_data.sample_times_s)
     num_lumped_params = num_joints * 10
     W_data = np.zeros((num_timesteps * num_joints, num_lumped_params))
