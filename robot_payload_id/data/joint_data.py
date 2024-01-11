@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 
 from pydrake.all import AutoDiffXd, MultibodyForces_, MultibodyPlant
@@ -53,12 +55,12 @@ def generate_random_joint_data(
 
 
 def compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
-    plant: MultibodyPlant,
     num_timesteps: int,
     timestep: float,
     a: np.ndarray,
     b: np.ndarray,
     omega: float,
+    plant: Optional[MultibodyPlant] = None,
 ) -> JointData:
     """Generates autodiff joint data from the following simple sinusoidal trajectory
     parameterization:
@@ -67,7 +69,6 @@ def compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
         qi_ddot(t) = ai * (ω*i)**2 * cos(ω*i*t)
 
     Args:
-        plant (MultibodyPlant): The plant to generate data for.
         num_timesteps (int): The number of datapoints to generate.
         timestep (float): The timestep between datapoints.
         a (np.ndarray): The `a` parameters for the trajectory of type AutoDiffXd and
@@ -75,11 +76,12 @@ def compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
         b (np.ndarray): The `b` parameters for the trajectory of type AutoDiffXd and
             shape (num_joints,).
         omega (float): The frequency of the trajectory.
+        plant (MultibodyPlant, optional): The plant to generate data for. If None, then
+            the torques will be set to zero.
 
     Returns:
         JointData: The generated joint data.
     """
-
     q = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
     q_dot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
     q_ddot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
@@ -93,18 +95,19 @@ def compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
             )
 
     # Compute the corresponding torques
-    tau_gt = np.empty((num_timesteps, len(a)))
-    context = plant.CreateDefaultContext()
-    for i, (q_curr, v_curr, v_dot_curr) in tqdm(
-        enumerate(zip(q, q_dot, q_ddot)),
-        total=num_timesteps,
-        desc="Generating sinusoidal data",
-    ):
-        plant.SetPositions(context, q_curr)
-        plant.SetVelocities(context, v_curr)
-        forces = MultibodyForces_(plant)
-        plant.CalcForceElementsContribution(context, forces)
-        tau_gt[i] = plant.CalcInverseDynamics(context, v_dot_curr, forces)
+    tau_gt = np.zeros((num_timesteps, len(a)))
+    if plant is not None:
+        context = plant.CreateDefaultContext()
+        for i, (q_curr, v_curr, v_dot_curr) in tqdm(
+            enumerate(zip(q, q_dot, q_ddot)),
+            total=num_timesteps,
+            desc="Generating sinusoidal data",
+        ):
+            plant.SetPositions(context, q_curr)
+            plant.SetVelocities(context, v_curr)
+            forces = MultibodyForces_(plant)
+            plant.CalcForceElementsContribution(context, forces)
+            tau_gt[i] = plant.CalcInverseDynamics(context, v_dot_curr, forces)
 
     joint_data = JointData(
         joint_positions=q,

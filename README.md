@@ -53,10 +53,28 @@ constraints on the pseudo inertias.
 python scripts/solve_inertial_param_sdp.py --use_one_link_arm --remove_unidentifiable_params
 ```
 
+NOTE that one would want to obtain data using optimal experiment design to ensure that
+the numerics are good enough (e.g. condition number optimization).
+
 ## Reparameterized System ID
 
 ```bash
 python scripts/identify_model.py --config-name iiwa_id
+```
+
+## Optimal Experiment Design
+
+### 1. Computing and saving symbolic data matrix
+
+```bash
+python scripts/compute_and_save_symbolic_data_matrix.py --use_one_link_arm
+```
+
+### 2. Designing optimal excitation trajectories
+
+```bash
+python scripts/design_optimal_excitation_trajectories.py --use_one_link_arm \
+--optimizer "black_box" --cost_function "condition_number_and_e_optimality"
 ```
 
 ### Sweeping Parameters

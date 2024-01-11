@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 import pydrake.symbolic as sym
 
-from pydrake.all import MultibodyForces_
+from pydrake.all import Expression, MultibodyForces_
 from tqdm import tqdm
 
 from robot_payload_id.utils import (
@@ -148,3 +148,58 @@ def calc_lumped_parameters(
             alpha_gt = sym.Evaluate(alpha_sym, sym_env)
 
     return alpha_sym, alpha_estimated, alpha_gt
+
+
+def eval_expression_mat(
+    expression_mat: np.ndarray, symbolic_vars: np.ndarray, var_vals: np.ndarray
+) -> np.ndarray:
+    """Evaluate a (N,M) array of Drake Exressions with a given mapping of symbolic
+    variables to values.
+
+    Args:
+        expression_mat (np.ndarray): The (N,M) array of Drake Expressions to evaluate.
+        symbolic_vars (np.ndarray): The symbolic variables in the expressions of shape
+            (K,).
+        var_vals (np.ndarray): The values to substitute for the symbolic variables with
+            of shape (K,).
+
+    Returns:
+        np.ndarray: The evaluated expressions of shape (N,M).
+    """
+    var_val_mapping = dict(zip(symbolic_vars, var_vals))
+    evaluated_mat = np.empty(expression_mat.shape)
+    for i in range(expression_mat.shape[0]):
+        for j in range(expression_mat.shape[1]):
+            evaluated_mat[i, j] = expression_mat[i, j].Evaluate(var_val_mapping)
+    return evaluated_mat
+
+
+def eval_expression_mat_derivative(
+    expression_mat: np.ndarray, symbolic_vars: np.ndarray, var_vals: np.ndarray
+) -> np.ndarray:
+    """Evaluate the partial derivatives of a (N,M) array of Drake Exressions with a
+    given mapping of symbolic variables to values.
+
+    Args:
+        expression_mat (np.ndarray): The (N,M) array of Drake Expressions to evaluate.
+        symbolic_vars (np.ndarray): The symbolic variables in the expressions of shape
+            (K,).
+        var_vals (np.ndarray): The values to substitute for the symbolic variables with
+            of shape (K,).
+
+    Returns:
+        np.ndarray: The evaluated partial derivatives of shape (K,N,M).
+    """
+    derivatives = np.empty((len(symbolic_vars), *expression_mat.shape))
+    for k in range(len(symbolic_vars)):
+        var_val_mapping = dict(zip(np.delete(symbolic_vars, k), np.delete(var_vals, k)))
+        for i in range(expression_mat.shape[0]):
+            for j in range(expression_mat.shape[1]):
+                expr: Expression = expression_mat[i, j]
+                # Partial derivative of expr w.r.t. symbolic_vars[k]
+                derivatives[k, i, j] = (
+                    expr.EvaluatePartial(var_val_mapping)
+                    .Differentiate(symbolic_vars[k])
+                    .Evaluate({symbolic_vars[k]: var_vals[k]})
+                )
+    return derivatives

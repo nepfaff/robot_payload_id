@@ -17,6 +17,7 @@ import sympy
 from pydrake.all import Evaluate, Expression, MultibodyForces_, from_sympy, to_sympy
 from tqdm import tqdm
 
+from robot_payload_id.symbolic import eval_expression_mat
 from robot_payload_id.utils import ArmPlantComponents, JointData, SymJointStateVariables
 
 
@@ -97,6 +98,61 @@ def pickle_symbolic_data_matrix(
             pickle_to_file(expression_sympy, save_dir / f"W_{i}_{j}_sympy.pkl")
             pickle_to_file(make_memo_pickable(memo), save_dir / f"W_{i}_{j}_memo.pkl")
     logging.info(f"Time to save to disk: {timedelta(seconds=time.time() - start_time)}")
+
+
+def pickle_load(file_path: Path):
+    with open(file_path, "rb") as f:
+        return pickle.load(f)
+
+
+def load_symbolic_data_matrix(
+    dir_path: Path,
+    sym_state_variables: SymJointStateVariables,
+    num_joints: int,
+    num_params: int,
+) -> np.ndarray:
+    """Loads the symbolic data matrix from disk. The symbolic data matrix is assumed to
+    have been saved using `pickle_symbolic_data_matrix`.
+
+    Args:
+        dir_path (Path): The directory containing the symbolic data matrix.
+        sym_state_variables (SymJointStateVariables): The symbolic joint state
+            variables.
+        num_joints (int): The number of joints.
+        num_params (int): The number of parameters.
+
+    Returns:
+        np.ndarray: The symbolic data matrix.
+    """
+    name_to_var = {}
+    for q, q_dot, q_ddot, tau in zip(
+        sym_state_variables.q,
+        sym_state_variables.q_dot,
+        sym_state_variables.q_ddot,
+        sym_state_variables.tau,
+        strict=True,
+    ):
+        name_to_var[q.get_name()] = q
+        name_to_var[q_dot.get_name()] = q_dot
+        name_to_var[q_ddot.get_name()] = q_ddot
+        name_to_var[tau.get_name()] = tau
+
+    W_sym = np.empty((num_joints, num_params), dtype=Expression)
+    for i in tqdm(range(num_joints), total=num_joints, desc="Loading W_sym (joints)"):
+        for j in tqdm(
+            range(num_params), total=num_params, desc="   Loading W_sym (params)"
+        ):
+            memo = pickle_load(dir_path / f"W_{i}_{j}_memo.pkl")
+            for key, val in memo.items():
+                memo[key] = name_to_var[val]
+            expression_sympy = pickle_load(dir_path / f"W_{i}_{j}_sympy.pkl")
+            expression_drake = from_sympy(expression_sympy, memo=memo)
+            W_sym[i, j] = (
+                expression_drake
+                if isinstance(expression_drake, Expression)
+                else Expression(expression_drake)
+            )
+    return W_sym
 
 
 def extract_symbolic_data_matrix_Wensing_trick(
@@ -199,3 +255,68 @@ def extract_symbolic_data_matrix(
     )
 
     return W_sym
+
+
+def reexpress_symbolic_data_matrix(
+    W_sym: np.ndarray,
+    sym_state_variables: SymJointStateVariables,
+    joint_data: JointData,
+) -> np.ndarray:
+    """Re-expresses the symbolic data matrix using different symbolic variables.
+
+    Args:
+        W_sym (np.ndarray): The symbolic data matrix that will be re-expressed.
+        sym_state_variables (SymJointStateVariables): The symbolic joint state
+            variables contained in `W_sym`.
+        joint_data (JointData): The joint data to use for substituting values of type
+            `Expression`. Only the joint positions, velocities, and accelerations are
+            used.
+
+    Returns:
+        np.ndarray: The re-expressed symbolic data matrix.
+    """
+    num_timesteps, num_joints = joint_data.joint_positions.shape
+    W_sym_new = np.empty((num_timesteps, W_sym.shape[1]), dtype=Expression)
+    for i in tqdm(
+        range(num_timesteps),
+        total=num_timesteps,
+        desc="Creating data matrix from traj samples",
+    ):
+        sym_to_val = {}
+        for j in range(num_joints):
+            sym_to_val[sym_state_variables.q[j]] = joint_data.joint_positions[i, j]
+            sym_to_val[sym_state_variables.q_dot[j]] = joint_data.joint_velocities[i, j]
+            sym_to_val[sym_state_variables.q_ddot[j]] = joint_data.joint_accelerations[
+                i, j
+            ]
+
+        for m in range(num_joints):
+            for n in range(W_sym.shape[1]):
+                W_sym_new[i * num_joints + m, n] = W_sym[m, n].Substitute(sym_to_val)
+    return W_sym_new
+
+
+def remove_structurally_unidentifiable_columns(
+    W_sym: np.ndarray, symbolic_vars: np.ndarray, tolerance: float = 1e-12
+) -> np.ndarray:
+    """Removes structurally unidentifiable columns from a symbolic data matrix. The
+    methods works by evaluating the symbolic expressions with random values and
+    performing QR decomposition on the resulting numeric data matrix.
+
+    Args:
+        W_sym (np.ndarray): The symbolic data matrix.
+        symbolic_vars (np.ndarray): The symbolic variables in `W_sym`.
+        tolerance (float, optional): The tolerance for removing unidentifiable columns.
+
+    Returns:
+        np.ndarray: The symbolic data matrix with unidentifiable columns removed.
+    """
+    # Evaluate with random values
+    W_numeric = eval_expression_mat(
+        W_sym,
+        symbolic_vars,
+        np.random.uniform(low=1, high=100, size=len(symbolic_vars)),
+    )
+    _, R = np.linalg.qr(W_numeric)
+    identifiable = np.abs(np.diag(R)) > tolerance
+    return W_sym[:, identifiable]

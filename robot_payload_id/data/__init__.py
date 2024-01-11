@@ -1,7 +1,10 @@
 from .data_matrix_numeric import extract_numeric_data_matrix_autodiff
 from .data_matrix_symbolic import (
     extract_symbolic_data_matrix,
+    load_symbolic_data_matrix,
     pickle_symbolic_data_matrix,
+    reexpress_symbolic_data_matrix,
+    remove_structurally_unidentifiable_columns,
     symbolic_to_numeric_data_matrix,
 )
 from .joint_data import (

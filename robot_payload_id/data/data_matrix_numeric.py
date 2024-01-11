@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import create_autodiff_plant, create_symbolic_plant
-from robot_payload_id.utils import ArmPlantComponents, JointData
+from robot_payload_id.utils import ArmPlantComponents, JointData, SymJointStateVariables
 
 
 def extract_numeric_data_matrix_symbolic(
