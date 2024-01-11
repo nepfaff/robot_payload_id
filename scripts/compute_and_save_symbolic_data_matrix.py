@@ -10,7 +10,8 @@ from robot_payload_id.data import (
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import create_symbolic_plant
 
-if __name__ == "__main__":
+
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--use_one_link_arm",
@@ -60,3 +61,7 @@ if __name__ == "__main__":
         state_variables=sym_plant_components.state_variables,
         save_dir=save_dir,
     )
+
+
+if __name__ == "__main__":
+    main()
