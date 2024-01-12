@@ -140,7 +140,10 @@ def load_symbolic_data_matrix(
     W_sym = np.empty((num_joints, num_params), dtype=Expression)
     for i in tqdm(range(num_joints), total=num_joints, desc="Loading W_sym (joints)"):
         for j in tqdm(
-            range(num_params), total=num_params, desc="   Loading W_sym (params)"
+            range(num_params),
+            total=num_params,
+            desc="   Loading W_sym (params)",
+            leave=False,
         ):
             memo = pickle_load(dir_path / f"W_{i}_{j}_memo.pkl")
             for key, val in memo.items():
@@ -160,12 +163,14 @@ def extract_symbolic_data_matrix_Wensing_trick(
 ) -> np.ndarray:
     """
     Wensing's trick for computing W_sym by setting lumped parameters equal to one at a
-    time. This doesn't work as Drake doesn't simplify the expressions and thus throws a
-    division by zero error for terms such as m * hx/m when setting m = 0.
-    Simplifying using sympy should be possible but faces the same slowness issues as
-    `extract_data_matrix_symbolic`.
-    NOTE: This method is currently experimental and should be used with care.
-    TODO: Clean up + add documentation.
+    time. Requires the inverse dynamics to be computed in terms of the lumped
+    parameters.
+
+    Args:
+        symbolic_plant_components (ArmPlantComponents): The symbolic plant components.
+
+    Returns:
+        np.ndarray: The symbolic data matrix.
     """
     # Compute the symbolic torques
     forces = MultibodyForces_[Expression](symbolic_plant_components.plant)
@@ -186,17 +191,27 @@ def extract_symbolic_data_matrix_Wensing_trick(
         ]
     )
     W_column_vectors = []
-    for i in range(len(sym_parameters_arr)):
+    start_time = time.time()
+    for i in tqdm(
+        range(len(sym_parameters_arr)),
+        total=len(sym_parameters_arr),
+        desc="Computing W_sym (parameter loop)",
+    ):
         param_values = np.zeros(len(sym_parameters_arr))
         param_values[i] = 1.0
         W_column_vector = []
         expression: Expression
-        for expression in sym_torques:
+        for expression in tqdm(
+            sym_torques, desc="    Computing W_sym (column loop)", leave=False
+        ):
             W_column_vector.append(
                 expression.EvaluatePartial(dict(zip(sym_parameters_arr, param_values)))
             )
         W_column_vectors.append(W_column_vector)
     W_sym = np.hstack(W_column_vectors)
+    logging.info(
+        f"Time to compute W_sym: { timedelta(seconds=time.time() - start_time)}"
+    )
 
     return W_sym
 
@@ -205,7 +220,8 @@ def extract_symbolic_data_matrix(
     symbolic_plant_components: ArmPlantComponents,
     simplify: bool = False,
 ) -> np.ndarray:
-    """Uses symbolic differentiation to compute the symbolic data matrix.
+    """Uses symbolic differentiation to compute the symbolic data matrix. Requires the
+    inverse dynamics to be computed in terms of the lumped parameters.
 
     Args:
         symbolic_plant_components (ArmPlantComponents): The symbolic plant components.
