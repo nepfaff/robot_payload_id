@@ -257,8 +257,10 @@ def extract_symbolic_data_matrix(
         if simplify:
             memo = {}
             expression_sympy = to_sympy(expression, memo=memo)
-            # Cancel simplification should be sufficient
-            simplified_expression_sympy = sympy.cancel(expression_sympy)
+            # NOTE: This simplification step is very slow. We might be able to do better
+            # by manually choosing the simplification methods to use (e.g. 'expand'
+            # might suffice)
+            simplified_expression_sympy = sympy.simplify(expression_sympy)
             simplified_expression: Expression = from_sympy(
                 simplified_expression_sympy, memo=memo
             )
