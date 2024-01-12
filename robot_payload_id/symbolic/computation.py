@@ -166,7 +166,7 @@ def eval_expression_mat(
     Returns:
         np.ndarray: The evaluated expressions of shape (N,M).
     """
-    var_val_mapping = dict(zip(symbolic_vars, var_vals))
+    var_val_mapping = dict(zip(symbolic_vars, var_vals, strict=True))
     evaluated_mat = np.empty(expression_mat.shape)
     for i in range(expression_mat.shape[0]):
         for j in range(expression_mat.shape[1]):
@@ -192,7 +192,9 @@ def eval_expression_mat_derivative(
     """
     derivatives = np.empty((len(symbolic_vars), *expression_mat.shape))
     for k in range(len(symbolic_vars)):
-        var_val_mapping = dict(zip(np.delete(symbolic_vars, k), np.delete(var_vals, k)))
+        var_val_mapping = dict(
+            zip(np.delete(symbolic_vars, k), np.delete(var_vals, k), strict=True)
+        )
         for i in range(expression_mat.shape[0]):
             for j in range(expression_mat.shape[1]):
                 expr: Expression = expression_mat[i, j]
