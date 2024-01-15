@@ -269,7 +269,7 @@ def extract_symbolic_data_matrix(
             W_sym.append(expression.Jacobian(sym_parameters_arr))
     W_sym = np.vstack(W_sym)
     logging.info(
-        f"Time to compute W_sym: { timedelta(seconds=time.time() - start_time)}"
+        f"Time to compute W_sym: {timedelta(seconds=time.time() - start_time)}"
     )
 
     return W_sym
