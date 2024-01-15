@@ -20,6 +20,11 @@ def main():
         help="Use one link arm instead of 7-DOF arm.",
     )
     parser.add_argument(
+        "--load_data_matrix",
+        action="store_true",
+        help="Load data matrix from file instead of computing it.",
+    )
+    parser.add_argument(
         "--optimizer",
         type=str,
         required=True,
@@ -78,11 +83,20 @@ def main():
 
     use_one_link_arm = args.use_one_link_arm
     num_joints = 1 if use_one_link_arm else 7
-    data_matrix_dir_path = Path(
-        "data/symbolic_data_matrix_one_link_arm"
-        if use_one_link_arm
-        else "data/symbolic_data_matrix_iiwa"
-    )
+
+    data_matrix_dir_path, urdf_path = None, None
+    if args.load_data_matrix:
+        data_matrix_dir_path = Path(
+            "data/symbolic_data_matrix_one_link_arm"
+            if use_one_link_arm
+            else "data/symbolic_data_matrix_iiwa"
+        )
+    else:
+        urdf_path = (
+            "./models/one_link_arm.urdf"
+            if use_one_link_arm
+            else "./models/iiwa.dmd.yaml"
+        )
 
     optimizer = args.optimizer
     cost_function = args.cost_function
@@ -94,6 +108,7 @@ def main():
     if optimizer == "black_box":
         optimize_traj_black_box(
             data_matrix_dir_path=data_matrix_dir_path,
+            urdf_path=urdf_path,
             num_joints=num_joints,
             cost_function=cost_function,
             num_fourier_terms=num_fourier_terms,
@@ -105,6 +120,7 @@ def main():
     elif optimizer == "snopt":
         optimize_traj_snopt(
             data_matrix_dir_path=data_matrix_dir_path,
+            urdf_path=urdf_path,
             num_joints=num_joints,
             a_init=10 * np.random.rand(num_joints * num_fourier_terms),
             b_init=10 * np.random.rand(num_joints * num_fourier_terms),
@@ -119,6 +135,7 @@ def main():
     else:
         a, b, q0 = optimize_traj_black_box(
             data_matrix_dir_path=data_matrix_dir_path,
+            urdf_path=urdf_path,
             num_joints=num_joints,
             cost_function=cost_function,
             num_fourier_terms=num_fourier_terms,
@@ -129,6 +146,7 @@ def main():
         )
         optimize_traj_snopt(
             data_matrix_dir_path=data_matrix_dir_path,
+            urdf_path=urdf_path,
             num_joints=num_joints,
             a_init=a,
             b_init=b,

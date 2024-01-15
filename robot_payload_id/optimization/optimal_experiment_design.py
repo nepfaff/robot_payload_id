@@ -17,12 +17,14 @@ from pydrake.all import (
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params,
-    compute_autodiff_joint_data_from_simple_sinusoidal_traj_params,
+    extract_symbolic_data_matrix,
     load_symbolic_data_matrix,
     reexpress_symbolic_data_matrix,
     remove_structurally_unidentifiable_columns,
 )
+from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import (
+    create_symbolic_plant,
     eval_expression_mat,
     eval_expression_mat_derivative,
 )
@@ -39,7 +41,6 @@ class CostFunction(enum.Enum):
 
 
 def optimize_traj_snopt(
-    data_matrix_dir_path: Path,
     num_joints: int,
     a_init: np.ndarray,
     b_init: np.ndarray,
@@ -49,6 +50,8 @@ def optimize_traj_snopt(
     omega: float,
     num_timesteps: int,
     timestep: float,
+    data_matrix_dir_path: Optional[Path] = None,
+    urdf_path: Optional[str] = None,
     snopt_out_path: Optional[Path] = None,
     use_print_vars_callback: bool = False,
     iteration_limit: int = 10000000,
@@ -57,7 +60,6 @@ def optimize_traj_snopt(
     trajectory parameterization.
 
     Args:
-        data_matrix_dir_path (Path): The path to the symbolic data matrix.
         num_joints (int): The number of joints in the arm.
         a_init (np.ndarray): The initial guess for the trajectory parameters `a`.
         b_init (np.ndarray): The initial guess for the trajectory parameters `b`.
@@ -69,6 +71,10 @@ def optimize_traj_snopt(
         omega (float): The frequency of the trajectory.
         num_time_steps (int): The number of time steps to use for the trajectory.
         timestep (float): The time step to use for the trajectory.
+        data_matrix_dir_path (Path): The path to the symbolic data matrix. If None, then
+            the symbolic data matrix is re-computed.
+        urdf_path (str): The path to the URDF file. Only used if `data_matrix_dir_path`
+            is None.
         snopt_out_path (Path, optional): The path to write the SNOPT output to. If None,
             then no output is written.
         use_print_vars_callback (bool, optional): Whether to print the variables at each
@@ -84,21 +90,36 @@ def optimize_traj_snopt(
     assert (
         cost_function == CostFunction.CONDITION_NUMBER
     ), "Only condition number cost function is supported atm!"
+    assert not (
+        data_matrix_dir_path is None and urdf_path is None
+    ), "Must provide either data matrix dir path or URDF path!"
 
-    # Load symbolic data matrix
-    q_var = MakeVectorVariable(num_joints, "q")
-    q_dot_var = MakeVectorVariable(num_joints, "\dot{q}")
-    q_ddot_var = MakeVectorVariable(num_joints, "\ddot{q}")
-    tau_var = MakeVectorVariable(num_joints, "\tau")
-    sym_state_variables = SymJointStateVariables(
-        q=q_var, q_dot=q_dot_var, q_ddot=q_ddot_var, tau=tau_var
-    )
-    W_sym = load_symbolic_data_matrix(
-        dir_path=data_matrix_dir_path,
-        sym_state_variables=sym_state_variables,
-        num_joints=num_joints,
-        num_params=num_joints * 10,
-    )
+    # Obtain symbolic data matrix
+    if data_matrix_dir_path is None:  # Compute W_sym
+        arm_components = create_arm(
+            arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
+        )
+        sym_plant_components = create_symbolic_plant(
+            arm_components=arm_components, use_lumped_parameters=True
+        )
+        sym_state_variables = sym_plant_components.state_variables
+        W_sym = extract_symbolic_data_matrix(
+            symbolic_plant_components=sym_plant_components
+        )
+    else:  # Load W_sym
+        q_var = MakeVectorVariable(num_joints, "q")
+        q_dot_var = MakeVectorVariable(num_joints, "\dot{q}")
+        q_ddot_var = MakeVectorVariable(num_joints, "\ddot{q}")
+        tau_var = MakeVectorVariable(num_joints, "\tau")
+        sym_state_variables = SymJointStateVariables(
+            q=q_var, q_dot=q_dot_var, q_ddot=q_ddot_var, tau=tau_var
+        )
+        W_sym = load_symbolic_data_matrix(
+            dir_path=data_matrix_dir_path,
+            sym_state_variables=sym_state_variables,
+            num_joints=num_joints,
+            num_params=num_joints * 10,
+        )
 
     # Create decision variables
     prog = MathematicalProgram()
@@ -214,7 +235,6 @@ def optimize_traj_snopt(
 
 
 def optimize_traj_black_box(
-    data_matrix_dir_path: Path,
     num_joints: int,
     cost_function: CostFunction,
     num_fourier_terms: int,
@@ -222,12 +242,13 @@ def optimize_traj_black_box(
     num_timesteps: int,
     timestep: float,
     budget: int,
+    data_matrix_dir_path: Optional[Path] = None,
+    urdf_path: Optional[str] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Optimizes the trajectory parameters using black box optimization. Uses a Fourier
     series trajectory parameterization.
 
     Args:
-        data_matrix_dir_path (Path): The path to the symbolic data matrix.
         num_joints (int): The number of joints in the arm.
         cost_function (CostFunction): The cost function to use.
         num_fourier_terms (int): The number of Fourier terms to use for the trajectory
@@ -236,25 +257,45 @@ def optimize_traj_black_box(
         num_time_steps (int): The number of time steps to use for the trajectory.
         timestep (float): The time step to use for the trajectory.
         budget (int): The number of iterations to run the optimizer for.
+        data_matrix_dir_path (Path): The path to the symbolic data matrix. If None, then
+            the symbolic data matrix is re-computed.
+        urdf_path (str): The path to the URDF file. Only used if `data_matrix_dir_path`
+            is None.
 
     Returns:
         Tuple[np.ndarray, np.ndarray, np.ndarray]: The optimized trajectory parameters
             `a`, `b`, and `q0`.
     """
-    # Load symbolic data matrix
-    q_var = MakeVectorVariable(num_joints, "q")
-    q_dot_var = MakeVectorVariable(num_joints, "\dot{q}")
-    q_ddot_var = MakeVectorVariable(num_joints, "\ddot{q}")
-    tau_var = MakeVectorVariable(num_joints, "\tau")
-    sym_state_variables = SymJointStateVariables(
-        q=q_var, q_dot=q_dot_var, q_ddot=q_ddot_var, tau=tau_var
-    )
-    W_sym = load_symbolic_data_matrix(
-        dir_path=data_matrix_dir_path,
-        sym_state_variables=sym_state_variables,
-        num_joints=num_joints,
-        num_params=num_joints * 10,
-    )
+    assert not (
+        data_matrix_dir_path is None and urdf_path is None
+    ), "Must provide either data matrix dir path or URDF path!"
+
+    # Obtain symbolic data matrix
+    if data_matrix_dir_path is None:  # Compute W_sym
+        arm_components = create_arm(
+            arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
+        )
+        sym_plant_components = create_symbolic_plant(
+            arm_components=arm_components, use_lumped_parameters=True
+        )
+        sym_state_variables = sym_plant_components.state_variables
+        W_sym = extract_symbolic_data_matrix(
+            symbolic_plant_components=sym_plant_components
+        )
+    else:  # Load W_sym
+        q_var = MakeVectorVariable(num_joints, "q")
+        q_dot_var = MakeVectorVariable(num_joints, "\dot{q}")
+        q_ddot_var = MakeVectorVariable(num_joints, "\ddot{q}")
+        tau_var = MakeVectorVariable(num_joints, "\tau")
+        sym_state_variables = SymJointStateVariables(
+            q=q_var, q_dot=q_dot_var, q_ddot=q_ddot_var, tau=tau_var
+        )
+        W_sym = load_symbolic_data_matrix(
+            dir_path=data_matrix_dir_path,
+            sym_state_variables=sym_state_variables,
+            num_joints=num_joints,
+            num_params=num_joints * 10,
+        )
 
     # Create decision variables
     a = MakeVectorVariable(num_joints * num_fourier_terms, "a")
