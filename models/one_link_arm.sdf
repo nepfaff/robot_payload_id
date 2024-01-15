@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<sdf version="1.7">
+  <model name="one_link_arm">
+    <link name="base">
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>0.01</mass>
+          <inertia>
+            <ixx>0</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0</iyy>
+            <iyz>0</iyz>
+            <izz>0</izz>
+          </inertia>
+        </inertial>
+    </link>
+    <joint name="base_weld" type="fixed">
+        <child>base</child>
+        <parent>world</parent>
+    </joint>
+    <link name="link1">
+        <inertial>
+          <pose>0 0 -0.5 0 0 0</pose>
+          <mass>0.6</mass>
+          <inertia>
+            <ixx>0.05</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>0.05</iyy>
+            <iyz>0</iyz>
+            <izz>0</izz>
+          </inertia>
+        </inertial>
+        <visual name="link_1_visual">
+            <pose>0 0 -0.5 0 0 0</pose>
+            <geometry>
+                <cylinder>
+                  <radius>0.05</radius>
+                  <length>1</length>
+                </cylinder>
+            </geometry>
+            <material>
+              <diffuse>0.80078125 0.1484375 0.1484375 1.0</diffuse>
+            </material>
+        </visual>
+    </link>
+    <joint name="shoulder" type="revolute">
+        <child>link1</child>
+        <parent>base</parent>
+        <axis>
+          <xyz expressed_in="__model__">0 1 0</xyz>
+          <limit>
+            <lower>-2.96706</lower>
+            <upper>2.96706</upper>
+            <effort>300</effort>
+            <velocity>10</velocity>
+          </limit>
+          <dynamics>
+            <damping>0.0</damping>
+            <friction>0</friction>
+            <spring_reference>0</spring_reference>
+            <spring_stiffness>0</spring_stiffness>
+          </dynamics>
+        </axis>
+    </joint>
+  </model>
+</sdf>
