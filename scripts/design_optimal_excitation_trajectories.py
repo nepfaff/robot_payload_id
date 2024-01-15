@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
+from robot_payload_id.environment import create_arm
 from robot_payload_id.optimization import (
     CostFunction,
     optimize_traj_black_box,
@@ -66,7 +67,7 @@ def main():
     parser.add_argument(
         "--snopt_iteration_limit",
         type=int,
-        default=100,
+        default=1000,
         required=False,
         help="Iteration limit for SNOPT.",
     )
@@ -84,19 +85,22 @@ def main():
     use_one_link_arm = args.use_one_link_arm
     num_joints = 1 if use_one_link_arm else 7
 
-    data_matrix_dir_path, urdf_path = None, None
+    data_matrix_dir_path, model_path = None, None
     if args.load_data_matrix:
         data_matrix_dir_path = Path(
             "data/symbolic_data_matrix_one_link_arm"
             if use_one_link_arm
             else "data/symbolic_data_matrix_iiwa"
         )
-    else:
-        urdf_path = (
-            "./models/one_link_arm.urdf"
-            if use_one_link_arm
-            else "./models/iiwa.dmd.yaml"
-        )
+    model_path = (
+        "./models/one_link_arm.sdf" if use_one_link_arm else "./models/iiwa.dmd.yaml"
+    )
+
+    arm_components = create_arm(arm_file_path=model_path, num_joints=num_joints)
+    plant = arm_components.plant
+    robot_model_instance_idx = plant.GetModelInstanceByName(
+        "arm" if use_one_link_arm else "iiwa"
+    )
 
     optimizer = args.optimizer
     cost_function = args.cost_function
@@ -108,7 +112,7 @@ def main():
     if optimizer == "black_box":
         optimize_traj_black_box(
             data_matrix_dir_path=data_matrix_dir_path,
-            urdf_path=urdf_path,
+            model_path=model_path,
             num_joints=num_joints,
             cost_function=cost_function,
             num_fourier_terms=num_fourier_terms,
@@ -120,22 +124,24 @@ def main():
     elif optimizer == "snopt":
         optimize_traj_snopt(
             data_matrix_dir_path=data_matrix_dir_path,
-            urdf_path=urdf_path,
+            model_path=model_path,
             num_joints=num_joints,
-            a_init=10 * np.random.rand(num_joints * num_fourier_terms),
-            b_init=10 * np.random.rand(num_joints * num_fourier_terms),
+            a_init=5 * np.random.rand(num_joints * num_fourier_terms),
+            b_init=5 * np.random.rand(num_joints * num_fourier_terms),
             q0_init=np.random.rand(num_joints),
             cost_function=cost_function,
             num_fourier_terms=num_fourier_terms,
             omega=omega,
             num_timesteps=num_timesteps,
             timestep=timestep,
+            plant=plant,
+            robot_model_instance_idx=robot_model_instance_idx,
             iteration_limit=snopt_iteration_limit,
         )
     else:
         a, b, q0 = optimize_traj_black_box(
             data_matrix_dir_path=data_matrix_dir_path,
-            urdf_path=urdf_path,
+            model_path=model_path,
             num_joints=num_joints,
             cost_function=cost_function,
             num_fourier_terms=num_fourier_terms,
@@ -146,7 +152,7 @@ def main():
         )
         optimize_traj_snopt(
             data_matrix_dir_path=data_matrix_dir_path,
-            urdf_path=urdf_path,
+            model_path=model_path,
             num_joints=num_joints,
             a_init=a,
             b_init=b,
@@ -156,6 +162,8 @@ def main():
             omega=omega,
             num_timesteps=num_timesteps,
             timestep=timestep,
+            plant=plant,
+            robot_model_instance_idx=robot_model_instance_idx,
             iteration_limit=snopt_iteration_limit,
         )
 

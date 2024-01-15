@@ -12,6 +12,8 @@ from pydrake.all import (
     MakeVectorVariable,
     MathematicalProgram,
     MathematicalProgramResult,
+    ModelInstanceIndex,
+    MultibodyPlant,
     SnoptSolver,
 )
 
@@ -50,8 +52,10 @@ def optimize_traj_snopt(
     omega: float,
     num_timesteps: int,
     timestep: float,
+    plant: MultibodyPlant,
+    robot_model_instance_idx: ModelInstanceIndex,
     data_matrix_dir_path: Optional[Path] = None,
-    urdf_path: Optional[str] = None,
+    model_path: Optional[str] = None,
     snopt_out_path: Optional[Path] = None,
     use_print_vars_callback: bool = False,
     iteration_limit: int = 10000000,
@@ -71,10 +75,13 @@ def optimize_traj_snopt(
         omega (float): The frequency of the trajectory.
         num_time_steps (int): The number of time steps to use for the trajectory.
         timestep (float): The time step to use for the trajectory.
+        plant (MultibodyPlant): The plant to use for adding constraints.
+        robot_model_instance_idx (ModelInstanceIndex): The model instance index of the
+            robot. Used for adding constraints.
         data_matrix_dir_path (Path): The path to the symbolic data matrix. If None, then
             the symbolic data matrix is re-computed.
-        urdf_path (str): The path to the URDF file. Only used if `data_matrix_dir_path`
-            is None.
+        model_path (str): The path to the model file (e.g. SDFormat, URDF). Only used
+            if `data_matrix_dir_path` is None.
         snopt_out_path (Path, optional): The path to write the SNOPT output to. If None,
             then no output is written.
         use_print_vars_callback (bool, optional): Whether to print the variables at each
@@ -91,13 +98,13 @@ def optimize_traj_snopt(
         cost_function == CostFunction.CONDITION_NUMBER
     ), "Only condition number cost function is supported atm!"
     assert not (
-        data_matrix_dir_path is None and urdf_path is None
-    ), "Must provide either data matrix dir path or URDF path!"
+        data_matrix_dir_path is None and model_path is None
+    ), "Must provide either data matrix dir path or model path!"
 
     # Obtain symbolic data matrix
     if data_matrix_dir_path is None:  # Compute W_sym
         arm_components = create_arm(
-            arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
+            arm_file_path=model_path, num_joints=num_joints, time_step=0.0
         )
         sym_plant_components = create_symbolic_plant(
             arm_components=arm_components, use_lumped_parameters=True
@@ -196,6 +203,20 @@ def optimize_traj_snopt(
 
     prog.AddCost(condition_number_cost_with_gradient, vars=symbolic_vars)
 
+    # Joint limit constraints
+    for i in range(num_joints):
+        joint_indices = plant.GetJointIndices(robot_model_instance_idx)
+        upper_limit = plant.get_mutable_joint(
+            joint_indices[i + 1]
+        ).position_upper_limits()[0]
+        lower_limit = plant.get_mutable_joint(
+            joint_indices[i + 1]
+        ).position_lower_limits()[0]
+        for j in range(num_timesteps):
+            prog.AddConstraint(
+                joint_data.joint_positions[j, i], lower_limit, upper_limit
+            )
+
     # Set initial guess
     prog.SetInitialGuess(a, a_init)
     prog.SetInitialGuess(b, b_init)
@@ -225,6 +246,9 @@ def optimize_traj_snopt(
         logging.warning("Failed to solve!")
         logging.info(f"MathematicalProgram:\n{prog}")
         logging.info(f"Solution result: {res.get_solution_result()}")
+        logging.info(
+            f"Infeasible constraints: {res.GetInfeasibleConstraintNames(prog)}"
+        )
         logging.info(f"Final loss: {res.get_optimal_cost()}")
         logging.info(
             "Final param values: "
@@ -243,7 +267,7 @@ def optimize_traj_black_box(
     timestep: float,
     budget: int,
     data_matrix_dir_path: Optional[Path] = None,
-    urdf_path: Optional[str] = None,
+    model_path: Optional[str] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Optimizes the trajectory parameters using black box optimization. Uses a Fourier
     series trajectory parameterization.
@@ -259,21 +283,21 @@ def optimize_traj_black_box(
         budget (int): The number of iterations to run the optimizer for.
         data_matrix_dir_path (Path): The path to the symbolic data matrix. If None, then
             the symbolic data matrix is re-computed.
-        urdf_path (str): The path to the URDF file. Only used if `data_matrix_dir_path`
-            is None.
+        model_path (str): The path to the model file (e.g. SDFormat, URDF). Only used
+            if `data_matrix_dir_path` is None.
 
     Returns:
         Tuple[np.ndarray, np.ndarray, np.ndarray]: The optimized trajectory parameters
             `a`, `b`, and `q0`.
     """
     assert not (
-        data_matrix_dir_path is None and urdf_path is None
-    ), "Must provide either data matrix dir path or URDF path!"
+        data_matrix_dir_path is None and model_path is None
+    ), "Must provide either data matrix dir path or model path!"
 
     # Obtain symbolic data matrix
     if data_matrix_dir_path is None:  # Compute W_sym
         arm_components = create_arm(
-            arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
+            arm_file_path=model_path, num_joints=num_joints, time_step=0.0
         )
         sym_plant_components = create_symbolic_plant(
             arm_components=arm_components, use_lumped_parameters=True
