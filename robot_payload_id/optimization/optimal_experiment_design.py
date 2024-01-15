@@ -265,6 +265,8 @@ def optimize_traj_black_box(
     omega: float,
     num_timesteps: int,
     timestep: float,
+    plant: MultibodyPlant,
+    robot_model_instance_idx: ModelInstanceIndex,
     budget: int,
     data_matrix_dir_path: Optional[Path] = None,
     model_path: Optional[str] = None,
@@ -280,6 +282,9 @@ def optimize_traj_black_box(
         omega (float): The frequency of the trajectory.
         num_time_steps (int): The number of time steps to use for the trajectory.
         timestep (float): The time step to use for the trajectory.
+        plant (MultibodyPlant): The plant to use for adding constraints.
+        robot_model_instance_idx (ModelInstanceIndex): The model instance index of the
+            robot. Used for adding constraints.
         budget (int): The number of iterations to run the optimizer for.
         data_matrix_dir_path (Path): The path to the symbolic data matrix. If None, then
             the symbolic data matrix is re-computed.
@@ -409,8 +414,35 @@ def optimize_traj_black_box(
         CostFunction.CONDITION_NUMBER_AND_E_OPTIMALITY: condition_number_and_e_optimality_cost,
     }
 
+    def joint_limit_penalty(var_values):
+        joint_positions_numeric = eval_expression_mat(
+            joint_data.joint_positions, symbolic_vars, var_values
+        )
+
+        num_violations = 0
+        for i in range(num_joints):
+            joint_indices = plant.GetJointIndices(robot_model_instance_idx)
+            upper_limit = plant.get_mutable_joint(
+                joint_indices[i + 1]
+            ).position_upper_limits()[0]
+            lower_limit = plant.get_mutable_joint(
+                joint_indices[i + 1]
+            ).position_lower_limits()[0]
+            num_violations += np.count_nonzero(
+                (joint_positions_numeric[:, i] < lower_limit)
+                | (joint_positions_numeric[:, i] > upper_limit)
+            )
+        return num_violations
+
+    def combined_objective(var_values):
+        return cost_function_to_cost[cost_function](
+            var_values
+        ) + 1 * joint_limit_penalty(var_values)
+
     # NOTE: Cost function must be pickable for parallelization
-    # optimizer = ng.optimizers.NGOpt(parametrization=2, budget=500000, num_workers=16)
+    # optimizer = ng.optimizers.NGOpt(
+    #     parametrization=len(a) + len(b) + len(q0), budget=budget, num_workers=16
+    # )
     # # Optimize in parallel
     # with futures.ProcessPoolExecutor(max_workers=optimizer.num_workers) as executor:
     #     recommendation = optimizer.minimize(
@@ -421,7 +453,7 @@ def optimize_traj_black_box(
     optimizer = ng.optimizers.NGOpt(
         parametrization=len(a) + len(b) + len(q0), budget=budget
     )
-    recommendation = optimizer.minimize(cost_function_to_cost[cost_function])
+    recommendation = optimizer.minimize(combined_objective)
     logging.info(f"Final loss: {recommendation.loss}")
     symbolic_var_names = [var.get_name() for var in symbolic_vars]
     logging.info(

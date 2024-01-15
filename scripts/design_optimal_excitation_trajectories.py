@@ -119,6 +119,8 @@ def main():
             omega=omega,
             num_timesteps=num_timesteps,
             timestep=timestep,
+            plant=plant,
+            robot_model_instance_idx=robot_model_instance_idx,
             budget=5000,
         )
     elif optimizer == "snopt":
@@ -148,6 +150,8 @@ def main():
             omega=omega,
             num_timesteps=num_timesteps,
             timestep=timestep,
+            plant=plant,
+            robot_model_instance_idx=robot_model_instance_idx,
             budget=5000,
         )
         optimize_traj_snopt(
