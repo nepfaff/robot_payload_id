@@ -298,7 +298,7 @@ def reexpress_symbolic_data_matrix(
     for i in tqdm(
         range(num_timesteps),
         total=num_timesteps,
-        desc="Creating data matrix from traj samples",
+        desc="Creating data matrix from traj samples (time steps)",
     ):
         sym_to_val = {}
         for j in range(num_joints):
@@ -308,8 +308,18 @@ def reexpress_symbolic_data_matrix(
                 i, j
             ]
 
-        for m in range(num_joints):
-            for n in range(W_sym.shape[1]):
+        for m in tqdm(
+            range(num_joints),
+            total=num_joints,
+            desc="    Substituting W_sym (column)",
+            leave=False,
+        ):
+            for n in tqdm(
+                range(W_sym.shape[1]),
+                total=W_sym.shape[1],
+                desc="        Substituting W_sym (row)",
+                leave=False,
+            ):
                 W_sym_new[i * num_joints + m, n] = W_sym[m, n].Substitute(sym_to_val)
     return W_sym_new
 
