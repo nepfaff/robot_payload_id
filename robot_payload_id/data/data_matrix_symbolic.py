@@ -41,9 +41,17 @@ def symbolic_to_numeric_data_matrix(
     W_data = np.zeros((num_timesteps * num_joints, num_lumped_params))
     tau_data = joint_data.joint_torques.flatten()
 
-    for i in tqdm(range(num_timesteps), desc="Computing W_data from W_sym"):
+    for i in tqdm(
+        range(num_timesteps),
+        total=num_timesteps,
+        desc="Computing W_data from W_sym (time step)",
+    ):
         sym_to_val = {}
-        for j in range(num_joints):
+        for j in tqdm(
+            range(num_joints),
+            total=num_joints,
+            desc="    Computing W_data from W_sym (joint)",
+        ):
             sym_to_val[state_variables.q[j]] = joint_data.joint_positions[i, j]
             sym_to_val[state_variables.q_dot[j]] = joint_data.joint_velocities[i, j]
             sym_to_val[state_variables.q_ddot[j]] = joint_data.joint_accelerations[i, j]
