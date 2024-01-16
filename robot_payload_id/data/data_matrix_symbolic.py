@@ -22,18 +22,23 @@ from robot_payload_id.utils import ArmPlantComponents, JointData, SymJointStateV
 
 
 def symbolic_to_numeric_data_matrix(
-    state_variables: SymJointStateVariables, joint_data: JointData, W_sym: np.ndarray
+    state_variables: SymJointStateVariables,
+    joint_data: JointData,
+    W_sym: np.ndarray,
+    use_progress_bars: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Converts symbolic data matrix to numeric data matrix.
 
     Args:
         state_variables (SymJointStateVariables): The symbolic joint state variables.
         joint_data (JointData): The joint data to use for substituting values.
-        W_sym (np.ndarray): The symbolic data matrix.
+        W_sym (np.ndarray): The symbolic data matrix of shape (num_joints, num_params).
+        use_progress_bars (bool, optional): Whether to use progress bars.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: A tuple containing the numeric data matrix and
-            the numeric joint torques.
+            the numeric joint torques. The numeric data matrix has shape
+            (num_timesteps * num_joints, num_params).
     """
     num_joints = joint_data.joint_positions.shape[1]
     num_timesteps = len(joint_data.sample_times_s)
@@ -45,12 +50,15 @@ def symbolic_to_numeric_data_matrix(
         range(num_timesteps),
         total=num_timesteps,
         desc="Computing W_data from W_sym (time step)",
+        disable=not use_progress_bars,
     ):
         sym_to_val = {}
         for j in tqdm(
             range(num_joints),
             total=num_joints,
             desc="    Computing W_data from W_sym (joint)",
+            leave=False,
+            disable=not use_progress_bars,
         ):
             sym_to_val[state_variables.q[j]] = joint_data.joint_positions[i, j]
             sym_to_val[state_variables.q_dot[j]] = joint_data.joint_velocities[i, j]
@@ -291,7 +299,8 @@ def reexpress_symbolic_data_matrix(
     """Re-expresses the symbolic data matrix using different symbolic variables.
 
     Args:
-        W_sym (np.ndarray): The symbolic data matrix that will be re-expressed.
+        W_sym (np.ndarray): The symbolic data matrix that will be re-expressed of shape
+            (num_joints, num_params).
         sym_state_variables (SymJointStateVariables): The symbolic joint state
             variables contained in `W_sym`.
         joint_data (JointData): The joint data to use for substituting values of type
@@ -299,7 +308,8 @@ def reexpress_symbolic_data_matrix(
             used.
 
     Returns:
-        np.ndarray: The re-expressed symbolic data matrix.
+        np.ndarray: The re-expressed symbolic data matrix of shape
+            (num_timesteps * num_joints, num_params).
     """
     num_timesteps, num_joints = joint_data.joint_positions.shape
     W_sym_new = np.empty((num_timesteps, W_sym.shape[1]), dtype=Expression)
@@ -332,20 +342,22 @@ def reexpress_symbolic_data_matrix(
     return W_sym_new
 
 
-def remove_structurally_unidentifiable_columns(
+def get_structurally_identifiable_column_mask(
     W_sym: np.ndarray, symbolic_vars: np.ndarray, tolerance: float = 1e-12
 ) -> np.ndarray:
-    """Removes structurally unidentifiable columns from a symbolic data matrix. The
+    """Gets the structurally identifiable columns of a symbolic data matrix. The
     methods works by evaluating the symbolic expressions with random values and
     performing QR decomposition on the resulting numeric data matrix.
 
     Args:
-        W_sym (np.ndarray): The symbolic data matrix.
+        W_sym (np.ndarray): The symbolic data matrix of shape
+            (num_timesteps * num_joints, num_params).
         symbolic_vars (np.ndarray): The symbolic variables in `W_sym`.
         tolerance (float, optional): The tolerance for removing unidentifiable columns.
 
     Returns:
-        np.ndarray: The symbolic data matrix with unidentifiable columns removed.
+        np.ndarray: The structurally identifiable column mask of `W_sym` of shape
+        (num_params,) and type bool.
     """
     # Evaluate with random values
     W_numeric = eval_expression_mat(
@@ -355,4 +367,28 @@ def remove_structurally_unidentifiable_columns(
     )
     _, R = np.linalg.qr(W_numeric)
     identifiable = np.abs(np.diag(R)) > tolerance
+    return identifiable
+
+
+def remove_structurally_unidentifiable_columns(
+    W_sym: np.ndarray, symbolic_vars: np.ndarray, tolerance: float = 1e-12
+) -> np.ndarray:
+    """Removes structurally unidentifiable columns from a symbolic data matrix. The
+    methods works by evaluating the symbolic expressions with random values and
+    performing QR decomposition on the resulting numeric data matrix.
+
+    Args:
+        W_sym (np.ndarray): The symbolic data matrix of shape
+            (num_timesteps * num_joints, num_params).
+        symbolic_vars (np.ndarray): The symbolic variables in `W_sym`.
+        tolerance (float, optional): The tolerance for removing unidentifiable columns.
+
+    Returns:
+        np.ndarray: The symbolic data matrix with unidentifiable columns removed of
+        shape (num_joints, num_identifiable_params) where num_identifiable_params
+        <= num_params.
+    """
+    identifiable = get_structurally_identifiable_column_mask(
+        W_sym=W_sym, symbolic_vars=symbolic_vars, tolerance=tolerance
+    )
     return W_sym[:, identifiable]

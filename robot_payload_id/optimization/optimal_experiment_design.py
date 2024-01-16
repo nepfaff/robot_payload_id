@@ -1,6 +1,8 @@
 import enum
 import logging
+import time
 
+from datetime import timedelta
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -23,6 +25,7 @@ from robot_payload_id.data import (
     load_symbolic_data_matrix,
     reexpress_symbolic_data_matrix,
     remove_structurally_unidentifiable_columns,
+    symbolic_to_numeric_data_matrix,
 )
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import (
@@ -30,7 +33,7 @@ from robot_payload_id.symbolic import (
     eval_expression_mat,
     eval_expression_mat_derivative,
 )
-from robot_payload_id.utils import SymJointStateVariables
+from robot_payload_id.utils import JointData, SymJointStateVariables
 
 
 class CostFunction(enum.Enum):
@@ -235,7 +238,11 @@ def optimize_traj_snopt(
         )
 
     # Solve
+    optimization_start = time.time()
     res: MathematicalProgramResult = solver.Solve(prog)
+    logging.info(
+        f"Optimization took {timedelta(seconds=time.time() - optimization_start)}"
+    )
     if res.is_success():
         logging.info("Solved successfully!")
         logging.info(
@@ -270,6 +277,7 @@ def optimize_traj_black_box(
     budget: int,
     data_matrix_dir_path: Optional[Path] = None,
     model_path: Optional[str] = None,
+    symbolically_reexpress_data_matrix: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Optimizes the trajectory parameters using black box optimization. Uses a Fourier
     series trajectory parameterization.
@@ -290,6 +298,9 @@ def optimize_traj_black_box(
             the symbolic data matrix is re-computed.
         model_path (str): The path to the model file (e.g. SDFormat, URDF). Only used
             if `data_matrix_dir_path` is None.
+        symbolically_reexpress_data_matrix (bool): Whether to symbolically re-express
+            the data matrix. If False, then the data matrix is numerically re-expressed
+            at each iteration.
 
     Returns:
         Tuple[np.ndarray, np.ndarray, np.ndarray]: The optimized trajectory parameters
@@ -332,7 +343,7 @@ def optimize_traj_black_box(
     q0 = MakeVectorVariable(num_joints, "q0")
     symbolic_vars = np.concatenate([a, b, q0])
 
-    # Express symbolic data matrix in terms of decision variables
+    # Compute symbolic joint data in terms of the decision variables
     joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
         num_timesteps=num_timesteps,
         timestep=timestep,
@@ -341,20 +352,67 @@ def optimize_traj_black_box(
         q0=q0,
         omega=omega,
     )
-    W_data = reexpress_symbolic_data_matrix(
-        W_sym=W_sym, sym_state_variables=sym_state_variables, joint_data=joint_data
-    )
 
-    # Remove structurally unidentifiable columns to prevent SolutionResult.kUnbounded
-    W_data = remove_structurally_unidentifiable_columns(W_data, symbolic_vars)
+    if symbolically_reexpress_data_matrix:
+        # Express symbolic data matrix in terms of decision variables
+        W_data = reexpress_symbolic_data_matrix(
+            W_sym=W_sym, sym_state_variables=sym_state_variables, joint_data=joint_data
+        )
 
-    W_dataTW_data = W_data.T @ W_data
+        # Remove structurally unidentifiable columns to prevent SolutionResult.kUnbounded
+        W_data = remove_structurally_unidentifiable_columns(W_data, symbolic_vars)
+
+        W_dataTW_data = W_data.T @ W_data
+
+        def compute_W_dataTW_data_numeric(var_values) -> np.ndarray:
+            W_dataTW_data_numeric = eval_expression_mat(
+                W_dataTW_data, symbolic_vars, var_values
+            )
+            return W_dataTW_data_numeric
+
+    else:
+        joint_symbolic_vars_expressions = np.concatenate(
+            [
+                joint_data.joint_positions,
+                joint_data.joint_velocities,
+                joint_data.joint_accelerations,
+            ],
+            axis=1,
+        )  # shape (num_timesteps, num_joints * 3)
+
+        def compute_W_dataTW_data_numeric(var_values) -> np.ndarray:
+            # Evaluate symbolic joint data
+            joint_symbolic_vars_values = eval_expression_mat(
+                joint_symbolic_vars_expressions, symbolic_vars, var_values
+            )  # shape (num_timesteps, num_joints * 3)
+            q_numeric, q_dot_numeric, q_ddot_numeric = np.split(
+                joint_symbolic_vars_values, 3, axis=1
+            )
+            joint_data_numeric = JointData(
+                joint_positions=q_numeric,
+                joint_velocities=q_dot_numeric,
+                joint_accelerations=q_ddot_numeric,
+                joint_torques=np.zeros_like(q_numeric),
+                sample_times_s=joint_data.sample_times_s,
+            )
+
+            # Evaluate and stack symbolic data matrix
+            W_data_raw, _ = symbolic_to_numeric_data_matrix(
+                sym_state_variables, joint_data_numeric, W_sym, use_progress_bars=False
+            )
+
+            # Remove structurally unidentifiable columns to prevent
+            # SolutionResult.kUnbounded
+            _, R = np.linalg.qr(W_data_raw)
+            identifiable = np.abs(np.diag(R)) > 1e-12
+            W_data = W_data_raw[:, identifiable]
+
+            W_dataTW_data = W_data.T @ W_data
+            return W_dataTW_data
 
     # Define cost functions
-    def condition_number_cost(var_values):
-        W_dataTW_data_numeric = eval_expression_mat(
-            W_dataTW_data, symbolic_vars, var_values
-        )
+    def condition_number_cost(var_values) -> float:
+        W_dataTW_data_numeric = compute_W_dataTW_data_numeric(var_values)
         eigenvalues, _ = np.linalg.eigh(W_dataTW_data_numeric)
         min_eig_idx = np.argmin(eigenvalues)
         max_eig_idx = np.argmax(eigenvalues)
@@ -367,10 +425,8 @@ def optimize_traj_black_box(
         condition_number = max_eig / min_eig
         return condition_number
 
-    def condition_number_and_d_optimality_cost(var_values):
-        W_dataTW_data_numeric = eval_expression_mat(
-            W_dataTW_data, symbolic_vars, var_values
-        )
+    def condition_number_and_d_optimality_cost(var_values) -> float:
+        W_dataTW_data_numeric = compute_W_dataTW_data_numeric(var_values)
         eigenvalues, _ = np.linalg.eigh(W_dataTW_data_numeric)
         min_eig_idx = np.argmin(eigenvalues)
         max_eig_idx = np.argmax(eigenvalues)
@@ -388,10 +444,8 @@ def optimize_traj_black_box(
         cost = condition_number + d_optimality_weight * d_optimality
         return cost
 
-    def condition_number_and_e_optimality_cost(var_values):
-        W_dataTW_data_numeric = eval_expression_mat(
-            W_dataTW_data, symbolic_vars, var_values
-        )
+    def condition_number_and_e_optimality_cost(var_values) -> float:
+        W_dataTW_data_numeric = compute_W_dataTW_data_numeric(var_values)
         eigenvalues, _ = np.linalg.eigh(W_dataTW_data_numeric)
         min_eig_idx = np.argmin(eigenvalues)
         max_eig_idx = np.argmax(eigenvalues)
@@ -414,7 +468,7 @@ def optimize_traj_black_box(
         CostFunction.CONDITION_NUMBER_AND_E_OPTIMALITY: condition_number_and_e_optimality_cost,
     }
 
-    def joint_limit_penalty(var_values):
+    def joint_limit_penalty(var_values) -> float:
         joint_positions_numeric = eval_expression_mat(
             joint_data.joint_positions, symbolic_vars, var_values
         )
@@ -434,7 +488,7 @@ def optimize_traj_black_box(
             )
         return num_violations
 
-    def combined_objective(var_values):
+    def combined_objective(var_values) -> float:
         return cost_function_to_cost[cost_function](
             var_values
         ) + 1 * joint_limit_penalty(var_values)
@@ -453,7 +507,11 @@ def optimize_traj_black_box(
     optimizer = ng.optimizers.NGOpt(
         parametrization=len(a) + len(b) + len(q0), budget=budget
     )
+    optimization_start = time.time()
     recommendation = optimizer.minimize(combined_objective)
+    logging.info(
+        f"Optimization took {timedelta(seconds=time.time() - optimization_start)}"
+    )
     logging.info(f"Final loss: {recommendation.loss}")
     symbolic_var_names = [var.get_name() for var in symbolic_vars]
     logging.info(

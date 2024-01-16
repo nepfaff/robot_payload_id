@@ -79,6 +79,13 @@ def main():
         help="Budget for black-box optimization.",
     )
     parser.add_argument(
+        "--not_symbolically_reexpress_data_matrix",
+        action="store_true",
+        help="Whether to not symbolically re-express the data matrix. If True, then the "
+        + "data matrix is numerically re-expressed at each iteration. Only used for "
+        + "black-box optimization.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -115,6 +122,7 @@ def main():
     timestep = args.timestep
     snopt_iteration_limit = args.snopt_iteration_limit
     budget = args.budget
+    symbolically_reexpress_data_matrix = not args.not_symbolically_reexpress_data_matrix
     if optimizer == "black_box":
         optimize_traj_black_box(
             data_matrix_dir_path=data_matrix_dir_path,
@@ -128,6 +136,7 @@ def main():
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
+            symbolically_reexpress_data_matrix=symbolically_reexpress_data_matrix,
         )
     elif optimizer == "snopt":
         optimize_traj_snopt(
@@ -159,6 +168,7 @@ def main():
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
+            symbolically_reexpress_data_matrix=symbolically_reexpress_data_matrix,
         )
         optimize_traj_snopt(
             data_matrix_dir_path=data_matrix_dir_path,

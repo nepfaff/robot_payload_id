@@ -2,6 +2,7 @@ from .data_matrix_numeric import extract_numeric_data_matrix_autodiff
 from .data_matrix_symbolic import (
     extract_symbolic_data_matrix,
     extract_symbolic_data_matrix_Wensing_trick,
+    get_structurally_identifiable_column_mask,
     load_symbolic_data_matrix,
     pickle_symbolic_data_matrix,
     reexpress_symbolic_data_matrix,
