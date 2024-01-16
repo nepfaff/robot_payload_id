@@ -72,6 +72,13 @@ def main():
         help="Iteration limit for SNOPT.",
     )
     parser.add_argument(
+        "--budget",
+        type=int,
+        default=5000,
+        required=False,
+        help="Budget for black-box optimization.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -107,6 +114,7 @@ def main():
     num_timesteps = args.num_timesteps
     timestep = args.timestep
     snopt_iteration_limit = args.snopt_iteration_limit
+    budget = args.budget
     if optimizer == "black_box":
         optimize_traj_black_box(
             data_matrix_dir_path=data_matrix_dir_path,
@@ -119,7 +127,7 @@ def main():
             timestep=timestep,
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
-            budget=5000,
+            budget=budget,
         )
     elif optimizer == "snopt":
         optimize_traj_snopt(
@@ -150,7 +158,7 @@ def main():
             timestep=timestep,
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
-            budget=5000,
+            budget=budget,
         )
         optimize_traj_snopt(
             data_matrix_dir_path=data_matrix_dir_path,
