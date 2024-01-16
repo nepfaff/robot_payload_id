@@ -98,9 +98,7 @@ def main():
 
     arm_components = create_arm(arm_file_path=model_path, num_joints=num_joints)
     plant = arm_components.plant
-    robot_model_instance_idx = plant.GetModelInstanceByName(
-        "arm" if use_one_link_arm else "iiwa"
-    )
+    robot_model_instance_idx = plant.GetModelInstanceByName("arm")
 
     optimizer = args.optimizer
     cost_function = args.cost_function
