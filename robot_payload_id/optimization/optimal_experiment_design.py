@@ -477,10 +477,10 @@ def optimize_traj_black_box(
         for i in range(num_joints):
             joint_indices = plant.GetJointIndices(robot_model_instance_idx)
             upper_limit = plant.get_mutable_joint(
-                joint_indices[i + 1]
+                joint_indices[i]
             ).position_upper_limits()[0]
             lower_limit = plant.get_mutable_joint(
-                joint_indices[i + 1]
+                joint_indices[i]
             ).position_lower_limits()[0]
             num_violations += np.count_nonzero(
                 (joint_positions_numeric[:, i] < lower_limit)
@@ -491,7 +491,7 @@ def optimize_traj_black_box(
     def combined_objective(var_values) -> float:
         return cost_function_to_cost[cost_function](
             var_values
-        ) + 1 * joint_limit_penalty(var_values)
+        ) + 10 * joint_limit_penalty(var_values)
 
     # NOTE: Cost function must be pickable for parallelization
     # optimizer = ng.optimizers.NGOpt(

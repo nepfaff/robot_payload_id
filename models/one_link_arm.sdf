@@ -15,10 +15,6 @@
           </inertia>
         </inertial>
     </link>
-    <joint name="base_weld" type="fixed">
-        <child>base</child>
-        <parent>world</parent>
-    </joint>
     <link name="link1">
         <inertial>
           <pose>0 0 -0.5 0 0 0</pose>
@@ -63,6 +59,10 @@
             <spring_stiffness>0</spring_stiffness>
           </dynamics>
         </axis>
+    </joint>
+    <joint name="base_weld" type="fixed">
+      <child>base</child>
+      <parent>world</parent>
     </joint>
   </model>
 </sdf>
