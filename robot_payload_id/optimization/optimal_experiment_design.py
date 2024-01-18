@@ -238,6 +238,7 @@ def optimize_traj_snopt(
         )
 
     # Solve
+    logging.info("Starting optimization...")
     optimization_start = time.time()
     res: MathematicalProgramResult = solver.Solve(prog)
     logging.info(
@@ -278,6 +279,7 @@ def optimize_traj_black_box(
     data_matrix_dir_path: Optional[Path] = None,
     model_path: Optional[str] = None,
     symbolically_reexpress_data_matrix: bool = True,
+    use_optimization_progress_bar: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Optimizes the trajectory parameters using black box optimization. Uses a Fourier
     series trajectory parameterization.
@@ -301,6 +303,8 @@ def optimize_traj_black_box(
         symbolically_reexpress_data_matrix (bool): Whether to symbolically re-express
             the data matrix. If False, then the data matrix is numerically re-expressed
             at each iteration.
+        use_optimization_progress_bar (bool): Whether to show a progress bar for the
+            optimization. This might lead to a small performance hit.
 
     Returns:
         Tuple[np.ndarray, np.ndarray, np.ndarray]: The optimized trajectory parameters
@@ -507,6 +511,9 @@ def optimize_traj_black_box(
     optimizer = ng.optimizers.NGOpt(
         parametrization=len(a) + len(b) + len(q0), budget=budget
     )
+    if use_optimization_progress_bar:
+        optimizer.register_callback("tell", ng.callbacks.ProgressBar())
+    logging.info("Starting optimization...")
     optimization_start = time.time()
     recommendation = optimizer.minimize(combined_objective)
     logging.info(
