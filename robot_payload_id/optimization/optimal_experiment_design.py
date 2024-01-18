@@ -565,9 +565,25 @@ def optimize_traj_black_box(
     }
 
     def joint_limit_penalty(var_values) -> float:
-        joint_positions_numeric = eval_expression_mat(
-            joint_data.joint_positions, symbolic_vars, var_values
-        )
+        if use_symbolic_computations:
+            joint_positions_numeric = eval_expression_mat(
+                joint_data.joint_positions, symbolic_vars, var_values
+            )
+        else:
+            # TODO: Only compute the necessary joint positions
+            # NOTE: It might make more sense to compute this in 'combined_objective'
+            # and then pass it to all the penalty functions that require it
+            a, b, q0 = np.split(var_values, [len(a_var), len(a_var) + len(b_var)])
+            joint_positions_numeric = (
+                compute_autodiff_joint_data_from_fourier_series_traj_params(
+                    num_timesteps=num_timesteps,
+                    timestep=timestep,
+                    a=a.reshape((num_joints, num_fourier_terms)),
+                    b=b.reshape((num_joints, num_fourier_terms)),
+                    q0=q0,
+                    omega=omega,
+                ).joint_positions
+            )
 
         num_violations = 0
         for i in range(num_joints):
