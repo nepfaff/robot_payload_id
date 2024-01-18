@@ -423,6 +423,10 @@ def optimize_traj_black_box(
             return identifiable
 
         identifiable_column_mask = compute_identifiable_column_mask()
+        logging.info(
+            f"{np.sum(identifiable_column_mask)} of {len(identifiable_column_mask)} "
+            + "params are identifiable."
+        )
 
         def compute_W_dataTW_data_numeric(var_values) -> np.ndarray:
             W_data_raw = compute_W_data_raw(var_values)
