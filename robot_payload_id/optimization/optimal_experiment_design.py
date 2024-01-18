@@ -409,6 +409,9 @@ def optimize_traj_black_box(
             # SolutionResult.kUnbounded
             _, R = np.linalg.qr(W_data_raw)
             identifiable = np.abs(np.diag(R)) > 1e-12
+            assert (
+                np.sum(identifiable) > 0
+            ), "No identifiable parameters! Try increasing num traj samples."
             W_data = W_data_raw[:, identifiable]
 
             W_dataTW_data = W_data.T @ W_data

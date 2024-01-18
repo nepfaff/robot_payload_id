@@ -391,4 +391,7 @@ def remove_structurally_unidentifiable_columns(
     identifiable = get_structurally_identifiable_column_mask(
         W_sym=W_sym, symbolic_vars=symbolic_vars, tolerance=tolerance
     )
+    assert (
+        np.sum(identifiable) > 0
+    ), "No identifiable parameters! Try increasing num traj samples."
     return W_sym[:, identifiable]
