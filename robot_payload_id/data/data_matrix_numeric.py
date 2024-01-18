@@ -5,7 +5,7 @@ matrix.
 
 import logging
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 
@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import create_autodiff_plant, create_symbolic_plant
-from robot_payload_id.utils import ArmPlantComponents, JointData, SymJointStateVariables
+from robot_payload_id.utils import ArmComponents, ArmPlantComponents, JointData
 
 
 def extract_numeric_data_matrix_symbolic(
@@ -168,7 +168,7 @@ def extract_numeric_data_matrix_through_symbolic_decomposition_with_dynamic_subs
 
 
 def extract_numeric_data_matrix_autodiff(
-    arm_components: ArmPlantComponents,
+    arm_components: Union[ArmComponents, ArmPlantComponents],
     joint_data: JointData,
     use_prgress_bar: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -176,7 +176,8 @@ def extract_numeric_data_matrix_autodiff(
     links.
 
     Args:
-        arm_components (ArmPlantComponents): The arm components.
+        arm_components (Union[ArmComponents, ArmPlantComponents]): The arm components
+            or the autodiff arm plant components.
         joint_data (JointData): The joint data.
         use_prgress_bar (bool, optional): Whether to use a progress bar.
 
@@ -185,7 +186,11 @@ def extract_numeric_data_matrix_autodiff(
             the numeric torque data.
     """
     # Create autodiff arm
-    ad_plant_components = create_autodiff_plant(arm_components=arm_components)
+    ad_plant_components = (
+        arm_components
+        if isinstance(arm_components, ArmPlantComponents)
+        else create_autodiff_plant(arm_components=arm_components)
+    )
 
     # Extract data matrix
     num_joints = joint_data.joint_positions.shape[1]

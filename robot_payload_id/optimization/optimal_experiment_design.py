@@ -30,6 +30,7 @@ from robot_payload_id.data import (
 )
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import (
+    create_autodiff_plant,
     create_symbolic_plant,
     eval_expression_mat,
     eval_expression_mat_derivative,
@@ -452,6 +453,7 @@ def optimize_traj_black_box(
         arm_components = create_arm(
             arm_file_path=model_path, num_joints=num_joints, time_step=0.0
         )
+        ad_plant_components = create_autodiff_plant(arm_components=arm_components)
 
         def compute_W_data(var_values, identifiable_column_mask=None) -> np.ndarray:
             a, b, q0 = np.split(var_values, [len(a_var), len(a_var) + len(b_var)])
@@ -465,9 +467,8 @@ def optimize_traj_black_box(
             )
 
             # Evaluate and stack symbolic data matrix
-            # TODO: Prevent recomputing autodiff plant everytime that this method is called
             W_data_raw, _ = extract_numeric_data_matrix_autodiff(
-                arm_components=arm_components,
+                arm_components=ad_plant_components,
                 joint_data=joint_data,
                 use_prgress_bar=False,
             )
