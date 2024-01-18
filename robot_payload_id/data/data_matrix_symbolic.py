@@ -343,7 +343,7 @@ def reexpress_symbolic_data_matrix(
 
 
 def get_structurally_identifiable_column_mask(
-    W_sym: np.ndarray, symbolic_vars: np.ndarray, tolerance: float = 1e-12
+    W_sym: np.ndarray, symbolic_vars: np.ndarray, tolerance: float = 1e-4
 ) -> np.ndarray:
     """Gets the structurally identifiable columns of a symbolic data matrix. The
     methods works by evaluating the symbolic expressions with random values and
@@ -371,7 +371,7 @@ def get_structurally_identifiable_column_mask(
 
 
 def remove_structurally_unidentifiable_columns(
-    W_sym: np.ndarray, symbolic_vars: np.ndarray, tolerance: float = 1e-12
+    W_sym: np.ndarray, symbolic_vars: np.ndarray, tolerance: float = 1e-4
 ) -> np.ndarray:
     """Removes structurally unidentifiable columns from a symbolic data matrix. The
     methods works by evaluating the symbolic expressions with random values and
