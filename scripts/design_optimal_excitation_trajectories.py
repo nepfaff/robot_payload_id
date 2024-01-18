@@ -79,6 +79,12 @@ def main():
         help="Budget for black-box optimization.",
     )
     parser.add_argument(
+        "--use_symbolic_computations",
+        action="store_true",
+        help="Whether to use symbolic computations. If False, then If False, then the "
+        + "data matrix is numerically computed from scratch at each iteration.",
+    )
+    parser.add_argument(
         "--not_symbolically_reexpress_data_matrix",
         action="store_true",
         help="Whether to not symbolically re-express the data matrix. If True, then the "
@@ -122,6 +128,7 @@ def main():
     timestep = args.timestep
     snopt_iteration_limit = args.snopt_iteration_limit
     budget = args.budget
+    use_symbolic_computations = args.use_symbolic_computations
     symbolically_reexpress_data_matrix = not args.not_symbolically_reexpress_data_matrix
     if optimizer == "black_box":
         optimize_traj_black_box(
@@ -136,6 +143,7 @@ def main():
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
+            use_symbolic_computations=use_symbolic_computations,
             symbolically_reexpress_data_matrix=symbolically_reexpress_data_matrix,
         )
     elif optimizer == "snopt":
@@ -168,6 +176,7 @@ def main():
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
+            use_symbolic_computations=use_symbolic_computations,
             symbolically_reexpress_data_matrix=symbolically_reexpress_data_matrix,
         )
         optimize_traj_snopt(

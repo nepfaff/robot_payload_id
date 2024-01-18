@@ -21,6 +21,7 @@ from pydrake.all import (
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params,
+    extract_numeric_data_matrix_autodiff,
     extract_symbolic_data_matrix,
     load_symbolic_data_matrix,
     reexpress_symbolic_data_matrix,
@@ -278,6 +279,7 @@ def optimize_traj_black_box(
     budget: int,
     data_matrix_dir_path: Optional[Path] = None,
     model_path: Optional[str] = None,
+    use_symbolic_computations: bool = False,
     symbolically_reexpress_data_matrix: bool = True,
     use_optimization_progress_bar: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -300,9 +302,11 @@ def optimize_traj_black_box(
             the symbolic data matrix is re-computed.
         model_path (str): The path to the model file (e.g. SDFormat, URDF). Only used
             if `data_matrix_dir_path` is None.
+        use_symbolic_computations (bool): Whether to use symbolic computations. If False,
+            then the data matrix is numerically computed from scratch at each iteration.
         symbolically_reexpress_data_matrix (bool): Whether to symbolically re-express
             the data matrix. If False, then the data matrix is numerically re-expressed
-            at each iteration.
+            at each iteration. Only used if `use_symbolic_computations` is True.
         use_optimization_progress_bar (bool): Whether to show a progress bar for the
             optimization. This might lead to a small performance hit.
 
@@ -314,104 +318,168 @@ def optimize_traj_black_box(
         data_matrix_dir_path is None and model_path is None
     ), "Must provide either data matrix dir path or model path!"
 
-    # Obtain symbolic data matrix
-    if data_matrix_dir_path is None:  # Compute W_sym
+    # Create decision variables
+    a_var = MakeVectorVariable(num_joints * num_fourier_terms, "a")
+    b_var = MakeVectorVariable(num_joints * num_fourier_terms, "b")
+    q0_var = MakeVectorVariable(num_joints, "q0")
+    symbolic_vars = np.concatenate([a_var, b_var, q0_var])
+
+    # TODO: Refactor into smaller functions
+    if use_symbolic_computations:
+        # Obtain symbolic data matrix
+        if data_matrix_dir_path is None:  # Compute W_sym
+            arm_components = create_arm(
+                arm_file_path=model_path, num_joints=num_joints, time_step=0.0
+            )
+            sym_plant_components = create_symbolic_plant(
+                arm_components=arm_components, use_lumped_parameters=True
+            )
+            sym_state_variables = sym_plant_components.state_variables
+            W_sym = extract_symbolic_data_matrix(
+                symbolic_plant_components=sym_plant_components
+            )
+        else:  # Load W_sym
+            q_var = MakeVectorVariable(num_joints, "q")
+            q_dot_var = MakeVectorVariable(num_joints, "\dot{q}")
+            q_ddot_var = MakeVectorVariable(num_joints, "\ddot{q}")
+            tau_var = MakeVectorVariable(num_joints, "\tau")
+            sym_state_variables = SymJointStateVariables(
+                q=q_var, q_dot=q_dot_var, q_ddot=q_ddot_var, tau=tau_var
+            )
+            W_sym = load_symbolic_data_matrix(
+                dir_path=data_matrix_dir_path,
+                sym_state_variables=sym_state_variables,
+                num_joints=num_joints,
+                num_params=num_joints * 10,
+            )
+
+        # Compute symbolic joint data in terms of the decision variables
+        joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
+            num_timesteps=num_timesteps,
+            timestep=timestep,
+            a=a_var.reshape((num_joints, num_fourier_terms)),
+            b=b_var.reshape((num_joints, num_fourier_terms)),
+            q0=q0_var,
+            omega=omega,
+        )
+
+        if symbolically_reexpress_data_matrix:
+            # Express symbolic data matrix in terms of decision variables
+            W_data = reexpress_symbolic_data_matrix(
+                W_sym=W_sym,
+                sym_state_variables=sym_state_variables,
+                joint_data=joint_data,
+            )
+
+            # Remove structurally unidentifiable columns to prevent SolutionResult.kUnbounded
+            W_data = remove_structurally_unidentifiable_columns(W_data, symbolic_vars)
+
+            W_dataTW_data = W_data.T @ W_data
+
+            def compute_W_dataTW_data_numeric(var_values) -> np.ndarray:
+                W_dataTW_data_numeric = eval_expression_mat(
+                    W_dataTW_data, symbolic_vars, var_values
+                )
+                return W_dataTW_data_numeric
+
+        else:
+            joint_symbolic_vars_expressions = np.concatenate(
+                [
+                    joint_data.joint_positions,
+                    joint_data.joint_velocities,
+                    joint_data.joint_accelerations,
+                ],
+                axis=1,
+            )  # shape (num_timesteps, num_joints * 3)
+
+            def compute_W_data(var_values, identifiable_column_mask=None) -> np.ndarray:
+                # Evaluate symbolic joint data
+                joint_symbolic_vars_values = eval_expression_mat(
+                    joint_symbolic_vars_expressions, symbolic_vars, var_values
+                )  # shape (num_timesteps, num_joints * 3)
+                q_numeric, q_dot_numeric, q_ddot_numeric = np.split(
+                    joint_symbolic_vars_values, 3, axis=1
+                )
+                joint_data_numeric = JointData(
+                    joint_positions=q_numeric,
+                    joint_velocities=q_dot_numeric,
+                    joint_accelerations=q_ddot_numeric,
+                    joint_torques=np.zeros_like(q_numeric),
+                    sample_times_s=joint_data.sample_times_s,
+                )
+
+                # Evaluate and stack symbolic data matrix
+                W_data_raw, _ = symbolic_to_numeric_data_matrix(
+                    state_variables=sym_state_variables,
+                    joint_data=joint_data_numeric,
+                    W_sym=(
+                        W_sym
+                        if identifiable_column_mask is None
+                        else W_sym[:, identifiable_column_mask]
+                    ),
+                    use_progress_bars=False,
+                )
+                return W_data_raw
+
+            def compute_identifiable_column_mask() -> np.ndarray:
+                random_var_values = np.random.uniform(
+                    low=1, high=1000, size=len(symbolic_vars)
+                )
+                W_data = compute_W_data(random_var_values)
+
+                _, R = np.linalg.qr(W_data)
+                identifiable = np.abs(np.diag(R)) > 1e-12
+                assert (
+                    np.sum(identifiable) > 0
+                ), "No identifiable parameters! Try increasing num traj samples."
+                return identifiable
+
+            # Remove structurally unidentifiable columns to prevent
+            # SolutionResult.kUnbounded
+            identifiable_column_mask = compute_identifiable_column_mask()
+            logging.info(
+                f"{np.sum(identifiable_column_mask)} of {len(identifiable_column_mask)} "
+                + "params are identifiable."
+            )
+
+            def compute_W_dataTW_data_numeric(var_values) -> np.ndarray:
+                W_data = compute_W_data(var_values, identifiable_column_mask)
+
+                W_dataTW_data = W_data.T @ W_data
+                return W_dataTW_data
+
+    else:
         arm_components = create_arm(
             arm_file_path=model_path, num_joints=num_joints, time_step=0.0
         )
-        sym_plant_components = create_symbolic_plant(
-            arm_components=arm_components, use_lumped_parameters=True
-        )
-        sym_state_variables = sym_plant_components.state_variables
-        W_sym = extract_symbolic_data_matrix(
-            symbolic_plant_components=sym_plant_components
-        )
-    else:  # Load W_sym
-        q_var = MakeVectorVariable(num_joints, "q")
-        q_dot_var = MakeVectorVariable(num_joints, "\dot{q}")
-        q_ddot_var = MakeVectorVariable(num_joints, "\ddot{q}")
-        tau_var = MakeVectorVariable(num_joints, "\tau")
-        sym_state_variables = SymJointStateVariables(
-            q=q_var, q_dot=q_dot_var, q_ddot=q_ddot_var, tau=tau_var
-        )
-        W_sym = load_symbolic_data_matrix(
-            dir_path=data_matrix_dir_path,
-            sym_state_variables=sym_state_variables,
-            num_joints=num_joints,
-            num_params=num_joints * 10,
-        )
-
-    # Create decision variables
-    a = MakeVectorVariable(num_joints * num_fourier_terms, "a")
-    b = MakeVectorVariable(num_joints * num_fourier_terms, "b")
-    q0 = MakeVectorVariable(num_joints, "q0")
-    symbolic_vars = np.concatenate([a, b, q0])
-
-    # Compute symbolic joint data in terms of the decision variables
-    joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
-        num_timesteps=num_timesteps,
-        timestep=timestep,
-        a=a.reshape((num_joints, num_fourier_terms)),
-        b=b.reshape((num_joints, num_fourier_terms)),
-        q0=q0,
-        omega=omega,
-    )
-
-    if symbolically_reexpress_data_matrix:
-        # Express symbolic data matrix in terms of decision variables
-        W_data = reexpress_symbolic_data_matrix(
-            W_sym=W_sym, sym_state_variables=sym_state_variables, joint_data=joint_data
-        )
-
-        # Remove structurally unidentifiable columns to prevent SolutionResult.kUnbounded
-        W_data = remove_structurally_unidentifiable_columns(W_data, symbolic_vars)
-
-        W_dataTW_data = W_data.T @ W_data
-
-        def compute_W_dataTW_data_numeric(var_values) -> np.ndarray:
-            W_dataTW_data_numeric = eval_expression_mat(
-                W_dataTW_data, symbolic_vars, var_values
-            )
-            return W_dataTW_data_numeric
-
-    else:
-        joint_symbolic_vars_expressions = np.concatenate(
-            [
-                joint_data.joint_positions,
-                joint_data.joint_velocities,
-                joint_data.joint_accelerations,
-            ],
-            axis=1,
-        )  # shape (num_timesteps, num_joints * 3)
 
         def compute_W_data(var_values, identifiable_column_mask=None) -> np.ndarray:
-            # Evaluate symbolic joint data
-            joint_symbolic_vars_values = eval_expression_mat(
-                joint_symbolic_vars_expressions, symbolic_vars, var_values
-            )  # shape (num_timesteps, num_joints * 3)
-            q_numeric, q_dot_numeric, q_ddot_numeric = np.split(
-                joint_symbolic_vars_values, 3, axis=1
-            )
-            joint_data_numeric = JointData(
-                joint_positions=q_numeric,
-                joint_velocities=q_dot_numeric,
-                joint_accelerations=q_ddot_numeric,
-                joint_torques=np.zeros_like(q_numeric),
-                sample_times_s=joint_data.sample_times_s,
+            a, b, q0 = np.split(var_values, [len(a_var), len(a_var) + len(b_var)])
+            joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
+                num_timesteps=num_timesteps,
+                timestep=timestep,
+                a=a.reshape((num_joints, num_fourier_terms)),
+                b=b.reshape((num_joints, num_fourier_terms)),
+                q0=q0,
+                omega=omega,
             )
 
             # Evaluate and stack symbolic data matrix
-            W_data_raw, _ = symbolic_to_numeric_data_matrix(
-                state_variables=sym_state_variables,
-                joint_data=joint_data_numeric,
-                W_sym=(
-                    W_sym
-                    if identifiable_column_mask is None
-                    else W_sym[:, identifiable_column_mask]
-                ),
-                use_progress_bars=False,
+            # TODO: Prevent recomputing autodiff plant everytime that this method is called
+            W_data_raw, _ = extract_numeric_data_matrix_autodiff(
+                arm_components=arm_components,
+                joint_data=joint_data,
+                use_prgress_bar=False,
             )
-            return W_data_raw
+
+            # Remove structurally unidentifiable columns to prevent
+            # SolutionResult.kUnbounded
+            W_data = (
+                W_data_raw
+                if identifiable_column_mask is None
+                else W_data_raw[:, identifiable_column_mask]
+            )
+            return W_data
 
         def compute_identifiable_column_mask() -> np.ndarray:
             random_var_values = np.random.uniform(
@@ -420,14 +488,12 @@ def optimize_traj_black_box(
             W_data = compute_W_data(random_var_values)
 
             _, R = np.linalg.qr(W_data)
-            identifiable = np.abs(np.diag(R)) > 1e-12
+            identifiable = np.abs(np.diag(R)) > 1e-4
             assert (
                 np.sum(identifiable) > 0
             ), "No identifiable parameters! Try increasing num traj samples."
             return identifiable
 
-        # Remove structurally unidentifiable columns to prevent
-        # SolutionResult.kUnbounded
         identifiable_column_mask = compute_identifiable_column_mask()
         logging.info(
             f"{np.sum(identifiable_column_mask)} of {len(identifiable_column_mask)} "
@@ -535,7 +601,7 @@ def optimize_traj_black_box(
 
     # Solve
     optimizer = ng.optimizers.NGOpt(
-        parametrization=len(a) + len(b) + len(q0), budget=budget
+        parametrization=len(a_var) + len(b_var) + len(q0_var), budget=budget
     )
     if use_optimization_progress_bar:
         optimizer.register_callback("tell", ng.callbacks.ProgressBar())
@@ -552,8 +618,8 @@ def optimize_traj_black_box(
     )
 
     a_value, b_value, q0_value = (
-        recommendation.value[: len(a)],
-        recommendation.value[len(a) : len(a) + len(b)],
-        recommendation.value[len(a) + len(b) :],
+        recommendation.value[: len(a_var)],
+        recommendation.value[len(a_var) : len(a_var) + len(b_var)],
+        recommendation.value[len(a_var) + len(b_var) :],
     )
     return a_value, b_value, q0_value

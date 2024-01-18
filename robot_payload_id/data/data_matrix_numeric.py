@@ -168,7 +168,9 @@ def extract_numeric_data_matrix_through_symbolic_decomposition_with_dynamic_subs
 
 
 def extract_numeric_data_matrix_autodiff(
-    arm_components: ArmPlantComponents, joint_data: JointData
+    arm_components: ArmPlantComponents,
+    joint_data: JointData,
+    use_prgress_bar: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Extracts the numeric data matrix using autodiff. This scales to a large number of
     links.
@@ -176,6 +178,7 @@ def extract_numeric_data_matrix_autodiff(
     Args:
         arm_components (ArmPlantComponents): The arm components.
         joint_data (JointData): The joint data.
+        use_prgress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: A tuple containing the numeric data matrix and
@@ -191,7 +194,9 @@ def extract_numeric_data_matrix_autodiff(
     W_data = np.zeros((num_timesteps * num_joints, num_lumped_params))
     tau_data = joint_data.joint_torques.flatten()
 
-    for i in tqdm(range(num_timesteps), desc="Extracting data matrix"):
+    for i in tqdm(
+        range(num_timesteps), desc="Extracting data matrix", disable=not use_prgress_bar
+    ):
         # Set joint data
         ad_plant_components.plant.get_actuation_input_port().FixValue(
             ad_plant_components.plant_context, joint_data.joint_torques[i]
