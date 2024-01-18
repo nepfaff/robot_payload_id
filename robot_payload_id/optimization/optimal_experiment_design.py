@@ -405,7 +405,7 @@ def optimize_traj_black_box(
                 sym_state_variables,
                 joint_data_numeric,
                 W_sym,
-                use_progress_bars=True,  # TODO: True only for debugging iiwa
+                use_progress_bars=False,
             )
             return W_data_raw
 
