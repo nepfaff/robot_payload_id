@@ -384,7 +384,7 @@ def optimize_traj_black_box(
             axis=1,
         )  # shape (num_timesteps, num_joints * 3)
 
-        def compute_W_dataTW_data_numeric(var_values) -> np.ndarray:
+        def compute_W_data_raw(var_values) -> np.ndarray:
             # Evaluate symbolic joint data
             joint_symbolic_vars_values = eval_expression_mat(
                 joint_symbolic_vars_expressions, symbolic_vars, var_values
@@ -402,17 +402,34 @@ def optimize_traj_black_box(
 
             # Evaluate and stack symbolic data matrix
             W_data_raw, _ = symbolic_to_numeric_data_matrix(
-                sym_state_variables, joint_data_numeric, W_sym, use_progress_bars=False
+                sym_state_variables,
+                joint_data_numeric,
+                W_sym,
+                use_progress_bars=True,  # TODO: True only for debugging iiwa
             )
+            return W_data_raw
 
-            # Remove structurally unidentifiable columns to prevent
-            # SolutionResult.kUnbounded
+        def compute_identifiable_column_mask() -> np.ndarray:
+            random_var_values = np.random.uniform(
+                low=1, high=1000, size=len(symbolic_vars)
+            )
+            W_data_raw = compute_W_data_raw(random_var_values)
+
             _, R = np.linalg.qr(W_data_raw)
             identifiable = np.abs(np.diag(R)) > 1e-12
             assert (
                 np.sum(identifiable) > 0
             ), "No identifiable parameters! Try increasing num traj samples."
-            W_data = W_data_raw[:, identifiable]
+            return identifiable
+
+        identifiable_column_mask = compute_identifiable_column_mask()
+
+        def compute_W_dataTW_data_numeric(var_values) -> np.ndarray:
+            W_data_raw = compute_W_data_raw(var_values)
+
+            # Remove structurally unidentifiable columns to prevent
+            # SolutionResult.kUnbounded
+            W_data = W_data_raw[:, identifiable_column_mask]
 
             W_dataTW_data = W_data.T @ W_data
             return W_dataTW_data

@@ -363,7 +363,7 @@ def get_structurally_identifiable_column_mask(
     W_numeric = eval_expression_mat(
         W_sym,
         symbolic_vars,
-        np.random.uniform(low=1, high=100, size=len(symbolic_vars)),
+        np.random.uniform(low=1, high=1000, size=len(symbolic_vars)),
     )
     _, R = np.linalg.qr(W_numeric)
     identifiable = np.abs(np.diag(R)) > tolerance
