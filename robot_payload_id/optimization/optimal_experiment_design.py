@@ -384,7 +384,7 @@ def optimize_traj_black_box(
             axis=1,
         )  # shape (num_timesteps, num_joints * 3)
 
-        def compute_W_data_raw(var_values) -> np.ndarray:
+        def compute_W_data(var_values, identifiable_column_mask=None) -> np.ndarray:
             # Evaluate symbolic joint data
             joint_symbolic_vars_values = eval_expression_mat(
                 joint_symbolic_vars_expressions, symbolic_vars, var_values
@@ -402,9 +402,13 @@ def optimize_traj_black_box(
 
             # Evaluate and stack symbolic data matrix
             W_data_raw, _ = symbolic_to_numeric_data_matrix(
-                sym_state_variables,
-                joint_data_numeric,
-                W_sym,
+                state_variables=sym_state_variables,
+                joint_data=joint_data_numeric,
+                W_sym=(
+                    W_sym
+                    if identifiable_column_mask is None
+                    else W_sym[:, identifiable_column_mask]
+                ),
                 use_progress_bars=False,
             )
             return W_data_raw
@@ -413,15 +417,17 @@ def optimize_traj_black_box(
             random_var_values = np.random.uniform(
                 low=1, high=1000, size=len(symbolic_vars)
             )
-            W_data_raw = compute_W_data_raw(random_var_values)
+            W_data = compute_W_data(random_var_values)
 
-            _, R = np.linalg.qr(W_data_raw)
+            _, R = np.linalg.qr(W_data)
             identifiable = np.abs(np.diag(R)) > 1e-12
             assert (
                 np.sum(identifiable) > 0
             ), "No identifiable parameters! Try increasing num traj samples."
             return identifiable
 
+        # Remove structurally unidentifiable columns to prevent
+        # SolutionResult.kUnbounded
         identifiable_column_mask = compute_identifiable_column_mask()
         logging.info(
             f"{np.sum(identifiable_column_mask)} of {len(identifiable_column_mask)} "
@@ -429,11 +435,7 @@ def optimize_traj_black_box(
         )
 
         def compute_W_dataTW_data_numeric(var_values) -> np.ndarray:
-            W_data_raw = compute_W_data_raw(var_values)
-
-            # Remove structurally unidentifiable columns to prevent
-            # SolutionResult.kUnbounded
-            W_data = W_data_raw[:, identifiable_column_mask]
+            W_data = compute_W_data(var_values, identifiable_column_mask)
 
             W_dataTW_data = W_data.T @ W_data
             return W_dataTW_data

@@ -42,7 +42,7 @@ def symbolic_to_numeric_data_matrix(
     """
     num_joints = joint_data.joint_positions.shape[1]
     num_timesteps = len(joint_data.sample_times_s)
-    num_lumped_params = num_joints * 10
+    num_lumped_params = W_sym.shape[1]
     W_data = np.zeros((num_timesteps * num_joints, num_lumped_params))
     tau_data = joint_data.joint_torques.flatten()
 
