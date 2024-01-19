@@ -6,6 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Optional, Tuple
 
+import matplotlib.pyplot as plt
 import nevergrad as ng
 import numpy as np
 
@@ -36,6 +37,8 @@ from robot_payload_id.symbolic import (
     eval_expression_mat_derivative,
 )
 from robot_payload_id.utils import JointData, SymJointStateVariables
+
+from .nevergrad_util import NevergradLossLogger
 
 
 class CostFunction(enum.Enum):
@@ -283,6 +286,7 @@ def optimize_traj_black_box(
     use_symbolic_computations: bool = False,
     symbolically_reexpress_data_matrix: bool = True,
     use_optimization_progress_bar: bool = True,
+    logging_path: Optional[Path] = None,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Optimizes the trajectory parameters using black box optimization. Uses a Fourier
     series trajectory parameterization.
@@ -310,6 +314,9 @@ def optimize_traj_black_box(
             at each iteration. Only used if `use_symbolic_computations` is True.
         use_optimization_progress_bar (bool): Whether to show a progress bar for the
             optimization. This might lead to a small performance hit.
+        logging_path (Path): The path to write the optimization logs to. If None, then no
+            logs are written. Recording logs is a callback and hence will slow down the
+            optimization.
 
     Returns:
         Tuple[np.ndarray, np.ndarray, np.ndarray]: The optimized trajectory parameters
@@ -622,6 +629,10 @@ def optimize_traj_black_box(
     )
     if use_optimization_progress_bar:
         optimizer.register_callback("tell", ng.callbacks.ProgressBar())
+    if logging_path is not None:
+        logging_path.mkdir(parents=True, exist_ok=True)
+        loss_logger = NevergradLossLogger(logging_path / "losses.txt")
+        optimizer.register_callback("tell", loss_logger)
     logging.info("Starting optimization...")
     optimization_start = time.time()
     recommendation = optimizer.minimize(combined_objective)
@@ -633,6 +644,16 @@ def optimize_traj_black_box(
     logging.info(
         f"Final param values: {dict(zip(symbolic_var_names, recommendation.value))}"
     )
+
+    if logging_path is not None:
+        # Create accumulated minimum loss plot
+        losses = loss_logger.load()
+        accumulated_min_losses = np.minimum.accumulate(losses)
+        plt.plot(accumulated_min_losses)
+        plt.title("Accumulated Minimum Loss")
+        plt.xlabel("Iteration")
+        plt.ylabel("Minimum loss")
+        plt.savefig(logging_path / "accumulated_min_losses.png")
 
     a_value, b_value, q0_value = (
         recommendation.value[: len(a_var)],

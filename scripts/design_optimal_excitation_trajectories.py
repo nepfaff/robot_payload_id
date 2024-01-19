@@ -92,6 +92,14 @@ def main():
         + "black-box optimization.",
     )
     parser.add_argument(
+        "--logging_path",
+        type=Path,
+        default=None,
+        required=False,
+        help="Path to the directory to save the logs to. Only used for black-box "
+        + "optimization.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -130,6 +138,7 @@ def main():
     budget = args.budget
     use_symbolic_computations = args.use_symbolic_computations
     symbolically_reexpress_data_matrix = not args.not_symbolically_reexpress_data_matrix
+    logging_path = args.logging_path
     if optimizer == "black_box":
         optimize_traj_black_box(
             data_matrix_dir_path=data_matrix_dir_path,
@@ -178,6 +187,7 @@ def main():
             budget=budget,
             use_symbolic_computations=use_symbolic_computations,
             symbolically_reexpress_data_matrix=symbolically_reexpress_data_matrix,
+            logging_path=logging_path,
         )
         optimize_traj_snopt(
             data_matrix_dir_path=data_matrix_dir_path,
