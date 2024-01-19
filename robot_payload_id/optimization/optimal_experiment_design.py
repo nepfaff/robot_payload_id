@@ -648,12 +648,19 @@ def optimize_traj_black_box(
     if logging_path is not None:
         # Create accumulated minimum loss plot
         losses = loss_logger.load()
-        accumulated_min_losses = np.minimum.accumulate(losses)
+        # Clip to make graph more readable
+        cliped_losses = np.clip(losses, a_min=None, a_max=1e8)
+        accumulated_min_losses = np.minimum.accumulate(cliped_losses)
+        min_loss_first_idx = np.argmin(accumulated_min_losses)
         plt.plot(accumulated_min_losses)
+        plt.axvline(x=min_loss_first_idx, color="r")
+        plt.yscale("log")
         plt.title("Accumulated Minimum Loss")
         plt.xlabel("Iteration")
         plt.ylabel("Minimum loss")
+        plt.legend(["Accumulated minimum loss", "First minimum loss"])
         plt.savefig(logging_path / "accumulated_min_losses.png")
+        plt.show()
 
     a_value, b_value, q0_value = (
         recommendation.value[: len(a_var)],
