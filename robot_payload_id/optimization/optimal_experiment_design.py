@@ -590,7 +590,6 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             plt.ylabel("Minimum loss")
             plt.legend(["Accumulated minimum loss", "First minimum loss"])
             plt.savefig(self._logging_path / "accumulated_min_losses.png")
-            plt.show()
 
         a_value, b_value, q0_value = (
             recommendation.value[: len(self._a_var)],
