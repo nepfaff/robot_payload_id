@@ -8,8 +8,10 @@ import numpy as np
 from robot_payload_id.environment import create_arm
 from robot_payload_id.optimization import (
     CostFunction,
-    optimize_traj_black_box,
-    optimize_traj_snopt,
+    ExcitationTrajectoryOptimizerBlackBoxNumeric,
+    ExcitationTrajectoryOptimizerBlackBoxSymbolic,
+    ExcitationTrajectoryOptimizerBlackBoxSymbolicNumeric,
+    ExcitationTrajectoryOptimizerSnopt,
 )
 
 
@@ -136,75 +138,88 @@ def main():
     timestep = args.timestep
     snopt_iteration_limit = args.snopt_iteration_limit
     budget = args.budget
-    use_symbolic_computations = args.use_symbolic_computations
-    symbolically_reexpress_data_matrix = not args.not_symbolically_reexpress_data_matrix
     logging_path = args.logging_path
+
+    # Create the black-box optimizer
+    if optimizer != "snopt":
+        if (
+            args.use_symbolic_computations
+            and not args.not_symbolically_reexpress_data_matrix
+        ):
+            black_box_optimizer = ExcitationTrajectoryOptimizerBlackBoxSymbolic(
+                num_joints=num_joints,
+                cost_function=cost_function,
+                num_fourier_terms=num_fourier_terms,
+                omega=omega,
+                num_timesteps=num_timesteps,
+                timestep=timestep,
+                plant=plant,
+                robot_model_instance_idx=robot_model_instance_idx,
+                budget=budget,
+                logging_path=logging_path,
+                data_matrix_dir_path=data_matrix_dir_path,
+                model_path=model_path,
+            )
+        elif (
+            args.use_symbolic_computations
+            and args.not_symbolically_reexpress_data_matrix
+        ):
+            black_box_optimizer = ExcitationTrajectoryOptimizerBlackBoxSymbolicNumeric(
+                num_joints=num_joints,
+                cost_function=cost_function,
+                num_fourier_terms=num_fourier_terms,
+                omega=omega,
+                num_timesteps=num_timesteps,
+                timestep=timestep,
+                plant=plant,
+                robot_model_instance_idx=robot_model_instance_idx,
+                budget=budget,
+                logging_path=logging_path,
+                data_matrix_dir_path=data_matrix_dir_path,
+                model_path=model_path,
+            )
+        else:
+            black_box_optimizer = ExcitationTrajectoryOptimizerBlackBoxNumeric(
+                num_joints=num_joints,
+                cost_function=cost_function,
+                num_fourier_terms=num_fourier_terms,
+                omega=omega,
+                num_timesteps=num_timesteps,
+                timestep=timestep,
+                plant=plant,
+                robot_model_instance_idx=robot_model_instance_idx,
+                budget=budget,
+                logging_path=logging_path,
+                model_path=model_path,
+            )
+    if optimizer != "black_box":
+        snopt_optimizer = ExcitationTrajectoryOptimizerSnopt(
+            data_matrix_dir_path=data_matrix_dir_path,
+            model_path=model_path,
+            num_joints=num_joints,
+            cost_function=cost_function,
+            num_fourier_terms=num_fourier_terms,
+            omega=omega,
+            num_timesteps=num_timesteps,
+            timestep=timestep,
+            plant=plant,
+            robot_model_instance_idx=robot_model_instance_idx,
+            iteration_limit=snopt_iteration_limit,
+        )
+
     if optimizer == "black_box":
-        optimize_traj_black_box(
-            data_matrix_dir_path=data_matrix_dir_path,
-            model_path=model_path,
-            num_joints=num_joints,
-            cost_function=cost_function,
-            num_fourier_terms=num_fourier_terms,
-            omega=omega,
-            num_timesteps=num_timesteps,
-            timestep=timestep,
-            plant=plant,
-            robot_model_instance_idx=robot_model_instance_idx,
-            budget=budget,
-            use_symbolic_computations=use_symbolic_computations,
-            symbolically_reexpress_data_matrix=symbolically_reexpress_data_matrix,
-        )
+        black_box_optimizer.optimize()
     elif optimizer == "snopt":
-        optimize_traj_snopt(
-            data_matrix_dir_path=data_matrix_dir_path,
-            model_path=model_path,
-            num_joints=num_joints,
-            a_init=5 * np.random.rand(num_joints * num_fourier_terms),
-            b_init=5 * np.random.rand(num_joints * num_fourier_terms),
-            q0_init=np.random.rand(num_joints),
-            cost_function=cost_function,
-            num_fourier_terms=num_fourier_terms,
-            omega=omega,
-            num_timesteps=num_timesteps,
-            timestep=timestep,
-            plant=plant,
-            robot_model_instance_idx=robot_model_instance_idx,
-            iteration_limit=snopt_iteration_limit,
+        snopt_optimizer.set_initial_guess(
+            a=5 * np.random.rand(num_joints * num_fourier_terms),
+            b=5 * np.random.rand(num_joints * num_fourier_terms),
+            q0=np.random.rand(num_joints),
         )
+        snopt_optimizer.optimize()
     else:
-        a, b, q0 = optimize_traj_black_box(
-            data_matrix_dir_path=data_matrix_dir_path,
-            model_path=model_path,
-            num_joints=num_joints,
-            cost_function=cost_function,
-            num_fourier_terms=num_fourier_terms,
-            omega=omega,
-            num_timesteps=num_timesteps,
-            timestep=timestep,
-            plant=plant,
-            robot_model_instance_idx=robot_model_instance_idx,
-            budget=budget,
-            use_symbolic_computations=use_symbolic_computations,
-            symbolically_reexpress_data_matrix=symbolically_reexpress_data_matrix,
-            logging_path=logging_path,
-        )
-        optimize_traj_snopt(
-            data_matrix_dir_path=data_matrix_dir_path,
-            model_path=model_path,
-            num_joints=num_joints,
-            a_init=a,
-            b_init=b,
-            q0_init=q0,
-            cost_function=cost_function,
-            num_fourier_terms=num_fourier_terms,
-            omega=omega,
-            num_timesteps=num_timesteps,
-            timestep=timestep,
-            plant=plant,
-            robot_model_instance_idx=robot_model_instance_idx,
-            iteration_limit=snopt_iteration_limit,
-        )
+        a, b, q0 = black_box_optimizer.optimize()
+        snopt_optimizer.set_initial_guess(a, b, q0)
+        snopt_optimizer.optimize()
 
 
 if __name__ == "__main__":
