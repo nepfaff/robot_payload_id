@@ -183,7 +183,9 @@ def extract_numeric_data_matrix_autodiff(
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: A tuple containing the numeric data matrix and
-            the numeric torque data.
+            the numeric torque data. The numeric data matrix has shape (num_joints *
+            num_timesteps, num_lumped_params) and the numeric torque data has shape
+            (num_joints * num_timesteps,).
     """
     # Create autodiff arm
     ad_plant_components = (
