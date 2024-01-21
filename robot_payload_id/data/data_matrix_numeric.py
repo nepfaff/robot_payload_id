@@ -178,7 +178,9 @@ def extract_numeric_data_matrix_autodiff(
     Args:
         arm_components (Union[ArmComponents, ArmPlantComponents]): The arm components
             or the autodiff arm plant components.
-        joint_data (JointData): The joint data.
+        joint_data (JointData): The joint data. Only the joint positions, velocities,
+            and accelerations are used for the data matrix computation. The joint
+            torques are flattened and returned.
         use_prgress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
