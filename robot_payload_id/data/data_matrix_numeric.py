@@ -205,9 +205,6 @@ def extract_numeric_data_matrix_autodiff(
         range(num_timesteps), desc="Extracting data matrix", disable=not use_prgress_bar
     ):
         # Set joint data
-        ad_plant_components.plant.get_actuation_input_port().FixValue(
-            ad_plant_components.plant_context, joint_data.joint_torques[i]
-        )
         ad_plant_components.plant.SetPositions(
             ad_plant_components.plant_context, joint_data.joint_positions[i]
         )
