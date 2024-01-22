@@ -65,7 +65,7 @@ class ExcitationTrajectoryOptimizer(ABC):
         num_fourier_terms: int,
         omega: float,
         num_timesteps: int,
-        timestep: float,
+        time_horizon: float,
         plant: MultibodyPlant,
         robot_model_instance_idx: ModelInstanceIndex,
     ):
@@ -78,7 +78,8 @@ class ExcitationTrajectoryOptimizer(ABC):
                 trajectory parameterization.
             omega (float): The frequency of the trajectory.
             num_time_steps (int): The number of time steps to use for the trajectory.
-            timestep (float): The time step to use for the trajectory.
+            time_horizon (float): The time horizon/ duration of the trajectory. The
+                sampling time step is computed as time_horizon / num_timesteps.
             plant (MultibodyPlant): The plant to use for adding constraints.
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
@@ -89,7 +90,7 @@ class ExcitationTrajectoryOptimizer(ABC):
         self._num_fourier_terms = num_fourier_terms
         self._omega = omega
         self._num_timesteps = num_timesteps
-        self._timestep = timestep
+        self._time_horizon = time_horizon
         self._plant = plant
         self._robot_model_instance_idx = robot_model_instance_idx
 
@@ -152,7 +153,7 @@ class ExcitationTrajectoryOptimizerSnopt(ExcitationTrajectoryOptimizer):
         num_fourier_terms: int,
         omega: float,
         num_timesteps: int,
-        timestep: float,
+        time_horizon: float,
         plant: MultibodyPlant,
         robot_model_instance_idx: ModelInstanceIndex,
         data_matrix_dir_path: Optional[Path] = None,
@@ -170,7 +171,8 @@ class ExcitationTrajectoryOptimizerSnopt(ExcitationTrajectoryOptimizer):
                 trajectory parameterization.
             omega (float): The frequency of the trajectory.
             num_time_steps (int): The number of time steps to use for the trajectory.
-            timestep (float): The time step to use for the trajectory.
+            time_horizon (float): The time horizon/ duration of the trajectory. The
+                sampling time step is computed as time_horizon / num_timesteps.
             plant (MultibodyPlant): The plant to use for adding constraints.
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
@@ -195,7 +197,7 @@ class ExcitationTrajectoryOptimizerSnopt(ExcitationTrajectoryOptimizer):
             num_fourier_terms=num_fourier_terms,
             omega=omega,
             num_timesteps=num_timesteps,
-            timestep=timestep,
+            time_horizon=time_horizon,
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
         )
@@ -218,7 +220,7 @@ class ExcitationTrajectoryOptimizerSnopt(ExcitationTrajectoryOptimizer):
         # Express symbolic data matrix in terms of decision variables
         self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
             num_timesteps=num_timesteps,
-            timestep=timestep,
+            time_horizon=time_horizon,
             a=self._a_var.reshape((num_joints, num_fourier_terms)),
             b=self._b_var.reshape((num_joints, num_fourier_terms)),
             q0=self._q0_var,
@@ -402,7 +404,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
         num_fourier_terms: int,
         omega: float,
         num_timesteps: int,
-        timestep: float,
+        time_horizon: float,
         plant: MultibodyPlant,
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
@@ -417,7 +419,8 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
                 trajectory parameterization.
             omega (float): The frequency of the trajectory.
             num_time_steps (int): The number of time steps to use for the trajectory.
-            timestep (float): The time step to use for the trajectory.
+            time_horizon (float): The time horizon/ duration of the trajectory. The
+                sampling time step is computed as time_horizon / num_timesteps.
             plant (MultibodyPlant): The plant to use for adding constraints.
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
@@ -438,7 +441,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             num_fourier_terms=num_fourier_terms,
             omega=omega,
             num_timesteps=num_timesteps,
-            timestep=timestep,
+            time_horizon=time_horizon,
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
         )
@@ -617,7 +620,7 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolic(
         num_fourier_terms: int,
         omega: float,
         num_timesteps: int,
-        timestep: float,
+        time_horizon: float,
         plant: MultibodyPlant,
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
@@ -634,7 +637,8 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolic(
                 trajectory parameterization.
             omega (float): The frequency of the trajectory.
             num_time_steps (int): The number of time steps to use for the trajectory.
-            timestep (float): The time step to use for the trajectory.
+            time_horizon (float): The time horizon/ duration of the trajectory. The
+                sampling time step is computed as time_horizon / num_timesteps.
             plant (MultibodyPlant): The plant to use for adding constraints.
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
@@ -659,7 +663,7 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolic(
             num_fourier_terms=num_fourier_terms,
             omega=omega,
             num_timesteps=num_timesteps,
-            timestep=timestep,
+            time_horizon=time_horizon,
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
@@ -674,7 +678,7 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolic(
         # Compute symbolic joint data in terms of the decision variables
         self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
             num_timesteps=num_timesteps,
-            timestep=timestep,
+            time_horizon=time_horizon,
             a=self._a_var.reshape((num_joints, num_fourier_terms)),
             b=self._b_var.reshape((num_joints, num_fourier_terms)),
             q0=self._q0_var,
@@ -723,7 +727,7 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolicNumeric(
         num_fourier_terms: int,
         omega: float,
         num_timesteps: int,
-        timestep: float,
+        time_horizon: float,
         plant: MultibodyPlant,
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
@@ -740,7 +744,8 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolicNumeric(
                 trajectory parameterization.
             omega (float): The frequency of the trajectory.
             num_time_steps (int): The number of time steps to use for the trajectory.
-            timestep (float): The time step to use for the trajectory.
+            time_horizon (float): The time horizon/ duration of the trajectory. The
+                sampling time step is computed as time_horizon / num_timesteps.
             plant (MultibodyPlant): The plant to use for adding constraints.
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
@@ -765,7 +770,7 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolicNumeric(
             num_fourier_terms=num_fourier_terms,
             omega=omega,
             num_timesteps=num_timesteps,
-            timestep=timestep,
+            time_horizon=time_horizon,
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
@@ -783,7 +788,7 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolicNumeric(
         # Compute symbolic joint data in terms of the decision variables
         self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
             num_timesteps=num_timesteps,
-            timestep=timestep,
+            time_horizon=time_horizon,
             a=self._a_var.reshape((num_joints, num_fourier_terms)),
             b=self._b_var.reshape((num_joints, num_fourier_terms)),
             q0=self._q0_var,
@@ -883,7 +888,7 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
         num_fourier_terms: int,
         omega: float,
         num_timesteps: int,
-        timestep: float,
+        time_horizon: float,
         plant: MultibodyPlant,
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
@@ -899,7 +904,8 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
                 trajectory parameterization.
             omega (float): The frequency of the trajectory.
             num_time_steps (int): The number of time steps to use for the trajectory.
-            timestep (float): The time step to use for the trajectory.
+            time_horizon (float): The time horizon/ duration of the trajectory. The
+                sampling time step is computed as time_horizon / num_timesteps.
             plant (MultibodyPlant): The plant to use for adding constraints.
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
@@ -922,7 +928,7 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
             num_fourier_terms=num_fourier_terms,
             omega=omega,
             num_timesteps=num_timesteps,
-            timestep=timestep,
+            time_horizon=time_horizon,
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
@@ -951,7 +957,7 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
         )
         joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
             num_timesteps=self._num_timesteps,
-            timestep=self._timestep,
+            time_horizon=self._time_horizon,
             a=a.reshape((self._num_joints, self._num_fourier_terms)),
             b=b.reshape((self._num_joints, self._num_fourier_terms)),
             q0=q0,
@@ -1003,7 +1009,7 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
         joint_positions_numeric = (
             compute_autodiff_joint_data_from_fourier_series_traj_params(
                 num_timesteps=self._num_timesteps,
-                timestep=self._timestep,
+                time_horizon=self._time_horizon,
                 a=a.reshape((self._num_joints, self._num_fourier_terms)),
                 b=b.reshape((self._num_joints, self._num_fourier_terms)),
                 q0=q0,

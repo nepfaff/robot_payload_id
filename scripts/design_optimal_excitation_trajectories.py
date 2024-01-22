@@ -50,7 +50,8 @@ def main():
     parser.add_argument(
         "--omega",
         type=float,
-        required=True,
+        default=0.2 * np.pi,
+        required=False,
         help="Frequency of the trajectory.",
     )
     parser.add_argument(
@@ -60,11 +61,12 @@ def main():
         help="The number of timesteps to use.",
     )
     parser.add_argument(
-        "--timestep",
+        "--time_horizon",
         type=float,
-        default=1e-3,
+        default=10,
         required=False,
-        help="Trajectory timestep to use.",
+        help="The time horizon/ duration of the trajectory. The sampling time step is "
+        + "computed as time_horizon / num_timesteps.",
     )
     parser.add_argument(
         "--snopt_iteration_limit",
@@ -135,7 +137,7 @@ def main():
     num_fourier_terms = args.num_fourier_terms
     omega = args.omega
     num_timesteps = args.num_timesteps
-    timestep = args.timestep
+    time_horizon = args.time_horizon
     snopt_iteration_limit = args.snopt_iteration_limit
     budget = args.budget
     logging_path = args.logging_path
@@ -152,7 +154,7 @@ def main():
                 num_fourier_terms=num_fourier_terms,
                 omega=omega,
                 num_timesteps=num_timesteps,
-                timestep=timestep,
+                time_horizon=time_horizon,
                 plant=plant,
                 robot_model_instance_idx=robot_model_instance_idx,
                 budget=budget,
@@ -170,7 +172,7 @@ def main():
                 num_fourier_terms=num_fourier_terms,
                 omega=omega,
                 num_timesteps=num_timesteps,
-                timestep=timestep,
+                time_horizon=time_horizon,
                 plant=plant,
                 robot_model_instance_idx=robot_model_instance_idx,
                 budget=budget,
@@ -185,7 +187,7 @@ def main():
                 num_fourier_terms=num_fourier_terms,
                 omega=omega,
                 num_timesteps=num_timesteps,
-                timestep=timestep,
+                time_horizon=time_horizon,
                 plant=plant,
                 robot_model_instance_idx=robot_model_instance_idx,
                 budget=budget,
@@ -201,7 +203,7 @@ def main():
             num_fourier_terms=num_fourier_terms,
             omega=omega,
             num_timesteps=num_timesteps,
-            timestep=timestep,
+            time_horizon=time_horizon,
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             iteration_limit=snopt_iteration_limit,
@@ -211,9 +213,9 @@ def main():
         black_box_optimizer.optimize()
     elif optimizer == "snopt":
         snopt_optimizer.set_initial_guess(
-            a=5 * np.random.rand(num_joints * num_fourier_terms),
-            b=5 * np.random.rand(num_joints * num_fourier_terms),
-            q0=np.random.rand(num_joints),
+            a=np.random.rand(num_joints * num_fourier_terms) - 0.5,
+            b=np.random.rand(num_joints * num_fourier_terms) - 0.5,
+            q0=np.random.rand(num_joints) - 0.5,
         )
         snopt_optimizer.optimize()
     else:

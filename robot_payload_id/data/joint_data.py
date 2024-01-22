@@ -122,11 +122,11 @@ def compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
 
 def compute_autodiff_joint_data_from_fourier_series_traj_params(
     num_timesteps: int,
-    timestep: float,
+    time_horizon: float,
     a: np.ndarray,
     b: np.ndarray,
     q0: np.ndarray,
-    omega: float,
+    omega: float = 0.2 * np.pi,
     plant: Optional[MultibodyPlant] = None,
 ) -> JointData:
     """Generates autodiff joint data from the following Fourier series trajectory
@@ -138,7 +138,8 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
 
     Args:
         num_timesteps (int): The number of datapoints to generate.
-        timestep (float): The timestep between datapoints.
+        time_horizon (float): The time horizon/ duration of the trajectory. The sampling
+            time step is computed as time_horizon / num_timesteps.
         a (np.ndarray): The `a` parameters for the trajectory of type AutoDiffXd and
             shape (num_joints, num_fourier_terms).
         b (np.ndarray): The `b` parameters for the trajectory of type AutoDiffXd and
@@ -157,9 +158,10 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
     q_dot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
     q_ddot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
     num_terms = a.shape[1]
+    times = np.linspace(0, time_horizon, num_timesteps)
     for t in range(num_timesteps):
         for i in range(len(a)):
-            time = t * timestep
+            time = times[t]
             q[t, i] = (
                 sum(
                     (
