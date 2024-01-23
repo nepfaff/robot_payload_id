@@ -10,7 +10,7 @@ from .data_matrix_symbolic import (
     symbolic_to_numeric_data_matrix,
 )
 from .joint_data import (
-    compute_autodiff_joint_data_from_fourier_series_traj_params,
+    compute_autodiff_joint_data_from_fourier_series_traj_params1,
     compute_autodiff_joint_data_from_simple_sinusoidal_traj_params,
     generate_random_joint_data,
 )

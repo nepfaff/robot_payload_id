@@ -23,7 +23,7 @@ from pydrake.all import (
 )
 
 from robot_payload_id.data import (
-    compute_autodiff_joint_data_from_fourier_series_traj_params,
+    compute_autodiff_joint_data_from_fourier_series_traj_params1,
     extract_numeric_data_matrix_autodiff,
     extract_symbolic_data_matrix,
     load_symbolic_data_matrix,
@@ -218,7 +218,7 @@ class ExcitationTrajectoryOptimizerSnopt(ExcitationTrajectoryOptimizer):
         self._symbolic_vars = np.concatenate([self._a_var, self._b_var, self._q0_var])
 
         # Express symbolic data matrix in terms of decision variables
-        self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
+        self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=num_timesteps,
             time_horizon=time_horizon,
             a=self._a_var.reshape((num_joints, num_fourier_terms)),
@@ -676,7 +676,7 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolic(
         )
 
         # Compute symbolic joint data in terms of the decision variables
-        self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
+        self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=num_timesteps,
             time_horizon=time_horizon,
             a=self._a_var.reshape((num_joints, num_fourier_terms)),
@@ -786,7 +786,7 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolicNumeric(
         )
 
         # Compute symbolic joint data in terms of the decision variables
-        self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
+        self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=num_timesteps,
             time_horizon=time_horizon,
             a=self._a_var.reshape((num_joints, num_fourier_terms)),
@@ -955,7 +955,7 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
         a, b, q0 = np.split(
             var_values, [len(self._a_var), len(self._a_var) + len(self._b_var)]
         )
-        joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params(
+        joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=self._num_timesteps,
             time_horizon=self._time_horizon,
             a=a.reshape((self._num_joints, self._num_fourier_terms)),
@@ -1007,7 +1007,7 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
             var_values, [len(self._a_var), len(self._a_var) + len(self._b_var)]
         )
         joint_positions_numeric = (
-            compute_autodiff_joint_data_from_fourier_series_traj_params(
+            compute_autodiff_joint_data_from_fourier_series_traj_params1(
                 num_timesteps=self._num_timesteps,
                 time_horizon=self._time_horizon,
                 a=a.reshape((self._num_joints, self._num_fourier_terms)),

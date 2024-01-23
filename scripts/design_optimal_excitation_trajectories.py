@@ -50,7 +50,7 @@ def main():
     parser.add_argument(
         "--omega",
         type=float,
-        default=0.2 * np.pi,
+        default=0.3 * np.pi,
         required=False,
         help="Frequency of the trajectory.",
     )
