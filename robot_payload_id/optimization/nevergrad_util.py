@@ -57,12 +57,6 @@ class NevergradWandbLogger:
     """Logs to WandB during optimization."""
 
     def __init__(self, optimizer: ng.optimization.Optimizer) -> None:
-        wandb.log(
-            {
-                "optimizer_name": optimizer.name,
-                "parametrization_name": optimizer.parametrization.name,
-            }
-        )
         wandb.run.summary["optimizer_name"] = optimizer.name
         wandb.run.summary["parametrization_name"] = optimizer.parametrization.name
 
@@ -72,4 +66,10 @@ class NevergradWandbLogger:
         candidate: ng.parametrization.parameter.Parameter,
         loss: ng.typing.FloatLoss,
     ) -> None:
-        wandb.log({"candidate": candidate.value, "loss": loss})
+        wandb.log(
+            {
+                "candidate": candidate.value,
+                "loss": loss,
+                "current_lowest_loss": optimizer.current_bests["minimum"].mean,
+            }
+        )
