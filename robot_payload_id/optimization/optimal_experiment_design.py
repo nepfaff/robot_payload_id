@@ -1,5 +1,6 @@
 import enum
 import logging
+import os
 import time
 
 from abc import ABC, abstractmethod
@@ -22,6 +23,8 @@ from pydrake.all import (
     SnoptSolver,
 )
 
+import wandb
+
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
     extract_numeric_data_matrix_autodiff,
@@ -40,7 +43,7 @@ from robot_payload_id.symbolic import (
 )
 from robot_payload_id.utils import JointData, SymJointStateVariables
 
-from .nevergrad_util import NevergradLossLogger
+from .nevergrad_util import NevergradLossLogger, NevergradWandbLogger
 
 
 class CostFunction(enum.Enum):
@@ -459,6 +462,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
         parameterization = ng.p.Array(
             init=np.random.rand(len(self._symbolic_vars)) - 0.5
         )
+        wandb.log({"initial_guess": parameterization.value})
 
         # Select optimizer
         self._optimizer = ng.optimizers.NGOpt(
@@ -484,6 +488,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             logging_path.mkdir(parents=True)
             self._loss_logger = NevergradLossLogger(logging_path / "losses.txt")
             self._optimizer.register_callback("tell", self._loss_logger)
+        self._optimizer.register_callback("tell", NevergradWandbLogger(self._optimizer))
 
         cost_function_to_cost = {
             CostFunction.CONDITION_NUMBER: self._condition_number_cost,
@@ -507,6 +512,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             return np.inf
 
         condition_number = max_eig / min_eig
+        wandb.log({"condition_number": condition_number})
         return condition_number
 
     def _condition_number_and_d_optimality_cost(self, var_values: np.ndarray) -> float:
@@ -526,6 +532,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
 
         d_optimality_weight = 1e-1
         cost = condition_number + d_optimality_weight * d_optimality
+        wandb.log({"condition_number": condition_number, "d_optimality": d_optimality})
         return cost
 
     def _condition_number_and_e_optimality_cost(self, var_values: np.ndarray) -> float:
@@ -544,6 +551,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
 
         e_optimality_weight = 1e-3
         cost = condition_number + e_optimality_weight * e_optimality
+        wandb.log({"condition_number": condition_number, "e_optimality": e_optimality})
         return cost
 
     def _compute_joint_positions_numeric(self, var_values: np.ndarray) -> np.ndarray:
@@ -565,6 +573,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
                 (joint_positions_numeric[:, i] < lower_limit)
                 | (joint_positions_numeric[:, i] > upper_limit)
             )
+        wandb.log({"num_joint_limit_violations": num_violations})
         return num_violations
 
     def _combined_objective(self, var_values: ndarray) -> float:
@@ -585,7 +594,9 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
         logging.info(
             f"Optimization took {timedelta(seconds=time.time() - optimization_start)}"
         )
-        logging.info(f"Final loss: {recommendation.loss}")
+        final_loss = recommendation.loss
+        logging.info(f"Final loss: {final_loss}")
+        wandb.log({"final_loss": final_loss})
         symbolic_var_names = [var.get_name() for var in self._symbolic_vars]
         logging.info(
             f"Final param values: {dict(zip(symbolic_var_names, recommendation.value))}"
@@ -606,6 +617,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             plt.ylabel("Minimum loss")
             plt.legend(["Accumulated minimum loss", "First minimum loss"])
             plt.savefig(self._logging_path / "accumulated_min_losses.png")
+            wandb.log({"accumulated_min_losses": plt})
 
         a_value, b_value, q0_value = (
             recommendation.value[: len(self._a_var)],
@@ -614,6 +626,13 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             ],
             recommendation.value[len(self._a_var) + len(self._b_var) :],
         )
+        np.save(os.path.join(wandb.run.dir, "a_value.npy"), a_value)
+        np.save(os.path.join(wandb.run.dir, "b_value.npy"), b_value)
+        np.save(os.path.join(wandb.run.dir, "q0_value.npy"), q0_value)
+        if self._logging_path is not None:
+            np.save(self._logging_path / "a_value.npy", a_value)
+            np.save(self._logging_path / "b_value.npy", b_value)
+            np.save(self._logging_path / "q0_value.npy", q0_value)
         return a_value, b_value, q0_value
 
 
@@ -958,6 +977,12 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
         logging.info(
             f"{self._base_param_mapping.shape[1]} of "
             + f"{self._base_param_mapping.shape[0]} params are identifiable."
+        )
+        wandb.log(
+            {
+                "num_identifiable_params": self._base_param_mapping.shape[1],
+                "base_param_mapping": self._base_param_mapping,
+            }
         )
 
     def _compute_W_data(

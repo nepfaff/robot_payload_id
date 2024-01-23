@@ -1,9 +1,12 @@
 import argparse
 import logging
+import time
 
 from pathlib import Path
 
 import numpy as np
+
+import wandb
 
 from robot_payload_id.environment import create_arm
 from robot_payload_id.optimization import (
@@ -104,6 +107,13 @@ def main():
         + "optimization.",
     )
     parser.add_argument(
+        "--wandb_mode",
+        type=str,
+        default="online",
+        choices=["disabled", "online", "offline"],
+        help="WandB mode.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -113,6 +123,13 @@ def main():
     args = parser.parse_args()
 
     logging.basicConfig(level=args.log_level)
+
+    wandb.init(
+        project="robot_payload_id",
+        name=f"optimal_trajectory_design {time.strftime('%Y-%m-%d-%H-%M-%S')}",
+        config=vars(args),
+        mode=args.wandb_mode,
+    )
 
     use_one_link_arm = args.use_one_link_arm
     num_joints = 1 if use_one_link_arm else 7

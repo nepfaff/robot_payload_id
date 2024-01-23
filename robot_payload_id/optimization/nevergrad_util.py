@@ -63,6 +63,8 @@ class NevergradWandbLogger:
                 "parametrization_name": optimizer.parametrization.name,
             }
         )
+        wandb.run.summary["optimizer_name"] = optimizer.name
+        wandb.run.summary["parametrization_name"] = optimizer.parametrization.name
 
     def __call__(
         self,
