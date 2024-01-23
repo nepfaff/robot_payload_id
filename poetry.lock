@@ -1575,6 +1575,33 @@ benchmark = ["IOHexperimenter (>=0.2.8.7)", "Keras-Preprocessing", "Pillow (>=8.
 dev = ["autodocsumm (>=0.1.11)", "black (==22.3.0)", "docutils (==0.17.1)", "mypy (>=0.800)", "pandas (>=0.23.4)", "pylint (>=2.4.4)", "pyparsing (==2.2.1)", "pytest (>=4.3.0)", "pytest-cov (>=2.6.1)", "recommonmark (>=0.5.0)", "setuptools (>=41.2.0)", "sphinx (>=3.3.0)", "sphinx-rtd-theme (>=0.4.3)", "twine (>=3.1.1)", "wheel (>=0.33.6)"]
 
 [[package]]
+name = "nlopt"
+version = "2.7.1"
+description = "Library for nonlinear optimization, wrapping many algorithms for global and local, constrained or unconstrained, optimization"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "nlopt-2.7.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:42b7883704e1285ff40d930699eb7fc7e1341229da33666b4163459cfdf89fb1"},
+    {file = "nlopt-2.7.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6ba0862162248442fbf1f04b20a321c11ff40ff4442a12aaaafcdaff9abb0ab7"},
+    {file = "nlopt-2.7.1-cp310-cp310-win_amd64.whl", hash = "sha256:426c18548d733640449d707c82eb57c09a5f01d4b064f87312808d194d227f24"},
+    {file = "nlopt-2.7.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:7a12fe3cbfb36a6a18f84a1ac23ed3dda323860235381b3d2d182d8b771783ef"},
+    {file = "nlopt-2.7.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3e1653de0060a42d6709423e6160888893bb688f4ff79aa0f1def4701ea25dd8"},
+    {file = "nlopt-2.7.1-cp311-cp311-win_amd64.whl", hash = "sha256:88ec7cf491da150d497ecc61889bc7adb0af0ad05a67e925a4f5ac88e20f1b9c"},
+    {file = "nlopt-2.7.1-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:79791a2179d1cf708622eaeea76c88acbadc6af0d2f198df21a74473838686c3"},
+    {file = "nlopt-2.7.1-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:aad38bab99348f6c3bbf0d5f339b3fd77465b27ef44c330f4ba512a40b87b373"},
+    {file = "nlopt-2.7.1-cp37-cp37m-win_amd64.whl", hash = "sha256:479a415f522051f6d728a3279c013aab96a6eaf3c323a89582dcb07eb636f15f"},
+    {file = "nlopt-2.7.1-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:d99f1d6217bc3ead6fa6fe84a923577003f9a5f760cd354a3f8dcd1e11d626ce"},
+    {file = "nlopt-2.7.1-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:33f9370bd37788b4ac792cf161835f1e4e9bbad8bfb5a76f75a295ae38dcd8d0"},
+    {file = "nlopt-2.7.1-cp38-cp38-win_amd64.whl", hash = "sha256:8e7b65cf3a751e822b02f28b65d0c548052523fa6333619af3f24fec60a6b6bd"},
+    {file = "nlopt-2.7.1-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:087ff54de5ec0375fd18f843b36e9a8590c0f1e194bb45d3119ba844aeb836dd"},
+    {file = "nlopt-2.7.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b4a05448f0ffebbab7a6a822297430e018c848652280e6efa13484e210291d5c"},
+    {file = "nlopt-2.7.1-cp39-cp39-win_amd64.whl", hash = "sha256:757c41210f3ab6173e5c508c79c7833e33cf90a068d098b1e13d277432120b81"},
+]
+
+[package.dependencies]
+numpy = ">=1.14"
+
+[[package]]
 name = "nodeenv"
 version = "1.8.0"
 description = "Node.js virtual environment builder"
@@ -3133,4 +3160,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "394be7a1c9eab960b36d26844d2e59eabc004f01071aca92a819c8228fe20495"
+content-hash = "473f4f7142d757e6b9d3338f4930ca19b3af3651e0bc36450d515235fc3cc9ec"
