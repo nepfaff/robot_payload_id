@@ -455,16 +455,29 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
         self._q0_var = MakeVectorVariable(num_joints, "q0")
         self._symbolic_vars = np.concatenate([self._a_var, self._b_var, self._q0_var])
 
+        # Set initial guess
+        parameterization = ng.p.Array(
+            init=np.random.rand(len(self._symbolic_vars)) - 0.5
+        )
+
+        # Select optimizer
+        self._optimizer = ng.optimizers.NGOpt(
+            parametrization=parameterization,
+            budget=budget,
+        )
+        # self._optimizer = ng.families.NonObjectOptimizer(
+        #     method="NLOPT", random_restart=True
+        # )(
+        #     parametrization=parameterization,
+        #     budget=budget,
+        # )
         # NOTE: Cost function must be pickable for parallelization
         # self._optimizer = ng.optimizers.NGOpt(
-        #     parametrization=len(self._a_var) + len(self._b_var) + len(self._q0_var),
+        #     parametrization=len(self._symbolic_vars),
         #     budget=budget,
         #     num_workers=16,
         # )
-        self._optimizer = ng.optimizers.NGOpt(
-            parametrization=len(self._a_var) + len(self._b_var) + len(self._q0_var),
-            budget=budget,
-        )
+
         if use_optimization_progress_bar:
             self._optimizer.register_callback("tell", ng.callbacks.ProgressBar())
         if logging_path is not None:
