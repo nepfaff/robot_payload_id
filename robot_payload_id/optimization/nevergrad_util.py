@@ -3,6 +3,8 @@ from typing import List, Union
 
 import nevergrad as ng
 
+import wandb
+
 
 class NevergradLossLogger:
     """Logs losses into a file during optimization.
@@ -49,3 +51,23 @@ class NevergradLossLogger:
                 for line in f.readlines():
                     losses.append(float(line))
         return losses
+
+
+class NevergradWandbLogger:
+    """Logs to WandB during optimization."""
+
+    def __init__(self, optimizer: ng.optimization.Optimizer) -> None:
+        wandb.log(
+            {
+                "optimizer_name": optimizer.name,
+                "parametrization_name": optimizer.parametrization.name,
+            }
+        )
+
+    def __call__(
+        self,
+        optimizer: ng.optimization.Optimizer,
+        candidate: ng.parametrization.parameter.Parameter,
+        loss: ng.typing.FloatLoss,
+    ) -> None:
+        wandb.log({"candidate": candidate.value, "loss": loss})
