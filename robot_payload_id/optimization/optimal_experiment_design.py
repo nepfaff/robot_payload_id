@@ -860,7 +860,7 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolicNumeric(
 
     def _compute_identifiable_column_mask(self) -> np.ndarray:
         random_var_values = np.random.uniform(
-            low=1, high=1000, size=len(self._symbolic_vars)
+            low=-1, high=1, size=len(self._symbolic_vars)
         )
         W_data = self._compute_W_data(random_var_values)
 
@@ -954,16 +954,16 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
         )
         self._ad_plant_components = create_autodiff_plant(arm_components=arm_components)
 
-        self._identifiable_column_mask = self._compute_identifiable_column_mask()
+        self._base_param_mapping = self._compute_base_param_mapping()
         logging.info(
-            f"{np.sum(self._identifiable_column_mask)} of "
-            + f"{len(self._identifiable_column_mask)} params are identifiable."
+            f"{self._base_param_mapping.shape[1]} of "
+            + f"{self._base_param_mapping.shape[0]} params are identifiable."
         )
 
     def _compute_W_data(
         self,
         var_values: np.ndarray,
-        identifiable_column_mask: Optional[np.ndarray] = None,
+        base_param_mapping: Optional[np.ndarray] = None,
     ) -> np.ndarray:
         a, b, q0 = np.split(
             var_values, [len(self._a_var), len(self._a_var) + len(self._b_var)]
@@ -984,30 +984,44 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
             use_prgress_bar=False,
         )
 
-        # Remove structurally unidentifiable columns to prevent
-        # SolutionResult.kUnbounded
-        W_data = (
-            W_data_raw
-            if identifiable_column_mask is None
-            else W_data_raw[:, identifiable_column_mask]
-        )
+        if base_param_mapping is None:
+            W_data = W_data_raw
+        else:
+            # Remove structurally unidentifiable columns to prevent
+            # SolutionResult.kUnbounded
+            W_data = np.empty(
+                (self._num_timesteps * self._num_joints, base_param_mapping.shape[1])
+            )
+            multiplier = base_param_mapping @ np.linalg.inv(
+                base_param_mapping.T @ base_param_mapping
+            )
+            for i in range(self._num_timesteps):
+                W_data[i * self._num_joints : (i + 1) * self._num_joints, :] = (
+                    W_data_raw[i * self._num_joints : (i + 1) * self._num_joints, :]
+                    @ multiplier
+                )
+
         return W_data
 
-    def _compute_identifiable_column_mask(self) -> np.ndarray:
+    def _compute_base_param_mapping(self) -> np.ndarray:
+        """Computes the base parameter mapping matrix that maps the full parameters to
+        the identifiable parameters."""
         random_var_values = np.random.uniform(
-            low=1, high=1000, size=len(self._symbolic_vars)
+            low=-1, high=1, size=len(self._symbolic_vars)
         )
         W_data = self._compute_W_data(random_var_values)
 
-        _, R = np.linalg.qr(W_data)
-        identifiable = np.abs(np.diag(R)) > 1e-4
+        _, S, VT = np.linalg.svd(W_data)
+        V = VT.T
+        base_param_mapping = V[:, np.abs(S) > 1e-6]
+
         assert (
-            np.sum(identifiable) > 0
+            base_param_mapping.shape[1] > 0
         ), "No identifiable parameters! Try increasing num traj samples."
-        return identifiable
+        return base_param_mapping
 
     def _compute_W_dataTW_data_numeric(self, var_values) -> np.ndarray:
-        W_data = self._compute_W_data(var_values, self._identifiable_column_mask)
+        W_data = self._compute_W_data(var_values, self._base_param_mapping)
 
         W_dataTW_data = W_data.T @ W_data
         return W_dataTW_data
