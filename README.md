@@ -73,9 +73,9 @@ python scripts/compute_and_save_symbolic_data_matrix.py --use_one_link_arm
 ### 2. Designing optimal excitation trajectories
 
 ```bash
-python scripts/design_optimal_excitation_trajectories.py --use_one_link_arm \
+python scripts/design_optimal_excitation_trajectories.py  \
 --optimizer "black_box" --cost_function "condition_number_and_e_optimality" \
---num_fourier_terms 3 --omega 0.5 --num_timesteps 1000
+--num_fourier_terms 5 --num_timesteps 1000 --use_one_link_arm
 ```
 
 ### Sweeping Parameters
