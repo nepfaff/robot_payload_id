@@ -1013,13 +1013,10 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
             W_data = np.empty(
                 (self._num_timesteps * self._num_joints, base_param_mapping.shape[1])
             )
-            multiplier = base_param_mapping @ np.linalg.inv(
-                base_param_mapping.T @ base_param_mapping
-            )
             for i in range(self._num_timesteps):
                 W_data[i * self._num_joints : (i + 1) * self._num_joints, :] = (
                     W_data_raw[i * self._num_joints : (i + 1) * self._num_joints, :]
-                    @ multiplier
+                    @ base_param_mapping
                 )
 
         return W_data
