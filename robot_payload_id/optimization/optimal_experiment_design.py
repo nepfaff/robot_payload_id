@@ -577,7 +577,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
         return num_violations
 
     def _combined_objective(self, var_values: ndarray) -> float:
-        return self._cost_function_func(var_values) + 10 * self._joint_limit_penalty(
+        return self._cost_function_func(var_values) + 100.0 * self._joint_limit_penalty(
             var_values
         )
 
