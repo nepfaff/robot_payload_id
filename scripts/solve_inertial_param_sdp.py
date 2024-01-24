@@ -1,10 +1,12 @@
 import argparse
 import logging
 
+from pathlib import Path
+
 import numpy as np
 
 from robot_payload_id.data import (
-    compute_autodiff_joint_data_from_simple_sinusoidal_traj_params,
+    compute_autodiff_joint_data_from_fourier_series_traj_params1,
     extract_numeric_data_matrix_autodiff,
 )
 from robot_payload_id.environment import create_arm
@@ -30,10 +32,26 @@ def main():
         help="Number of data points to use.",
     )
     parser.add_argument(
-        "--qr_tolerance",
+        "--time_horizon",
         type=float,
-        default=1e-12,
-        help="Tolerance for QR decomposition.",
+        default=10.0,
+        required=False,
+        help="The time horizon/ duration of the trajectory. The sampling time step is "
+        + "computed as time_horizon / num_timesteps.",
+    )
+    parser.add_argument(
+        "--traj_parameter_path",
+        type=Path,
+        required=True,
+        help="Path to the trajectory parameter folder. The folder must contain "
+        + "'a_value.npy', 'b_value.npy', and 'q0_value.npy'. If "
+        + "--remove_unidentifiable_params is set, the folder must also contain "
+        + "'base_param_mapping.npy'.",
+    )
+    parser.add_argument(
+        "--kPrintToConsole",
+        action="store_true",
+        help="Whether to print solver output.",
     )
     parser.add_argument(
         "--log_level",
@@ -58,38 +76,54 @@ def main():
         arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
     )
 
+    # Load trajectory parameters
+    traj_parameter_path = args.traj_parameter_path
+    a_data = np.load(traj_parameter_path / "a_value.npy").reshape((num_joints, -1))
+    b_data = np.load(traj_parameter_path / "b_value.npy").reshape((num_joints, -1))
+    q0_data = np.load(traj_parameter_path / "q0_value.npy")
+    base_param_mapping = (
+        np.load(traj_parameter_path / "base_param_mapping.npy")
+        if args.remove_unidentifiable_params
+        else None
+    )
+
     # Generate data matrix
-    # TODO: Make configurable (parameterization + parameters)
-    joint_data = compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
+    joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
         plant=arm_components.plant,
         num_timesteps=args.num_data_points,
-        timestep=1.0,
-        a=-40.2049 * np.ones(num_joints),
-        b=20.8 * np.zeros(num_joints),
-        omega=0.5,
+        time_horizon=args.time_horizon,
+        a=a_data,
+        b=b_data,
+        q0=q0_data,
     )
-    W_data, tau_data = extract_numeric_data_matrix_autodiff(
+    W_data_raw, tau_data = extract_numeric_data_matrix_autodiff(
         arm_components=arm_components, joint_data=joint_data
     )
 
-    identifiable = None
-    if args.remove_unidentifiable_params:
-        # Identify the identifiable parameters using the QR decomposition
-        _, R = np.linalg.qr(W_data)
-        identifiable = np.abs(np.diag(R)) > args.qr_tolerance
+    if base_param_mapping is None:
+        W_data = W_data_raw
+    else:
+        # Remove structurally unidentifiable columns to prevent
+        # SolutionResult.kUnbounded
+        W_data = np.empty((W_data_raw.shape[0], base_param_mapping.shape[1]))
+        for i in range(args.num_data_points):
+            W_data[i * num_joints : (i + 1) * num_joints, :] = (
+                W_data_raw[i * num_joints : (i + 1) * num_joints, :]
+                @ base_param_mapping
+            )
 
-    prog, result, variable_names, variable_list = solve_inertial_param_sdp(
+    _, result, variable_names, variable_list = solve_inertial_param_sdp(
         num_links=num_joints,
         W_data=W_data,
         tau_data=tau_data,
-        identifiable=identifiable,
+        base_param_mapping=base_param_mapping,
+        solver_kPrintToConsole=args.kPrintToConsole,
     )
     if result.is_success():
         var_sol_dict = dict(zip(variable_names, result.GetSolution(variable_list)))
         logging.info(f"SDP result:\n{var_sol_dict}")
     else:
-        logging.warn("Failed to solve inertial parameter SDP!")
-        logging.info(f"MathematicalProgram:\n{prog}")
+        logging.warning("Failed to solve inertial parameter SDP!")
         logging.info(f"Solution result:\n{result.get_solution_result()}")
         logging.info(f"Solver details:\n{result.get_solver_details()}")
 

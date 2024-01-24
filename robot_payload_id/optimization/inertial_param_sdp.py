@@ -6,6 +6,7 @@ import numpy as np
 
 from pydrake.all import (
     CommonSolverOption,
+    DecomposeAffineExpressions,
     MathematicalProgram,
     MathematicalProgramResult,
     Solve,
@@ -47,7 +48,7 @@ def solve_inertial_param_sdp(
     num_links: int,
     W_data: np.ndarray,
     tau_data: np.ndarray,
-    identifiable: Optional[np.ndarray] = None,
+    base_param_mapping: Optional[np.ndarray] = None,
     regularization_weight: float = 0.0,
     solver_kPrintToConsole: bool = False,
 ) -> Tuple[MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray]:
@@ -59,9 +60,10 @@ def solve_inertial_param_sdp(
         num_links (int): The number of links in the robot.
         W_data (np.ndarray): The data matrix.
         tau_data (np.ndarray): The joint torque data.
-        identifiable (np.ndarray, optional): A boolean array of shape
-            (num_lumped_params,) where True indicates that the corresponding parameter
-            is identifiable. If None, all parameters are assumed to be identifiable.
+        base_param_mapping (np.ndarray, optional): The base parameter mapping matrix
+        that maps the full parameters to the identifiable parameters. It corresponds to
+        the part of V in the SVD that corresponds to non-zero singular values. If None,
+        all parameters are assumed to be identifiable.
         regularization_weight (float, optional): The parameter regularization weight.
         solver_kPrintToConsole (bool, optional): Whether to print solver output.
 
@@ -69,8 +71,8 @@ def solve_inertial_param_sdp(
         Tuple[MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray]: A
             tuple containing the MathematicalProgram, MathematicalProgramResult, an
             array of the variable names, and an array of the MathematicalProgram
-            variables. The variable names and variables only contain the identifiable
-            parameters.
+            variables. The variable names and variables contain all the parameters
+            rather than the identifiable base parameters.
     """
     prog = MathematicalProgram()
 
@@ -96,23 +98,43 @@ def solve_inertial_param_sdp(
     variable_names = np.array([var.get_name() for var in variable_list])
 
     # Optionally remove unidentifiable parameters
-    if identifiable is not None:
-        W_data = W_data[:, identifiable]
-        variable_list = variable_list[identifiable]
-        variable_names = variable_names[identifiable]
+    if base_param_mapping is not None:
+        base_variable_list = variable_list.T @ base_param_mapping
 
         logging.info(
             "Condition number after removing unidentifiable params: "
             + f"{np.linalg.cond(W_data)}"
         )
+    else:
+        base_variable_list = variable_list
 
-    # Objective
-    prog.Add2NormSquaredCost(A=W_data, b=tau_data, vars=variable_list)
+    # Create decision variables z = x.T @ base_param_mapping to preserve good
+    # conditioning
+    z = prog.NewContinuousVariables(base_variable_list.shape[0], "z")
+    prog.AddQuadraticCost(
+        2 * W_data.T @ W_data,
+        -2 * tau_data.T @ W_data,
+        tau_data.T @ tau_data,
+        vars=z,
+        is_convex=True,
+    )
+
+    # Add constraint that z = x.T @ base_param_mapping
+    # TODO: Add scaling between cost and constraint (Pre-conditioning of QP)
+    A, _, x = DecomposeAffineExpressions(base_variable_list)  # z = Ax
+    A[np.abs(A) < 1e-6] = 0.0
+    num_base_params = len(z)
+    prog.AddLinearEqualityConstraint(
+        np.hstack([np.eye(num_base_params), -A]),
+        np.zeros(num_base_params),
+        np.concatenate([z, x]),
+    )
 
     # Regularization
     # TODO: Replace this with geometric regularization
     prog.AddQuadraticCost(
-        regularization_weight * variable_list.T @ variable_list, is_convex=True
+        regularization_weight * base_variable_list.T @ base_variable_list,
+        is_convex=True,
     )
 
     # Inertial parameter feasibility constraints
@@ -125,5 +147,6 @@ def solve_inertial_param_sdp(
         options = SolverOptions()
         options.SetOption(CommonSolverOption.kPrintToConsole, 1)
 
+    logging.info("Starting to solve SDP...")
     result = Solve(prog=prog, solver_options=options)
     return prog, result, variable_names, variable_list
