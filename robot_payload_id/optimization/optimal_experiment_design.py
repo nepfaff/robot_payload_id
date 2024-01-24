@@ -978,12 +978,8 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
             f"{self._base_param_mapping.shape[1]} of "
             + f"{self._base_param_mapping.shape[0]} params are identifiable."
         )
-        wandb.log(
-            {
-                "num_identifiable_params": self._base_param_mapping.shape[1],
-                "base_param_mapping": self._base_param_mapping,
-            }
-        )
+        wandb.run.summary["num_params"] = self._base_param_mapping.shape[0]
+        wandb.run.summary["num_identifiable_params"] = self._base_param_mapping.shape[1]
 
     def _compute_W_data(
         self,
@@ -1069,3 +1065,14 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
             ).joint_positions
         )
         return joint_positions_numeric
+
+    def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
+        np.save(
+            os.path.join(wandb.run.dir, "base_param_mapping.npy"),
+            self._base_param_mapping,
+        )
+        if self._logging_path is not None:
+            np.save(
+                self._logging_path / "base_param_mapping.npy", self._base_param_mapping
+            )
+        return super().optimize()
