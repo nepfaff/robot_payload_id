@@ -31,11 +31,11 @@ Activate the environment:
 poetry shell
 ```
 
-Install `git lfs`:
+Install `git-lfs`:
 
 ```bash
-git lfs install
-git lfs pull
+git-lfs install
+git-lfs pull
 ```
 
 ## Symbolic System ID
