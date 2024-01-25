@@ -114,6 +114,7 @@ def solve_inertial_param_sdp(
     # Scaling coefficient to achieve similar scaling between the cost and linear
     # equality constraints (improves numerics and is required for solvability)
     scaling_coeff = np.max(np.abs(W_data.T @ W_data))
+    logging.info(f"Scaling coefficient: {scaling_coeff}")
     prog.AddQuadraticCost(
         2 * W_data.T @ W_data/scaling_coeff,
         -2 * tau_data.T @ W_data/scaling_coeff,
