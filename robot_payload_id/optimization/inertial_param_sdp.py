@@ -111,14 +111,13 @@ def solve_inertial_param_sdp(
     # Create decision variables z = x.T @ base_param_mapping to preserve good
     # conditioning
     z = prog.NewContinuousVariables(base_variable_list.shape[0], "z")
-    # Scaling coefficient to achieve similar scaling between the cost and linear
+    # Normalize cost to achieve similar scaling between the cost and linear
     # equality constraints (improves numerics and is required for solvability)
-    scaling_coeff = np.max(np.abs(W_data.T @ W_data))
-    logging.info(f"Scaling coefficient: {scaling_coeff}")
+    num_datapoints = len(W_data) / num_links
     prog.AddQuadraticCost(
-        2 * W_data.T @ W_data/scaling_coeff,
-        -2 * tau_data.T @ W_data/scaling_coeff,
-        tau_data.T @ tau_data/scaling_coeff,
+        2 * W_data.T @ W_data/num_datapoints,
+        -2 * tau_data.T @ W_data/num_datapoints,
+        tau_data.T @ tau_data/num_datapoints,
         vars=z,
         is_convex=True,
     )
