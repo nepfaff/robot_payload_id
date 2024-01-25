@@ -50,7 +50,8 @@ Generates data, constructs the data matrix and solves the SDP using posidefinite
 constraints on the pseudo inertias.
 
 ```bash
-python scripts/solve_inertial_param_sdp.py --use_one_link_arm --remove_unidentifiable_params
+python scripts/solve_inertial_param_sdp.py --use_one_link_arm \
+--remove_unidentifiable_params --traj_parameter_path logs/traj
 ```
 
 NOTE that one would want to obtain data using optimal experiment design to ensure that
@@ -75,7 +76,7 @@ python scripts/compute_and_save_symbolic_data_matrix.py --use_one_link_arm
 ```bash
 python scripts/design_optimal_excitation_trajectories.py  \
 --optimizer "black_box" --cost_function "condition_number_and_e_optimality" \
---num_fourier_terms 5 --num_timesteps 1000 --use_one_link_arm
+--num_fourier_terms 5 --num_timesteps 1000 --use_one_link_arm --logging_path logs/traj
 ```
 
 ### Sweeping Parameters
