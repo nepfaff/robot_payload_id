@@ -120,7 +120,7 @@ def compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
     return joint_data
 
 
-def compute_autodiff_joint_data_from_fourier_series_traj_params1(
+def compute_autodiff_joint_data_from_fourier_series_traj_params(
     num_timesteps: int,
     time_horizon: float,
     a: np.ndarray,
