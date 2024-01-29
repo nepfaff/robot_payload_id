@@ -985,6 +985,7 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
         self,
         var_values: np.ndarray,
         base_param_mapping: Optional[np.ndarray] = None,
+        use_progress_bar: bool = False,
     ) -> np.ndarray:
         a, b, q0 = np.split(
             var_values, [len(self._a_var), len(self._a_var) + len(self._b_var)]
@@ -996,13 +997,14 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
             b=b.reshape((self._num_joints, self._num_fourier_terms)),
             q0=q0,
             omega=self._omega,
+            use_progress_bar=use_progress_bar,
         )
 
         # Evaluate and stack symbolic data matrix
         W_data_raw, _ = extract_numeric_data_matrix_autodiff(
             arm_components=self._ad_plant_components,
             joint_data=joint_data,
-            use_prgress_bar=False,
+            use_progress_bar=use_progress_bar,
         )
 
         if base_param_mapping is None:
@@ -1027,7 +1029,7 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
         random_var_values = np.random.uniform(
             low=-1, high=1, size=len(self._symbolic_vars)
         )
-        W_data = self._compute_W_data(random_var_values)
+        W_data = self._compute_W_data(random_var_values, use_progress_bar=True)
 
         _, S, VT = np.linalg.svd(W_data)
         V = VT.T
@@ -1059,6 +1061,7 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
                 b=b.reshape((self._num_joints, self._num_fourier_terms)),
                 q0=q0,
                 omega=self._omega,
+                use_progress_bar=False,
             ).joint_positions
         )
         return joint_positions_numeric
