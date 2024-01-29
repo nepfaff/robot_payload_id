@@ -38,40 +38,7 @@ git-lfs install
 git-lfs pull
 ```
 
-## Symbolic System ID
-
-```bash
-python scripts/symbolic_id.py --config-name one_link_arm_symbolic_id
-```
-
-## SDP System ID
-
-Generates data, constructs the data matrix and solves the SDP using posidefinite
-constraints on the pseudo inertias.
-
-```bash
-python scripts/solve_inertial_param_sdp.py --use_one_link_arm \
---remove_unidentifiable_params --traj_parameter_path logs/traj
-```
-
-NOTE that one would want to obtain data using optimal experiment design to ensure that
-the numerics are good enough (e.g. condition number optimization).
-
-## Reparameterized System ID
-
-```bash
-python scripts/identify_model.py --config-name iiwa_id
-```
-
 ## Optimal Experiment Design
-
-### 1. Computing and saving symbolic data matrix
-
-```bash
-python scripts/compute_and_save_symbolic_data_matrix.py --use_one_link_arm
-```
-
-### 2. Designing optimal excitation trajectories
 
 ```bash
 python scripts/design_optimal_excitation_trajectories.py  \
@@ -85,6 +52,33 @@ Make sure to use the same parameters for `num_timesteps` and `time_horizon` as w
 for the optimal trajectory design.
 ```bash
 python scripts/visualize_trajectory.py --traj_parameter_path logs/traj
+```
+
+## Symbolic System ID
+
+```bash
+python scripts/symbolic_id.py --config-name one_link_arm_symbolic_id
+```
+
+## SDP System ID
+
+Generates data, constructs the data matrix and solves the SDP using posidefinite
+constraints on the pseudo inertias.
+This requires trajectories that have been designed using optimal excitation trajectory
+design as otherwise the numerics won't be good enough for the optimization to succeed.
+
+```bash
+python scripts/solve_inertial_param_sdp.py --use_one_link_arm \
+--remove_unidentifiable_params --traj_parameter_path logs/traj
+```
+
+NOTE that one would want to obtain data using optimal experiment design to ensure that
+the numerics are good enough (e.g. condition number optimization).
+
+## Reparameterized System ID
+
+```bash
+python scripts/identify_model.py --config-name iiwa_id
 ```
 
 ### Sweeping Parameters
