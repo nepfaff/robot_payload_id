@@ -115,7 +115,7 @@ def compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
         joint_velocities=q_dot,
         joint_accelerations=q_ddot,
         joint_torques=tau_gt,
-        sample_times_s=np.arange(num_timesteps) * 1e-3,
+        sample_times_s=np.arange(num_timesteps) * timestep,
     )
     return joint_data
 
@@ -201,12 +201,13 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
             plant.CalcForceElementsContribution(context, forces)
             tau_gt[i] = plant.CalcInverseDynamics(context, v_dot_curr, forces)
 
+    sample_delta = time_horizon / num_timesteps
     joint_data = JointData(
         joint_positions=q,
         joint_velocities=q_dot,
         joint_accelerations=q_ddot,
         joint_torques=tau_gt,
-        sample_times_s=np.arange(num_timesteps) * 1e-3,
+        sample_times_s=np.arange(num_timesteps) * sample_delta,
     )
     return joint_data
 
@@ -293,11 +294,12 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
             plant.CalcForceElementsContribution(context, forces)
             tau_gt[i] = plant.CalcInverseDynamics(context, v_dot_curr, forces)
 
+    sample_delta = time_horizon / num_timesteps
     joint_data = JointData(
         joint_positions=q,
         joint_velocities=q_dot,
         joint_accelerations=q_ddot,
         joint_torques=tau_gt,
-        sample_times_s=np.arange(num_timesteps) * 1e-3,
+        sample_times_s=np.arange(num_timesteps) * sample_delta,
     )
     return joint_data
