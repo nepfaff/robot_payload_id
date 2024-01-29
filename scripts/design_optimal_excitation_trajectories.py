@@ -229,6 +229,7 @@ def main():
             iteration_limit=snopt_iteration_limit,
         )
 
+    logging.info("Starting optimization")
     if optimizer == "black_box":
         black_box_optimizer.optimize()
     elif optimizer == "snopt":

@@ -1033,7 +1033,16 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
         )
         W_data = self._compute_W_data(random_var_values, use_progress_bar=True)
 
+        # NOTE: This might lead to running out of memory for large matrices. W_data
+        # is sparse and hence it might be possible to use a sparse SVD. However,
+        # this would make reconstruction difficutl.
+        logging.info(
+            "Computing SVD for base parameter mapping. This might take a while for "
+            + "large data matrices."
+        )
+        svd_start = time.time()
         _, S, VT = np.linalg.svd(W_data)
+        logging.info(f"SVD took {timedelta(seconds=time.time() - svd_start)}")
         V = VT.T
         base_param_mapping = V[:, np.abs(S) > 1e-6]
 
