@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 import numpy as np
+import yaml
 
 import wandb
 
@@ -54,20 +55,18 @@ def main():
         "--omega",
         type=float,
         default=0.3 * np.pi,
-        required=False,
         help="Frequency of the trajectory.",
     )
     parser.add_argument(
         "--num_timesteps",
         type=int,
-        required=True,
+        default=1000,
         help="The number of timesteps to use.",
     )
     parser.add_argument(
         "--time_horizon",
         type=float,
         default=10,
-        required=False,
         help="The time horizon/ duration of the trajectory. The sampling time step is "
         + "computed as time_horizon / num_timesteps.",
     )
@@ -131,6 +130,11 @@ def main():
         mode=args.wandb_mode,
     )
 
+    logging_path = args.logging_path
+    if logging_path is not None:
+        logging_path.mkdir(parents=True)
+        yaml.dump(vars(args), open(logging_path / "args.yaml", "w"))
+
     use_one_link_arm = args.use_one_link_arm
     num_joints = 1 if use_one_link_arm else 7
 
@@ -157,7 +161,6 @@ def main():
     time_horizon = args.time_horizon
     snopt_iteration_limit = args.snopt_iteration_limit
     budget = args.budget
-    logging_path = args.logging_path
 
     # Create the black-box optimizer
     if optimizer != "snopt":

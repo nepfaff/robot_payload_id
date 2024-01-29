@@ -485,7 +485,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
         if use_optimization_progress_bar:
             self._optimizer.register_callback("tell", ng.callbacks.ProgressBar())
         if logging_path is not None:
-            logging_path.mkdir(parents=True)
+            logging_path.mkdir(parents=True, exist_ok=True)
             self._loss_logger = NevergradLossLogger(logging_path / "losses.txt")
             self._optimizer.register_callback("tell", self._loss_logger)
         self._optimizer.register_callback("tell", NevergradWandbLogger(self._optimizer))
