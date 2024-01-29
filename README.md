@@ -79,6 +79,14 @@ python scripts/design_optimal_excitation_trajectories.py  \
 --num_fourier_terms 5 --num_timesteps 1000 --use_one_link_arm --logging_path logs/traj
 ```
 
+#### Visualize the designed trajectories
+
+Make sure to use the same parameters for `num_timesteps` and `time_horizon` as were used
+for the optimal trajectory design.
+```bash
+python scripts/visualize_trajectory.py --traj_parameter_path logs/traj
+```
+
 ### Sweeping Parameters
 
 A sweep can be started with
