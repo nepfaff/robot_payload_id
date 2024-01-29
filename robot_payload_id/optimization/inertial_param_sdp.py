@@ -115,9 +115,9 @@ def solve_inertial_param_sdp(
     # equality constraints (improves numerics and is required for solvability)
     num_datapoints = len(W_data) / num_links
     prog.AddQuadraticCost(
-        2 * W_data.T @ W_data/num_datapoints,
-        -2 * tau_data.T @ W_data/num_datapoints,
-        tau_data.T @ tau_data/num_datapoints,
+        2 * W_data.T @ W_data / num_datapoints,
+        -2 * tau_data.T @ W_data / num_datapoints,
+        tau_data.T @ tau_data / num_datapoints,
         vars=z,
         is_convex=True,
     )
