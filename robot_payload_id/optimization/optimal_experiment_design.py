@@ -527,7 +527,9 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             return np.inf
 
         condition_number = max_eig / min_eig
-        log_det = np.log(np.prod(eigenvalues))
+        # NOTE: This scaling seems to work for the iiwa. It is needed to prevent the
+        # log_det from reaching inf.
+        log_det = np.log(np.prod(eigenvalues * 1e-10))
         d_optimality = -log_det
 
         d_optimality_weight = 1e-1
