@@ -128,6 +128,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
     q0: np.ndarray,
     omega: float = 0.2 * np.pi,
     plant: Optional[MultibodyPlant] = None,
+    use_progress_bar: bool = True,
 ) -> JointData:
     """Generates autodiff joint data from the following Fourier series trajectory
     parameterization (see "Optimal robot excitation and identification", Equation 11):
@@ -148,6 +149,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
         omega (float): The frequency of the trajectory.
         plant (MultibodyPlant, optional): The plant to generate data for. If None, then
             the torques will be set to zero.
+        use_progress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
         JointData: The generated joint data.
@@ -158,7 +160,12 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
     q_ddot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
     num_terms = a.shape[1]
     times = np.linspace(0, time_horizon, num_timesteps)
-    for t in range(num_timesteps):
+    for t in tqdm(
+        range(num_timesteps),
+        total=num_timesteps,
+        desc="Generating joint data from traj params.",
+        disable=not use_progress_bar,
+    ):
         for i in range(len(a)):
             time = times[t]
             q[t, i] = (
@@ -193,7 +200,8 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
         for i, (q_curr, v_curr, v_dot_curr) in tqdm(
             enumerate(zip(q, q_dot, q_ddot)),
             total=num_timesteps,
-            desc="Generating sinusoidal data",
+            desc="Generating GT torque data.",
+            disable=not use_progress_bar,
         ):
             plant.SetPositions(context, q_curr)
             plant.SetVelocities(context, v_curr)
@@ -220,6 +228,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
     q0: np.ndarray,
     omega: float = 0.3 * np.pi,
     plant: Optional[MultibodyPlant] = None,
+    use_progress_bar: bool = True,
 ) -> JointData:
     """Generates autodiff joint data from the following Fourier series trajectory
     parameterization (It is a slight modificaiton of
@@ -241,6 +250,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
         omega (float): The frequency of the trajectory.
         plant (MultibodyPlant, optional): The plant to generate data for. If None, then
             the torques will be set to zero.
+        use_progress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
         JointData: The generated joint data.
@@ -251,7 +261,12 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
     q_ddot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
     num_terms = a.shape[1]
     times = np.linspace(0, time_horizon, num_timesteps)
-    for t in range(num_timesteps):
+    for t in tqdm(
+        range(num_timesteps),
+        total=num_timesteps,
+        desc="Generating joint data from traj params.",
+        disable=not use_progress_bar,
+    ):
         for i in range(len(a)):
             time = times[t]
             q[t, i] = (
@@ -286,7 +301,8 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
         for i, (q_curr, v_curr, v_dot_curr) in tqdm(
             enumerate(zip(q, q_dot, q_ddot)),
             total=num_timesteps,
-            desc="Generating sinusoidal data",
+            desc="Generating GT torque data.",
+            disable=not use_progress_bar,
         ):
             plant.SetPositions(context, q_curr)
             plant.SetVelocities(context, v_curr)
