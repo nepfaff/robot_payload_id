@@ -594,7 +594,7 @@ class LogCholeskyComInertialParameter(InertialParameter):
 
 def inertial_entropic_divergence(
     pseudo_inertias_init_inv, logdet_pseudo_inertias_init, pseudo_inertias
-):
+) -> torch.Tensor:
     """
     Provides entropic divergence from Eq. (19) of [1]:
         d_M(ϕ, ϕ₀)² = d_F(P || P₀) = -log(|P| / |P₀|) + tr(P₀⁻¹ P) - n
@@ -641,6 +641,28 @@ class InertialEntropicDivergence(nn.Module):
             psuedo_inertias,
         )
         return dist_2
+
+
+def calc_inertia_entropic_divergence(
+    masses1: np.ndarray,
+    coms1: np.ndarray,
+    rot_inertias1: np.ndarray,
+    masses2: np.ndarray,
+    coms2: np.ndarray,
+    rot_inertias2: np.ndarray,
+) -> float:
+    pseudo_inertias1 = inertial_param_to_pseudo_inertia(
+        torch.tensor(masses1), torch.tensor(coms1), torch.tensor(rot_inertias1)
+    )
+    pseudo_inertias1_inv = torch.linalg.inv(pseudo_inertias1)
+    pseudo_inertias1_logdet = torch.logdet(pseudo_inertias1)
+    pseudo_inertias2 = inertial_param_to_pseudo_inertia(
+        torch.tensor(masses2), torch.tensor(coms2), torch.tensor(rot_inertias2)
+    )
+    dists = inertial_entropic_divergence(
+        pseudo_inertias1_inv, pseudo_inertias1_logdet, pseudo_inertias2
+    )
+    return dists.mean().item()
 
 
 class DrakeInverseDynamics(nn.Module):

@@ -10,6 +10,11 @@ from robot_payload_id.data import (
     extract_numeric_data_matrix_autodiff,
 )
 from robot_payload_id.environment import create_arm
+from robot_payload_id.eric_id.drake_torch_dynamics import (
+    calc_inertia_entropic_divergence,
+    get_candidate_sys_id_bodies,
+    get_plant_inertial_params,
+)
 from robot_payload_id.optimization import solve_inertial_param_sdp
 
 
@@ -122,6 +127,62 @@ def main():
     if result.is_success():
         var_sol_dict = dict(zip(variable_names, result.GetSolution(variable_list)))
         logging.info(f"SDP result:\n{var_sol_dict}")
+
+        # Compute entropic divergence to GT parameters
+        masses_estiamted = np.array(
+            [var_sol_dict[f"m{i}(0)"] for i in range(num_joints)]
+        )
+        coms_estimated = np.array(
+            [
+                [
+                    var_sol_dict[f"hx{i}(0)"],
+                    var_sol_dict[f"hy{i}(0)"],
+                    var_sol_dict[f"hz{i}(0)"],
+                ]
+                / var_sol_dict[f"m{i}(0)"]
+                for i in range(num_joints)
+            ]
+        )
+        rot_inertias_estimated = np.array(
+            [
+                [
+                    [
+                        var_sol_dict[f"Ixx{i}(0)"],
+                        var_sol_dict[f"Ixy{i}(0)"],
+                        var_sol_dict[f"Ixz{i}(0)"],
+                    ],
+                    [
+                        var_sol_dict[f"Ixy{i}(0)"],
+                        var_sol_dict[f"Iyy{i}(0)"],
+                        var_sol_dict[f"Iyz{i}(0)"],
+                    ],
+                    [
+                        var_sol_dict[f"Ixz{i}(0)"],
+                        var_sol_dict[f"Iyz{i}(0)"],
+                        var_sol_dict[f"Izz{i}(0)"],
+                    ],
+                ]
+                for i in range(num_joints)
+            ]
+        )
+        bodies = get_candidate_sys_id_bodies(arm_components.plant)
+        masses_gt, coms_gt, rot_inertias_gt = get_plant_inertial_params(
+            arm_components.plant, arm_components.plant.CreateDefaultContext(), bodies
+        )
+        inertia_entropic_divergence = calc_inertia_entropic_divergence(
+            masses_estiamted,
+            coms_estimated,
+            rot_inertias_estimated,
+            masses_gt,
+            coms_gt,
+            rot_inertias_gt,
+        )
+        # Zero entropic divergence means the estimated parameters are the same as the
+        # ground truth parameters
+        logging.info(
+            "Inertia entropic divergence from ground truth: "
+            + f"{inertia_entropic_divergence}"
+        )
     else:
         logging.warning("Failed to solve inertial parameter SDP!")
         logging.info(f"Solution result:\n{result.get_solution_result()}")
