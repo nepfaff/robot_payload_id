@@ -178,10 +178,23 @@ def main():
             rot_inertias_gt,
         )
         # Zero entropic divergence means the estimated parameters are the same as the
-        # ground truth parameters
+        # ground truth parameters. This is not possible as not all parameters are
+        # identifiable.
         logging.info(
             "Inertia entropic divergence from ground truth: "
             + f"{inertia_entropic_divergence}"
+        )
+        last_link_inertia_entropic_divergence = calc_inertia_entropic_divergence(
+            masses_estiamted[-1:],
+            coms_estimated[-1:],
+            rot_inertias_estimated[-1:],
+            masses_gt[-1:],
+            coms_gt[-1:],
+            rot_inertias_gt[-1:],
+        )
+        logging.info(
+            "Inertia entropic divergence from ground truth for last link: "
+            + f"{last_link_inertia_entropic_divergence}"
         )
     else:
         logging.warning("Failed to solve inertial parameter SDP!")
