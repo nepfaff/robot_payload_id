@@ -598,7 +598,7 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
         )
         final_loss = recommendation.loss
         logging.info(f"Final loss: {final_loss}")
-        wandb.log({"final_loss": final_loss})
+        wandb.run.summary["final_loss"] = final_loss
         symbolic_var_names = [var.get_name() for var in self._symbolic_vars]
         logging.info(
             f"Final param values: {dict(zip(symbolic_var_names, recommendation.value))}"
@@ -619,7 +619,6 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             plt.ylabel("Minimum loss")
             plt.legend(["Accumulated minimum loss", "First minimum loss"])
             plt.savefig(self._logging_path / "accumulated_min_losses.png")
-            wandb.log({"accumulated_min_losses": plt})
 
         a_value, b_value, q0_value = (
             recommendation.value[: len(self._a_var)],
