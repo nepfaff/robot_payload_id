@@ -66,6 +66,12 @@ def main():
         help="The number of timesteps to use.",
     )
     parser.add_argument(
+        "--num_control_points",
+        type=int,
+        default=10,
+        help="The number of control points to use. Only used for B-spline optimization.",
+    )
+    parser.add_argument(
         "--time_horizon",
         type=float,
         default=10,
@@ -222,7 +228,7 @@ def main():
             robot_model_instance_idx=robot_model_instance_idx,
             model_path=model_path,
             num_timesteps=num_timesteps,
-            num_control_points=num_timesteps,
+            num_control_points=args.num_control_points,
             min_trajectory_duration=time_horizon / 2.0,
             max_trajectory_duration=time_horizon,
             max_al_iterations=max_al_iterations,
