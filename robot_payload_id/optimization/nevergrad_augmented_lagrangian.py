@@ -121,16 +121,25 @@ class NevergradAugmentedLagrangian:
         )
         return recommendation.value[0][0], constraint_residue, al_loss
 
-    def compute_num_lambda(self, prog: MathematicalProgram) -> int:
+    def compute_num_lambda(
+        self, prog: MathematicalProgram, nevergrad_set_bounds: bool = True
+    ) -> int:
         """Computes the number of Lagrangian multipliers in the program.
 
         Args:
             prog (MathematicalProgram): A MathematicalProgram object.
+            nevergrad_set_bounds: If set to True, Nevergrad will call set_bounds to set
+                the lower and upper bound for the decision variables; otherwise
+                Nevergrad doesn't set the bounds, and the augmented Lagrangian will
+                include the penalty on violating the variable bounds. It is recommended
+                to set nevergrad_set_bounds to True.
 
         Returns:
             int: The number of Lagrangian multipliers in the program.
         """
-        al = AugmentedLagrangianNonsmooth(prog)
+        al = AugmentedLagrangianNonsmooth(
+            prog, include_x_bounds=not nevergrad_set_bounds
+        )
         return al.lagrangian_size()
 
     def solve(
@@ -141,7 +150,7 @@ class NevergradAugmentedLagrangian:
         mu: float,
         nevergrad_set_bounds: bool = True,
         log_number_of_constraint_violations: bool = True,
-    ):
+    ) -> Tuple[np.ndarray, float, np.ndarray]:
         """
         Solves the constrained optimization problem through Nevergrad and augmented
         Lagrangian.
@@ -159,6 +168,10 @@ class NevergradAugmentedLagrangian:
                 to set nevergrad_set_bounds to True.
             log_number_of_constraint_violations: If set to True, the number of
                 constraint violations will be computed and logged.
+
+        Returns:
+            Tuple[np.ndarray, float, np.ndarray]: The optimal solution, the augmented
+                Lagrangian loss, and the constraint residue.
         """
         # Construct the augmented Lagrangian
         nonsmooth_al = AugmentedLagrangianNonsmooth(

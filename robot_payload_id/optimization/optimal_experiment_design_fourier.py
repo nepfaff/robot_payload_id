@@ -1,10 +1,10 @@
-import enum
 import logging
 import os
 import time
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from datetime import timedelta
+from functools import partial
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -28,8 +28,6 @@ import wandb
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
     extract_numeric_data_matrix_autodiff,
-    extract_symbolic_data_matrix,
-    load_symbolic_data_matrix,
     reexpress_symbolic_data_matrix,
     remove_structurally_unidentifiable_columns,
     symbolic_to_numeric_data_matrix,
@@ -37,28 +35,26 @@ from robot_payload_id.data import (
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import (
     create_autodiff_plant,
-    create_symbolic_plant,
     eval_expression_mat,
     eval_expression_mat_derivative,
 )
-from robot_payload_id.utils import JointData, SymJointStateVariables
+from robot_payload_id.utils import JointData
 
+from .nevergrad_augmented_lagrangian import NevergradAugmentedLagrangian
 from .nevergrad_util import NevergradLossLogger, NevergradWandbLogger
+from .optimal_experiment_design_base import (
+    CostFunction,
+    ExcitationTrajectoryOptimizerBase,
+    condition_number_and_d_optimality_cost,
+    condition_number_and_e_optimality_cost,
+    condition_number_cost,
+)
 
 
-class CostFunction(enum.Enum):
-    CONDITION_NUMBER = "condition_number"
-    CONDITION_NUMBER_AND_D_OPTIMALITY = "condition_number_and_d_optimality"
-    CONDITION_NUMBER_AND_E_OPTIMALITY = "condition_number_and_e_optimality"
-
-    def __str__(self):
-        return self.value
-
-
-class ExcitationTrajectoryOptimizer(ABC):
+class ExcitationTrajectoryOptimizerFourier(ExcitationTrajectoryOptimizerBase):
     """
-    The abstract base class for excitation trajectory optimizers.
-    Uses a Fourier series trajectory parameterization.
+    The abstract base class for excitation trajectory optimizers that use a Fourier
+    series trajectory parameterization.
     """
 
     def __init__(
@@ -87,15 +83,16 @@ class ExcitationTrajectoryOptimizer(ABC):
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
         """
-        self._num_joints = num_joints
-        self._num_params = num_joints * 10
-        self._cost_function = cost_function
+        super().__init__(
+            num_joints=num_joints,
+            cost_function=cost_function,
+            plant=plant,
+            robot_model_instance_idx=robot_model_instance_idx,
+        )
         self._num_fourier_terms = num_fourier_terms
         self._omega = omega
         self._num_timesteps = num_timesteps
         self._time_horizon = time_horizon
-        self._plant = plant
-        self._robot_model_instance_idx = robot_model_instance_idx
 
     @abstractmethod
     def optimize(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -107,46 +104,11 @@ class ExcitationTrajectoryOptimizer(ABC):
         """
         raise NotImplementedError
 
-    def _obtain_symbolic_data_matrix_and_state_vars(
-        self,
-        data_matrix_dir_path: Optional[Path] = None,
-        model_path: Optional[str] = None,
-    ) -> Tuple[ndarray, SymJointStateVariables]:
-        assert not (
-            data_matrix_dir_path is None and model_path is None
-        ), "Must provide either data matrix dir path or model path!"
 
-        if data_matrix_dir_path is None:  # Compute W_sym
-            arm_components = create_arm(
-                arm_file_path=model_path, num_joints=self._num_joints, time_step=0.0
-            )
-            sym_plant_components = create_symbolic_plant(
-                arm_components=arm_components, use_lumped_parameters=True
-            )
-            sym_state_variables = sym_plant_components.state_variables
-            W_sym = extract_symbolic_data_matrix(
-                symbolic_plant_components=sym_plant_components
-            )
-        else:  # Load W_sym
-            q_var = MakeVectorVariable(self._num_joints, "q")
-            q_dot_var = MakeVectorVariable(self._num_joints, "\dot{q}")
-            q_ddot_var = MakeVectorVariable(self._num_joints, "\ddot{q}")
-            tau_var = MakeVectorVariable(self._num_joints, "\tau")
-            sym_state_variables = SymJointStateVariables(
-                q=q_var, q_dot=q_dot_var, q_ddot=q_ddot_var, tau=tau_var
-            )
-            W_sym = load_symbolic_data_matrix(
-                dir_path=data_matrix_dir_path,
-                sym_state_variables=sym_state_variables,
-                num_joints=self._num_joints,
-                num_params=self._num_params,
-            )
-        return W_sym, sym_state_variables
-
-
-class ExcitationTrajectoryOptimizerSnopt(ExcitationTrajectoryOptimizer):
+class ExcitationTrajectoryOptimizerFourierSnopt(ExcitationTrajectoryOptimizerFourier):
     """
     The excitation trajectory optimizer that uses SNOPT to optimize the trajectory.
+    This optimizer uses a Fourier series parameterization.
     """
 
     def __init__(
@@ -393,10 +355,12 @@ class ExcitationTrajectoryOptimizerSnopt(ExcitationTrajectoryOptimizer):
         )
 
 
-class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
+class ExcitationTrajectoryOptimizerFourierBlackBox(
+    ExcitationTrajectoryOptimizerFourier
+):
     """
     The excitation trajectory optimizer that uses black box optimization to optimize
-    the trajectory.
+    the trajectory. This optimizer uses a Fourier series parameterization.
     NOTE: This is a mid-level class that should not be instantiated directly.
     """
 
@@ -462,7 +426,8 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
         parameterization = ng.p.Array(
             init=np.random.rand(len(self._symbolic_vars)) - 0.5
         )
-        wandb.log({"initial_guess": parameterization.value})
+        self._initial_guess = parameterization.value
+        wandb.log({"initial_guess": self._initial_guess})
 
         # Select optimizer
         self._optimizer = ng.optimizers.NGOpt(
@@ -502,59 +467,15 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
 
     def _condition_number_cost(self, var_values: np.ndarray) -> float:
         W_dataTW_data_numeric = self._compute_W_dataTW_data_numeric(var_values)
-        eigenvalues, _ = np.linalg.eigh(W_dataTW_data_numeric)
-        min_eig_idx = np.argmin(eigenvalues)
-        max_eig_idx = np.argmax(eigenvalues)
-        min_eig = eigenvalues[min_eig_idx]
-        max_eig = eigenvalues[max_eig_idx]
-
-        if min_eig <= 0:
-            return np.inf
-
-        condition_number = max_eig / min_eig
-        wandb.log({"condition_number": condition_number})
-        return condition_number
+        return condition_number_cost(W_dataTW_data_numeric)
 
     def _condition_number_and_d_optimality_cost(self, var_values: np.ndarray) -> float:
         W_dataTW_data_numeric = self._compute_W_dataTW_data_numeric(var_values)
-        eigenvalues, _ = np.linalg.eigh(W_dataTW_data_numeric)
-        min_eig_idx = np.argmin(eigenvalues)
-        max_eig_idx = np.argmax(eigenvalues)
-        min_eig = eigenvalues[min_eig_idx]
-        max_eig = eigenvalues[max_eig_idx]
-
-        if min_eig <= 0:
-            return np.inf
-
-        condition_number = max_eig / min_eig
-        # NOTE: This scaling seems to work for the iiwa. It is needed to prevent the
-        # log_det from reaching inf.
-        log_det = np.log(np.prod(eigenvalues * 1e-10))
-        d_optimality = -log_det
-
-        d_optimality_weight = 1e-1
-        cost = condition_number + d_optimality_weight * d_optimality
-        wandb.log({"condition_number": condition_number, "d_optimality": d_optimality})
-        return cost
+        return condition_number_and_d_optimality_cost(W_dataTW_data_numeric)
 
     def _condition_number_and_e_optimality_cost(self, var_values: np.ndarray) -> float:
         W_dataTW_data_numeric = self._compute_W_dataTW_data_numeric(var_values)
-        eigenvalues, _ = np.linalg.eigh(W_dataTW_data_numeric)
-        min_eig_idx = np.argmin(eigenvalues)
-        max_eig_idx = np.argmax(eigenvalues)
-        min_eig = eigenvalues[min_eig_idx]
-        max_eig = eigenvalues[max_eig_idx]
-
-        if min_eig <= 0:
-            return np.inf
-
-        condition_number = max_eig / min_eig
-        e_optimality = -min_eig
-
-        e_optimality_weight = 1e-3
-        cost = condition_number + e_optimality_weight * e_optimality
-        wandb.log({"condition_number": condition_number, "e_optimality": e_optimality})
-        return cost
+        return condition_number_and_e_optimality_cost(W_dataTW_data_numeric)
 
     def _compute_joint_positions_numeric(self, var_values: np.ndarray) -> np.ndarray:
         raise NotImplementedError
@@ -583,27 +504,9 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             var_values
         )
 
-    def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
-        # Optimize in parallel
-        # with futures.ProcessPoolExecutor(max_workers=self._optimizer.num_workers) as executor:
-        #     recommendation = self._optimizer.minimize(
-        #         self._combined_objective, executor=executor, batch_mode=True
-        #     )
-
-        logging.info("Starting optimization...")
-        optimization_start = time.time()
-        recommendation = self._optimizer.minimize(self._combined_objective)
-        logging.info(
-            f"Optimization took {timedelta(seconds=time.time() - optimization_start)}"
-        )
-        final_loss = recommendation.loss
-        logging.info(f"Final loss: {final_loss}")
-        wandb.run.summary["final_loss"] = final_loss
-        symbolic_var_names = [var.get_name() for var in self._symbolic_vars]
-        logging.info(
-            f"Final param values: {dict(zip(symbolic_var_names, recommendation.value))}"
-        )
-
+    def _log_optimization_result(
+        self, a_value: np.ndarray, b_value: np.ndarray, q0_value: np.ndarray
+    ) -> None:
         if self._logging_path is not None:
             # Create accumulated minimum loss plot
             losses = self._loss_logger.load()
@@ -620,13 +523,6 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             plt.legend(["Accumulated minimum loss", "First minimum loss"])
             plt.savefig(self._logging_path / "accumulated_min_losses.png")
 
-        a_value, b_value, q0_value = (
-            recommendation.value[: len(self._a_var)],
-            recommendation.value[
-                len(self._a_var) : len(self._a_var) + len(self._b_var)
-            ],
-            recommendation.value[len(self._a_var) + len(self._b_var) :],
-        )
         np.save(os.path.join(wandb.run.dir, "a_value.npy"), a_value)
         np.save(os.path.join(wandb.run.dir, "b_value.npy"), b_value)
         np.save(os.path.join(wandb.run.dir, "q0_value.npy"), q0_value)
@@ -634,16 +530,46 @@ class ExcitationTrajectoryOptimizerBlackBox(ExcitationTrajectoryOptimizer):
             np.save(self._logging_path / "a_value.npy", a_value)
             np.save(self._logging_path / "b_value.npy", b_value)
             np.save(self._logging_path / "q0_value.npy", q0_value)
+
+    def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
+        # Optimize in parallel
+        # with futures.ProcessPoolExecutor(max_workers=self._optimizer.num_workers) as executor:
+        #     recommendation = self._optimizer.minimize(
+        #         self._combined_objective, executor=executor, batch_mode=True
+        #     )
+
+        logging.info("Starting optimization...")
+        optimization_start = time.time()
+        recommendation = self._optimizer.minimize(self._combined_objective)
+        logging.info(
+            f"Optimization took {timedelta(seconds=time.time() - optimization_start)}"
+        )
+
+        # Log final loss
+        final_loss = recommendation.loss
+        logging.info(f"Final loss: {final_loss}")
+        wandb.run.summary["final_loss"] = final_loss
+
+        # Log optimization result
+        a_value, b_value, q0_value = (
+            recommendation.value[: len(self._a_var)],
+            recommendation.value[
+                len(self._a_var) : len(self._a_var) + len(self._b_var)
+            ],
+            recommendation.value[len(self._a_var) + len(self._b_var) :],
+        )
+        self._log_optimization_result(a_value, b_value, q0_value)
+
         return a_value, b_value, q0_value
 
 
-class ExcitationTrajectoryOptimizerBlackBoxSymbolic(
-    ExcitationTrajectoryOptimizerBlackBox
+class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
+    ExcitationTrajectoryOptimizerFourierBlackBox
 ):
     """
     The excitation trajectory optimizer that uses black box optimization to optimize
     the trajectory. This optimizer uses fully symbolic expressions to compute the data
-    matrix.
+    matrix. This optimizer uses a Fourier series parameterization.
     """
 
     def __init__(
@@ -743,14 +669,14 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolic(
         return joint_positions_numeric
 
 
-class ExcitationTrajectoryOptimizerBlackBoxSymbolicNumeric(
-    ExcitationTrajectoryOptimizerBlackBox
+class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolicNumeric(
+    ExcitationTrajectoryOptimizerFourierBlackBox
 ):
     """
     The excitation trajectory optimizer that uses black box optimization to optimize
     the trajectory. This optimizer uses symbolic expressions to compute the data
     matrix but does not symbolically re-express the data matrix in terms of the
-    decision variables.
+    decision variables. This optimizer uses a Fourier series parameterization.
     """
 
     def __init__(
@@ -904,14 +830,14 @@ class ExcitationTrajectoryOptimizerBlackBoxSymbolicNumeric(
         return joint_positions_numeric
 
 
-class ExcitationTrajectoryOptimizerBlackBoxNumeric(
-    ExcitationTrajectoryOptimizerBlackBox
+class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
+    ExcitationTrajectoryOptimizerFourierBlackBox
 ):
     """
     The excitation trajectory optimizer that uses black box optimization to optimize
     the trajectory. This optimizer uses fully numeric computations. This is faster than
     symbolic versions when the symbolic expressions are very large (substitution slower
-    than numeric re-compution).
+    than numeric re-compution). This optimizer uses a Fourier series parameterization.
     """
 
     def __init__(
@@ -925,9 +851,9 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
         plant: MultibodyPlant,
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
+        model_path: str,
         use_optimization_progress_bar: bool = True,
         logging_path: Optional[Path] = None,
-        model_path: Optional[str] = None,
     ):
         """
         Args:
@@ -943,17 +869,12 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
             budget (int): The number of iterations to run the optimizer for.
+            model_path (str): The path to the model file (e.g. SDFormat, URDF).
             use_optimization_progress_bar (bool): Whether to show a progress bar for the
                 optimization. This might lead to a small performance hit.
             logging_path (Path): The path to write the optimization logs to. If None,
                 then no logs are written. Recording logs is a callback and hence will
                 slow down the optimization.
-            model_path (str): The path to the model file (e.g. SDFormat, URDF). Only
-                used if `data_matrix_dir_path` is None.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray]: The optimized trajectory
-                parameters `a`, `b`, and `q0`.
         """
         super().__init__(
             num_joints=num_joints,
@@ -969,10 +890,12 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
             logging_path=logging_path,
         )
 
-        arm_components = create_arm(
+        self._arm_components = create_arm(
             arm_file_path=model_path, num_joints=num_joints, time_step=0.0
         )
-        self._ad_plant_components = create_autodiff_plant(arm_components=arm_components)
+        self._ad_plant_components = create_autodiff_plant(
+            arm_components=self._arm_components
+        )
 
         self._base_param_mapping = self._compute_base_param_mapping()
         logging.info(
@@ -1086,3 +1009,159 @@ class ExcitationTrajectoryOptimizerBlackBoxNumeric(
                 self._logging_path / "base_param_mapping.npy", self._base_param_mapping
             )
         return super().optimize()
+
+
+class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
+    ExcitationTrajectoryOptimizerFourierBlackBoxNumeric
+):
+    """
+    The excitation trajectory optimizer that uses black box optimization with the
+    augmented Lagrangian method to optimize the trajectory. This optimizer uses fully
+    numeric computations and the Fourier series parameterization.
+    """
+
+    def __init__(
+        self,
+        num_joints: int,
+        cost_function: CostFunction,
+        num_fourier_terms: int,
+        omega: float,
+        num_timesteps: int,
+        time_horizon: float,
+        plant: MultibodyPlant,
+        robot_model_instance_idx: ModelInstanceIndex,
+        max_al_iterations: int,
+        budget_per_iteration: int,
+        mu_initial: float,
+        mu_multiplier: float,
+        mu_max: float,
+        model_path: str,
+        logging_path: Optional[Path] = None,
+    ):
+        """
+        Args:
+            num_joints (int): The number of joints in the arm.
+            cost_function (CostFunction): The cost function to use.
+            num_fourier_terms (int): The number of Fourier terms to use for the
+                trajectory parameterization.
+            omega (float): The frequency of the trajectory.
+            num_time_steps (int): The number of time steps to use for the trajectory.
+            time_horizon (float): The time horizon/ duration of the trajectory. The
+                sampling time step is computed as time_horizon / num_timesteps.
+            plant (MultibodyPlant): The plant to use for adding constraints.
+            robot_model_instance_idx (ModelInstanceIndex): The model instance index of
+                the robot. Used for adding constraints.
+            max_al_iterations (int): The maximum number of augmented Lagrangian
+                iterations to run.
+            budget_per_iteration (int): The number of iterations to run the optimizer
+                for at each augmented Lagrangian iteration.
+            mu_initial (float): The initial value of the penalty weights.
+            mu_multiplier (float): We will multiply mu by mu_multiplier if the
+                equality constraint is not satisfied.
+            mu_max (float): The maximum value of the penalty weights.
+            model_path (str): The path to the model file (e.g. SDFormat, URDF).
+            logging_path (Path): The path to write the optimization logs to. If None,
+                then no logs are written.
+        """
+        super().__init__(
+            num_joints=num_joints,
+            cost_function=cost_function,
+            num_fourier_terms=num_fourier_terms,
+            omega=omega,
+            num_timesteps=num_timesteps,
+            time_horizon=time_horizon,
+            plant=plant,
+            robot_model_instance_idx=robot_model_instance_idx,
+            budget=budget_per_iteration,
+            model_path=model_path,
+            use_optimization_progress_bar=False,
+            logging_path=logging_path,
+        )
+        self._mu_initial = mu_initial
+
+        self._prog = MathematicalProgram()
+
+        # Create decision variables
+        self._a_var = self._prog.NewContinuousVariables(
+            num_joints * num_fourier_terms, "a"
+        )
+        self._b_var = self._prog.NewContinuousVariables(
+            num_joints * num_fourier_terms, "b"
+        )
+        self._q0_var = self._prog.NewContinuousVariables(num_joints, "q0")
+        self._symbolic_vars = np.concatenate([self._a_var, self._b_var, self._q0_var])
+
+        # Add cost
+        self._prog.AddCost(self._cost_function_func, vars=self._symbolic_vars)
+
+        # Add constraints
+        self._add_joint_limit_constraints()
+        # TODO: Add other constraints
+
+        # TODO: Make method configurable. This should be configurable for all Nevergrad
+        # optimizers.
+        self._ng_al = NevergradAugmentedLagrangian(
+            max_al_iterations=max_al_iterations,
+            budget_per_iteration=budget_per_iteration,
+            mu_multiplier=mu_multiplier,
+            mu_max=mu_max,
+            method="OnePlusOne",
+        )
+
+    def _get_joint_positions(self, index: int, var_values: np.ndarray) -> np.ndarray:
+        """Get the joint positions for a given joint index.
+
+        Args:
+            index (int): The index of the joint.
+            var_values (np.ndarray): The decision variable values.
+
+        Returns:
+            np.ndarray: The joint positions for the given joint index.
+        """
+        joint_positions_numeric = self._compute_joint_positions_numeric(
+            var_values
+        )  # Shape (T,N)
+        return joint_positions_numeric[:, index].astype(float)
+
+    def _add_joint_limit_constraints(self) -> None:
+        joint_indices = self._plant.GetJointIndices(self._robot_model_instance_idx)
+        for i in range(self._num_joints):
+            lower_limit = self._plant.get_mutable_joint(
+                joint_indices[i]
+            ).position_lower_limits()[0]
+            upper_limit = self._plant.get_mutable_joint(
+                joint_indices[i]
+            ).position_upper_limits()[0]
+            self._prog.AddConstraint(
+                func=partial(self._get_joint_positions, i),
+                lb=np.repeat(lower_limit, repeats=self._num_timesteps),
+                ub=np.repeat(upper_limit, repeats=self._num_timesteps),
+                vars=self._symbolic_vars,
+                description=f"joint_limit_constraint_{i}",
+            )
+
+    def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
+        # Compute the initial Lagrange multiplier guess
+        num_lambda = self._ng_al.compute_num_lambda(self._prog)
+        lambda_initial = np.random.rand(num_lambda)
+
+        # Optimize
+        x_val, _, _ = self._ng_al.solve(
+            prog=self._prog,
+            x_init=self._initial_guess,
+            lambda_val=lambda_initial,
+            mu=self._mu_initial,
+            nevergrad_set_bounds=True,
+        )
+
+        # Compute constraint violations
+        num_joint_limit_violations = self._joint_limit_penalty(x_val)
+        wandb.run.summary["num_joint_limit_violations"] = num_joint_limit_violations
+
+        # Log optimization result
+        a_value, b_value, q0_value = np.split(
+            x_val, [len(self._a_var), len(self._a_var) + len(self._b_var)]
+        )
+        self._log_optimization_result(a_value, b_value, q0_value)
+
+        return a_value, b_value, q0_value
