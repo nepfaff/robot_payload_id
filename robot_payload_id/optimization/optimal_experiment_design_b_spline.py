@@ -436,6 +436,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
 
     def _add_bound_constraints(self) -> None:
+        """Add position, velocity, and acceleration bound constraints."""
         self._trajopt.AddPositionBounds(
             lb=self._plant.GetPositionLowerLimits(),
             ub=self._plant.GetPositionUpperLimits(),
@@ -450,7 +451,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
 
     def _add_start_and_end_point_constraints(self) -> None:
-        # Start and end with zero velocities
+        """Add constraints to start and end with zero velocities/ accelerations."""
         self._trajopt.AddPathVelocityConstraint(
             lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
         )

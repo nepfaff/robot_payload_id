@@ -1125,7 +1125,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
 
         # Add constraints
         self._add_bound_constraints()
-        # TODO: Add other constraints
+        self._add_start_and_end_point_constraints()
+        # TODO: Add collision constraints
 
         self._ng_al = NevergradAugmentedLagrangian(
             max_al_iterations=max_al_iterations,
@@ -1182,6 +1183,15 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                     acceleration_lower_limits[j],
                     acceleration_upper_limits[j],
                 )
+
+    def _add_start_and_end_point_constraints(self) -> None:
+        """Add constraints to start and end with zero velocities/ accelerations."""
+        joint_data = self._compute_joint_data_numeric(self._symbolic_vars)
+        for i in range(self._num_joints):
+            self._prog.AddLinearConstraint(joint_data.joint_velocities[0, i] == 0.0)
+            self._prog.AddLinearConstraint(joint_data.joint_velocities[-1, i] == 0.0)
+            self._prog.AddLinearConstraint(joint_data.joint_accelerations[0, i] == 0.0)
+            self._prog.AddLinearConstraint(joint_data.joint_accelerations[-1, i] == 0.0)
 
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
         # Compute the initial Lagrange multiplier guess
