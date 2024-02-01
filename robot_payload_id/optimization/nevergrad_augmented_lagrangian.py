@@ -65,6 +65,7 @@ class NevergradAugmentedLagrangian:
         lambda_val: np.ndarray,
         mu: float,
         nevergrad_set_bounds: bool,
+        numerically_stable_max_float: float = 1e10,
     ) -> Tuple[np.ndarray, np.ndarray, float]:
         """
         Solves one augmented Lagrangian iteration through Nevergrad.
@@ -72,8 +73,26 @@ class NevergradAugmentedLagrangian:
         residue, and the augmented Lagrangian loss.
         """
         x_array = ng.p.Array(init=x_init)
-        if nevergrad_set_bounds:
-            x_array.set_bounds(nonsmooth_al.x_lo(), nonsmooth_al.x_up())
+
+        # NOTE: Settings bounds can lead to numerical instability for some optimizers
+        # such as NGOpt
+        all_bounds_are_inf = np.all(np.isinf(nonsmooth_al.x_lo())) and np.all(
+            np.isinf(nonsmooth_al.x_up())
+        )
+        if nevergrad_set_bounds and not all_bounds_are_inf:
+            # Replace inf with some big float that is still numerically stable
+            lower_bound = np.where(
+                np.isinf(nonsmooth_al.x_lo()),
+                -numerically_stable_max_float,
+                nonsmooth_al.x_lo(),
+            )
+            upper_bound = np.where(
+                np.isinf(nonsmooth_al.x_up()),
+                numerically_stable_max_float,
+                nonsmooth_al.x_up(),
+            )
+            x_array.set_bounds(lower_bound, upper_bound)
+            wandb.run.summary["nevergrad_set_bounds"] = True
 
         # Select optimizer and set initial guess
         optimizer = ng.optimizers.registry[self._method](
@@ -92,8 +111,6 @@ class NevergradAugmentedLagrangian:
             leave=False,
         ):
             x = optimizer.ask()
-            # TODO: NGOpt with a big budget might return NaN (same result as when
-            # calling) optimizer.ask() twice. Why does this happen?
             al_loss, constraint_residue, cost_function_val = nonsmooth_al.Eval(
                 x=x.value, lambda_val=lambda_val, mu=mu
             )
@@ -150,6 +167,7 @@ class NevergradAugmentedLagrangian:
         mu: float,
         nevergrad_set_bounds: bool = True,
         log_number_of_constraint_violations: bool = True,
+        numerically_stable_max_float: float = 1e10,
     ) -> Tuple[np.ndarray, float, np.ndarray]:
         """
         Solves the constrained optimization problem through Nevergrad and augmented
@@ -168,6 +186,10 @@ class NevergradAugmentedLagrangian:
                 to set nevergrad_set_bounds to True.
             log_number_of_constraint_violations: If set to True, the number of
                 constraint violations will be computed and logged.
+            numerically_stable_max_float: A numerically stable maximum float value. This
+                is used to replace inf in the bounds of the decision variables. Ideally,
+                this is a bit bigger than the largest value of interest but as small
+                as possible to improve the numerics.
 
         Returns:
             Tuple[np.ndarray, float, np.ndarray]: The optimal solution, the augmented
@@ -190,7 +212,12 @@ class NevergradAugmentedLagrangian:
         ):
             # Solve one augmented Lagrangian iteration
             x_val, constraint_residue, loss = self._solve_al(
-                nonsmooth_al, x_val, lambda_val, mu, nevergrad_set_bounds
+                nonsmooth_al=nonsmooth_al,
+                x_init=x_val,
+                lambda_val=lambda_val,
+                mu=mu,
+                nevergrad_set_bounds=nevergrad_set_bounds,
+                numerically_stable_max_float=numerically_stable_max_float,
             )
 
             # Update the Lagrangian multipliers
