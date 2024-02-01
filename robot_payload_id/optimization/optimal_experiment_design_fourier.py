@@ -1010,25 +1010,24 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         W_dataTW_data = W_data.T @ W_data
         return W_dataTW_data
 
-    def _compute_joint_positions_numeric(self, var_values: np.ndarray) -> np.ndarray:
-        # TODO: Only compute the necessary joint positions
-        # NOTE: It might make more sense to compute this in 'combined_objective'
-        # and then pass it to all the penalty functions that require it
+    def _compute_joint_data_numeric(self, var_values: np.ndarray) -> JointData:
         a, b, q0 = np.split(
             var_values, [len(self._a_var), len(self._a_var) + len(self._b_var)]
         )
-        joint_positions_numeric = (
-            compute_autodiff_joint_data_from_fourier_series_traj_params1(
-                num_timesteps=self._num_timesteps,
-                time_horizon=self._time_horizon,
-                a=a.reshape((self._num_joints, self._num_fourier_terms)),
-                b=b.reshape((self._num_joints, self._num_fourier_terms)),
-                q0=q0,
-                omega=self._omega,
-                use_progress_bar=False,
-            ).joint_positions
+        joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
+            num_timesteps=self._num_timesteps,
+            time_horizon=self._time_horizon,
+            a=a.reshape((self._num_joints, self._num_fourier_terms)),
+            b=b.reshape((self._num_joints, self._num_fourier_terms)),
+            q0=q0,
+            omega=self._omega,
+            use_progress_bar=False,
         )
-        return joint_positions_numeric
+        return joint_data
+
+    def _compute_joint_positions_numeric(self, var_values: np.ndarray) -> np.ndarray:
+        joint_data = self._compute_joint_data_numeric(var_values)
+        return joint_data.joint_positions
 
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
         self._log_base_params_mapping(self._base_param_mapping)
@@ -1125,7 +1124,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         self._prog.AddCost(self._cost_function_func, vars=self._symbolic_vars)
 
         # Add constraints
-        self._add_joint_limit_constraints()
+        self._add_bound_constraints()
         # TODO: Add other constraints
 
         self._ng_al = NevergradAugmentedLagrangian(
@@ -1151,22 +1150,38 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         )  # Shape (T,N)
         return joint_positions_numeric[:, index].astype(float)
 
-    def _add_joint_limit_constraints(self) -> None:
-        joint_indices = self._plant.GetJointIndices(self._robot_model_instance_idx)
-        for i in range(self._num_joints):
-            lower_limit = self._plant.get_mutable_joint(
-                joint_indices[i]
-            ).position_lower_limits()[0]
-            upper_limit = self._plant.get_mutable_joint(
-                joint_indices[i]
-            ).position_upper_limits()[0]
-            self._prog.AddConstraint(
-                func=partial(self._get_joint_positions, i),
-                lb=np.repeat(lower_limit, repeats=self._num_timesteps),
-                ub=np.repeat(upper_limit, repeats=self._num_timesteps),
-                vars=self._symbolic_vars,
-                description=f"joint_limit_constraint_{i}",
-            )
+    def _add_bound_constraints(self) -> None:
+        """Add position, velocity, and acceleration bound constraints."""
+        joint_data = self._compute_joint_data_numeric(self._symbolic_vars)
+
+        position_lower_limits = self._plant.GetPositionLowerLimits()
+        position_upper_limits = self._plant.GetPositionUpperLimits()
+        velocity_lower_limits = self._plant.GetVelocityLowerLimits()
+        velocity_upper_limits = self._plant.GetVelocityUpperLimits()
+        acceleration_lower_limits = self._plant.GetAccelerationLowerLimits()
+        acceleration_upper_limits = self._plant.GetAccelerationUpperLimits()
+        for i in range(self._num_timesteps):
+            for j in range(self._num_joints):
+                # Position bounds
+                self._prog.AddConstraint(
+                    joint_data.joint_positions[i, j],
+                    position_lower_limits[j],
+                    position_upper_limits[j],
+                )
+
+                # Velocity bounds
+                self._prog.AddConstraint(
+                    joint_data.joint_velocities[i, j],
+                    velocity_lower_limits[j],
+                    velocity_upper_limits[j],
+                )
+
+                # Acceleration bounds
+                self._prog.AddConstraint(
+                    joint_data.joint_accelerations[i, j],
+                    acceleration_lower_limits[j],
+                    acceleration_upper_limits[j],
+                )
 
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
         # Compute the initial Lagrange multiplier guess
