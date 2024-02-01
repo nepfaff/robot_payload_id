@@ -258,10 +258,13 @@ class NevergradAugmentedLagrangian:
                 num_constraint_violations = 0
                 for j in range(lagrangian_size):
                     if is_equality[j]:
-                        if np.abs(constraint_residue[j]) > self._constraint_tol:
+                        if constraint_residue[j] ** 2 > self._constraint_tol:
                             num_constraint_violations += 1
                     else:
-                        if constraint_residue[j] < -self._constraint_tol:
+                        if (
+                            np.maximum(-constraint_residue[j], 0) ** 2
+                            > self._constraint_tol
+                        ):
                             num_constraint_violations += 1
                 wandb.log({"num_constraint_violations": num_constraint_violations})
 
