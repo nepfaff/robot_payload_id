@@ -510,18 +510,19 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         if self._logging_path is not None:
             # Create accumulated minimum loss plot
             losses = self._loss_logger.load()
-            # Clip to make graph more readable
-            cliped_losses = np.clip(losses, a_min=None, a_max=1e8)
-            accumulated_min_losses = np.minimum.accumulate(cliped_losses)
-            min_loss_first_idx = np.argmin(accumulated_min_losses)
-            plt.plot(accumulated_min_losses)
-            plt.axvline(x=min_loss_first_idx, color="r")
-            plt.yscale("log")
-            plt.title("Accumulated Minimum Loss")
-            plt.xlabel("Iteration")
-            plt.ylabel("Minimum loss")
-            plt.legend(["Accumulated minimum loss", "First minimum loss"])
-            plt.savefig(self._logging_path / "accumulated_min_losses.png")
+            if len(losses) > 0:
+                # Clip to make graph more readable
+                cliped_losses = np.clip(losses, a_min=None, a_max=1e8)
+                accumulated_min_losses = np.minimum.accumulate(cliped_losses)
+                min_loss_first_idx = np.argmin(accumulated_min_losses)
+                plt.plot(accumulated_min_losses)
+                plt.axvline(x=min_loss_first_idx, color="r")
+                plt.yscale("log")
+                plt.title("Accumulated Minimum Loss")
+                plt.xlabel("Iteration")
+                plt.ylabel("Minimum loss")
+                plt.legend(["Accumulated minimum loss", "First minimum loss"])
+                plt.savefig(self._logging_path / "accumulated_min_losses.png")
 
         np.save(os.path.join(wandb.run.dir, "a_value.npy"), a_value)
         np.save(os.path.join(wandb.run.dir, "b_value.npy"), b_value)
