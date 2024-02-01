@@ -1128,8 +1128,6 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         self._add_joint_limit_constraints()
         # TODO: Add other constraints
 
-        # TODO: Make method configurable. This should be configurable for all Nevergrad
-        # optimizers.
         self._ng_al = NevergradAugmentedLagrangian(
             max_al_iterations=max_al_iterations,
             budget_per_iteration=budget_per_iteration,
