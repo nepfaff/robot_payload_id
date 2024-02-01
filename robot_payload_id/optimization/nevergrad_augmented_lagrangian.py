@@ -71,18 +71,15 @@ class NevergradAugmentedLagrangian:
         Returns a tuple of the optimal solution at this iteration, the constraint
         residue, and the augmented Lagrangian loss.
         """
-        # Set initial guess
-        x_array = ng.p.Array(shape=(nonsmooth_al.prog().num_vars(),))
-        x_array.value = x_init
-
+        x_array = ng.p.Array(init=x_init)
         if nevergrad_set_bounds:
             x_array.set_bounds(nonsmooth_al.x_lo(), nonsmooth_al.x_up())
 
-        # Select optimizer
-        instrum = ng.p.Instrumentation(x_array)
+        # Select optimizer and set initial guess
         optimizer = ng.optimizers.registry[self._method](
-            parametrization=instrum, budget=self._budget_per_iteration
+            parametrization=x_array, budget=self._budget_per_iteration, num_workers=1
         )
+        optimizer.suggest(x_init)
 
         # We need to return the loss and the constraint residue. We cache these
         # terms for each suggested x value.
@@ -95,19 +92,21 @@ class NevergradAugmentedLagrangian:
             leave=False,
         ):
             x = optimizer.ask()
+            # TODO: NGOpt with a big budget might return NaN (same result as when
+            # calling) optimizer.ask() twice. Why does this happen?
             al_loss, constraint_residue, cost_function_val = nonsmooth_al.Eval(
-                x=x.value[0][0], lambda_val=lambda_val, mu=mu
+                x=x.value, lambda_val=lambda_val, mu=mu
             )
-            x_suggests.append(x.value[0][0])
+            x_suggests.append(x.value)
             cached_results.append((al_loss, constraint_residue, cost_function_val))
             optimizer.tell(x, al_loss)
 
         # Get best result at this AL iteration
         recommendation = optimizer.provide_recommendation()
-        # Find the entry in x_suggests closest to  recommendation.value[0][0], and take
-        # the cached results for that entry.
+        # Find the entry in x_suggests closest to  recommendation.value, and take cached
+        # results for that entry.
         cache_idx = np.argmin(
-            np.sum((np.vstack(x_suggests) - recommendation.value[0][0]) ** 2, axis=1)
+            np.sum((np.vstack(x_suggests) - recommendation.value) ** 2, axis=1)
         )
         al_loss, constraint_residue, cost_function_val = cached_results[cache_idx]
         wandb.log(
@@ -119,7 +118,8 @@ class NevergradAugmentedLagrangian:
                 "Max absolute lambda": np.max(np.abs(lambda_val)),
             }
         )
-        return recommendation.value[0][0], constraint_residue, al_loss
+        wandb.run.summary["optimizer_name"] = optimizer.name
+        return recommendation.value, constraint_residue, al_loss
 
     def compute_num_lambda(
         self, prog: MathematicalProgram, nevergrad_set_bounds: bool = True
@@ -214,7 +214,7 @@ class NevergradAugmentedLagrangian:
             # TODO: Consider decreasing mu by a fraction of mu_multiplier if the
             # constraint error is small.
             constraint_error = equality_constraint_error + inequality_constraint_error
-            if constraint_error > self._constraint_tol:
+            if constraint_error > self._constraint_tol * lagrangian_size:
                 mu = np.minimum(mu * self._mu_multiplier, self._mu_max)
 
             # Log results
