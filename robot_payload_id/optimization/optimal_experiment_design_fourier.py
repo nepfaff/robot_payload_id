@@ -539,6 +539,14 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
             np.save(self._logging_path / "b_value.npy", b_value)
             np.save(self._logging_path / "q0_value.npy", q0_value)
 
+    def _log_base_params_mapping(self, base_param_mapping: np.ndarray) -> None:
+        np.save(
+            os.path.join(wandb.run.dir, "base_param_mapping.npy"),
+            base_param_mapping,
+        )
+        if self._logging_path is not None:
+            np.save(self._logging_path / "base_param_mapping.npy", base_param_mapping)
+
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
         # Optimize in parallel
         # with futures.ProcessPoolExecutor(max_workers=self._optimizer.num_workers) as executor:
@@ -1023,14 +1031,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         return joint_positions_numeric
 
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
-        np.save(
-            os.path.join(wandb.run.dir, "base_param_mapping.npy"),
-            self._base_param_mapping,
-        )
-        if self._logging_path is not None:
-            np.save(
-                self._logging_path / "base_param_mapping.npy", self._base_param_mapping
-            )
+        self._log_base_params_mapping(self._base_param_mapping)
         return super().optimize()
 
 
@@ -1192,5 +1193,6 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             x_val, [len(self._a_var), len(self._a_var) + len(self._b_var)]
         )
         self._log_optimization_result(a_value, b_value, q0_value)
+        self._log_base_params_mapping(self._base_param_mapping)
 
         return a_value, b_value, q0_value
