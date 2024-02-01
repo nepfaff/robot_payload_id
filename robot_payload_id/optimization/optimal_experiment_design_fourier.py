@@ -375,6 +375,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         plant: MultibodyPlant,
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
+        nevergrad_method: str = "NGOpt",
         use_optimization_progress_bar: bool = True,
         logging_path: Optional[Path] = None,
     ):
@@ -392,6 +393,9 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
             budget (int): The number of iterations to run the optimizer for.
+            nevergrad_method (str): The method to use for the Nevergrad optimizer.
+                Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
+                for a complete list of methods.
             use_optimization_progress_bar (bool): Whether to show a progress bar for the
                 optimization. This might lead to a small performance hit.
             logging_path (Path): The path to write the optimization logs to. If None,
@@ -413,6 +417,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
             robot_model_instance_idx=robot_model_instance_idx,
         )
         self._budget = budget
+        self._nevergrad_method = nevergrad_method
         self._use_optimization_progress_bar = use_optimization_progress_bar
         self._logging_path = logging_path
 
@@ -430,7 +435,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         wandb.log({"initial_guess": self._initial_guess})
 
         # Select optimizer
-        self._optimizer = ng.optimizers.NGOpt(
+        self._optimizer = ng.optimizers.registry[self._nevergrad_method](
             parametrization=parameterization,
             budget=budget,
         )
@@ -446,6 +451,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         #     budget=budget,
         #     num_workers=16,
         # )
+        self._optimizer.suggest(parameterization.value)
+        wandb.run.summary["optimizer_name"] = self._optimizer.name
 
         if use_optimization_progress_bar:
             self._optimizer.register_callback("tell", ng.callbacks.ProgressBar())
@@ -584,6 +591,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
         plant: MultibodyPlant,
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
+        nevergrad_method: str = "NGOpt",
         use_optimization_progress_bar: bool = True,
         logging_path: Optional[Path] = None,
         data_matrix_dir_path: Optional[Path] = None,
@@ -603,6 +611,9 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
             budget (int): The number of iterations to run the optimizer for.
+            nevergrad_method (str): The method to use for the Nevergrad optimizer.
+                Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
+                for a complete list of methods.
             use_optimization_progress_bar (bool): Whether to show a progress bar for the
                 optimization. This might lead to a small performance hit.
             logging_path (Path): The path to write the optimization logs to. If None,
@@ -627,6 +638,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
+            nevergrad_method=nevergrad_method,
             use_optimization_progress_bar=use_optimization_progress_bar,
             logging_path=logging_path,
         )
@@ -691,6 +703,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolicNumeric(
         plant: MultibodyPlant,
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
+        nevergrad_method: str = "NGOpt",
         use_optimization_progress_bar: bool = True,
         logging_path: Optional[Path] = None,
         data_matrix_dir_path: Optional[Path] = None,
@@ -710,6 +723,9 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolicNumeric(
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
             budget (int): The number of iterations to run the optimizer for.
+            nevergrad_method (str): The method to use for the Nevergrad optimizer.
+                Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
+                for a complete list of methods.
             use_optimization_progress_bar (bool): Whether to show a progress bar for the
                 optimization. This might lead to a small performance hit.
             logging_path (Path): The path to write the optimization logs to. If None,
@@ -734,6 +750,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolicNumeric(
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
+            nevergrad_method=nevergrad_method,
             use_optimization_progress_bar=use_optimization_progress_bar,
             logging_path=logging_path,
         )
@@ -853,6 +870,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
         model_path: str,
+        nevergrad_method: str = "NGOpt",
         use_optimization_progress_bar: bool = True,
         logging_path: Optional[Path] = None,
     ):
@@ -871,6 +889,9 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
                 the robot. Used for adding constraints.
             budget (int): The number of iterations to run the optimizer for.
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
+            nevergrad_method (str): The method to use for the Nevergrad optimizer.
+                Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
+                for a complete list of methods.
             use_optimization_progress_bar (bool): Whether to show a progress bar for the
                 optimization. This might lead to a small performance hit.
             logging_path (Path): The path to write the optimization logs to. If None,
@@ -887,6 +908,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             plant=plant,
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
+            nevergrad_method=nevergrad_method,
             use_optimization_progress_bar=use_optimization_progress_bar,
             logging_path=logging_path,
         )
@@ -1037,6 +1059,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         mu_multiplier: float,
         mu_max: float,
         model_path: str,
+        nevergrad_method: str = "OnePlusOne",
         logging_path: Optional[Path] = None,
     ):
         """
@@ -1061,6 +1084,9 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 equality constraint is not satisfied.
             mu_max (float): The maximum value of the penalty weights.
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
+            nevergrad_method (str): The method to use for the Nevergrad optimizer.
+                Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
+                for a complete list of methods.
             logging_path (Path): The path to write the optimization logs to. If None,
                 then no logs are written.
         """
@@ -1075,10 +1101,12 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget_per_iteration,
             model_path=model_path,
+            nevergrad_method=nevergrad_method,
             use_optimization_progress_bar=False,
             logging_path=logging_path,
         )
         self._mu_initial = mu_initial
+        self._optimizer = None
 
         self._prog = MathematicalProgram()
 
@@ -1106,7 +1134,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             budget_per_iteration=budget_per_iteration,
             mu_multiplier=mu_multiplier,
             mu_max=mu_max,
-            method="OnePlusOne",
+            method=self._nevergrad_method,
         )
 
     def _get_joint_positions(self, index: int, var_values: np.ndarray) -> np.ndarray:
@@ -1144,7 +1172,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
         # Compute the initial Lagrange multiplier guess
         num_lambda = self._ng_al.compute_num_lambda(self._prog)
-        lambda_initial = np.random.rand(num_lambda)
+        lambda_initial = np.ones(num_lambda)
 
         # Optimize
         x_val, _, _ = self._ng_al.solve(

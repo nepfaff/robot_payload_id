@@ -195,6 +195,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         mu_initial: float,
         mu_multiplier: float,
         mu_max: float,
+        nevergrad_method: str = "OnePlusOne",
         spline_order: int = 4,
         traj_initial: Optional[BsplineTrajectory] = None,
         logging_path: Optional[Path] = None,
@@ -222,6 +223,9 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             mu_multiplier (float): We will multiply mu by mu_multiplier if the
                 equality constraint is not satisfied.
             mu_max (float): The maximum value of the penalty weights.
+            nevergrad_method (str): The method to use for the Nevergrad optimizer.
+                Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
+                for a complete list of methods.
             spline_order (int): The order of the B-spline basis to use.
             traj_initial (Optional[BsplineTrajectory]): The initial guess for the
                 trajectory. If None, then a zero trajectory over the interval
@@ -243,6 +247,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             logging_path=logging_path,
         )
         self._mu_initial = mu_initial
+        self._nevergrad_method = nevergrad_method
 
         # Select cost function
         cost_function_to_cost = {
@@ -293,7 +298,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             budget_per_iteration=budget_per_iteration,
             mu_multiplier=mu_multiplier,
             mu_max=mu_max,
-            method="OnePlusOne",
+            method=self._nevergrad_method,
         )
 
     def _compute_decision_variable_initial_guess(self) -> np.ndarray:

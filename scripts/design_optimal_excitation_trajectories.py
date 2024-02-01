@@ -102,14 +102,14 @@ def main():
     parser.add_argument(
         "--mu_initial",
         type=float,
-        default=1e-3,
+        default=1.0,
         help="Initial value of the augmented Lagrangian parameter. Only used for "
         + "black-box with augmented Lagrangian optimization.",
     )
     parser.add_argument(
         "--mu_multiplier",
         type=float,
-        default=2.0,
+        default=1.1,
         help="Multiplier for the augmented Lagrangian parameter. Only used for black-box "
         + "with augmented Lagrangian optimization.",
     )
@@ -144,6 +144,12 @@ def main():
         action="store_true",
         help="Whether to not use augmented Lagrangian. Only used for black-box "
         + "optimization.",
+    )
+    parser.add_argument(
+        "--nevergrad_method",
+        type=str,
+        default="NGOpt",
+        help="Nevergrad method to use. Only used for black-box optimization.",
     )
     parser.add_argument(
         "--logging_path",
@@ -212,6 +218,7 @@ def main():
     mu_initial = args.mu_initial
     mu_multiplier = args.mu_multiplier
     mu_max = args.mu_max
+    nevergrad_method = args.nevergrad_method
 
     if args.use_bspline:
         assert (
@@ -236,6 +243,7 @@ def main():
             mu_initial=mu_initial,
             mu_multiplier=mu_multiplier,
             mu_max=mu_max,
+            nevergrad_method=nevergrad_method,
             spline_order=4,
             logging_path=logging_path,
         )
@@ -259,6 +267,7 @@ def main():
                         mu_multiplier=mu_multiplier,
                         mu_max=mu_max,
                         model_path=model_path,
+                        nevergrad_method=nevergrad_method,
                         logging_path=logging_path,
                     )
                 )
@@ -277,6 +286,7 @@ def main():
                         plant=plant,
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
+                        nevergrad_method=nevergrad_method,
                         logging_path=logging_path,
                         data_matrix_dir_path=data_matrix_dir_path,
                         model_path=model_path,
@@ -297,6 +307,7 @@ def main():
                         plant=plant,
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
+                        nevergrad_method=nevergrad_method,
                         logging_path=logging_path,
                         data_matrix_dir_path=data_matrix_dir_path,
                         model_path=model_path,
@@ -314,6 +325,7 @@ def main():
                         plant=plant,
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
+                        nevergrad_method=nevergrad_method,
                         logging_path=logging_path,
                         model_path=model_path,
                     )
