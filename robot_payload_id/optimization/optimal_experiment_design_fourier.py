@@ -4,7 +4,6 @@ import time
 
 from abc import abstractmethod
 from datetime import timedelta
-from functools import partial
 from pathlib import Path
 from typing import Optional, Tuple
 
