@@ -50,9 +50,9 @@ def main():
     # Create arm
     num_joints = 1 if args.use_one_link_arm else 7
     urdf_path = (
-        "./models/one_link_arm.urdf"
+        "./models/one_link_arm_with_obstacle.dmd.yaml"
         if args.use_one_link_arm
-        else "./models/iiwa.dmd.yaml"
+        else "./models/iiwa_with_obstacles.dmd.yaml"
     )
     arm_components = create_arm(
         arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0

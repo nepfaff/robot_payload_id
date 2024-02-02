@@ -1,0 +1,14 @@
+directives:
+- add_model:
+    name: arm
+    file: package://robot_payload_id/one_link_arm.sdf
+# NOTE: Weld already added in SDFormat file
+
+- add_model:
+    name: box
+    file: package://robot_payload_id/box.sdf
+- add_weld:
+    parent: world
+    child: box::box
+    X_PC:
+      translation: [-1.0, 0.0, 0.0]

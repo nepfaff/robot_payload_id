@@ -1,6 +1,6 @@
 directives:
 - add_model:
-    name: iiwa
+    name: arm
     file: package://drake/manipulation/models/iiwa_description/iiwa7/iiwa7_no_collision.sdf
     default_joint_positions:
         iiwa_joint_1: [0]
@@ -12,7 +12,7 @@ directives:
         iiwa_joint_7: [0]
 - add_weld:
     parent: world
-    child: iiwa::iiwa_link_0
+    child: arm::iiwa_link_0
 
 - add_model:
     name: pusher
@@ -24,5 +24,5 @@ directives:
         rotation: !Rpy { deg: [-90.0, 0.0, 0.0]}
         translation: [0.0, -0.045, 0.0]
 - add_weld:
-    parent: iiwa::iiwa_link_7
+    parent: arm::iiwa_link_7
     child: pusher_base

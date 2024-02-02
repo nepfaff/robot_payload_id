@@ -40,6 +40,15 @@
               <diffuse>0.80078125 0.1484375 0.1484375 1.0</diffuse>
             </material>
         </visual>
+        <collision name="link_1_collision">
+            <pose>0 0 -0.5 0 0 0</pose>
+            <geometry>
+                <cylinder>
+                  <radius>0.05</radius>
+                  <length>1</length>
+                </cylinder>
+            </geometry>
+        </collision>
     </link>
     <joint name="shoulder" type="revolute">
         <child>link1</child>

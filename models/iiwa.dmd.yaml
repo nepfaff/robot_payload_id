@@ -1,6 +1,6 @@
 directives:
 - add_model:
-    name: iiwa
+    name: arm
     file: package://drake/manipulation/models/iiwa_description/iiwa7/iiwa7_no_collision.sdf
     default_joint_positions:
         iiwa_joint_1: [-1.57]
@@ -12,4 +12,4 @@ directives:
         iiwa_joint_7: [0]
 - add_weld:
     parent: world
-    child: iiwa::iiwa_link_0
+    child: arm::iiwa_link_0

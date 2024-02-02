@@ -1,0 +1,35 @@
+directives:
+- add_model:
+    name: iiwa_base_metal_plate
+    file: package://robot_payload_id/iiwa_base_metal_plate.sdf
+- add_weld:
+    parent: world
+    child: iiwa_base_metal_plate::iiwa_base_metal_plate_base_link
+    X_PC:
+        translation: [-0.005, 0.0, 0.00635]
+
+- add_model:
+    name: floor
+    file: package://robot_payload_id/floor.sdf
+- add_weld:
+    parent: world
+    child: floor::floor_base_link
+    X_PC:
+        translation: [0.0, 0.0, -0.05]
+
+- add_model:
+    name: arm
+    file: package://drake/manipulation/models/iiwa_description/iiwa7/iiwa7_with_box_collision.sdf
+    default_joint_positions:
+        iiwa_joint_1: [0]
+        iiwa_joint_2: [0.1]
+        iiwa_joint_3: [0]
+        iiwa_joint_4: [-1.2]
+        iiwa_joint_5: [0]
+        iiwa_joint_6: [1.6]
+        iiwa_joint_7: [0]
+- add_weld:
+    parent: world
+    child: arm::iiwa_link_0
+    X_PC:
+        translation: [0.0, 0.0, 0.0127]
