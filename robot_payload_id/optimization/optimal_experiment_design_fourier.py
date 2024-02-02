@@ -4,6 +4,7 @@ import time
 
 from abc import abstractmethod
 from datetime import timedelta
+from functools import partial
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -14,9 +15,11 @@ import numpy as np
 from numpy import ndarray
 from pydrake.all import (
     AutoDiffXd,
+    Context,
     MakeVectorVariable,
     MathematicalProgram,
     MathematicalProgramResult,
+    MinimumDistanceLowerBoundConstraint,
     ModelInstanceIndex,
     MultibodyPlant,
     SnoptSolver,
@@ -36,6 +39,7 @@ from robot_payload_id.symbolic import (
     create_autodiff_plant,
     eval_expression_mat,
     eval_expression_mat_derivative,
+    eval_expression_vec,
 )
 from robot_payload_id.utils import JointData
 
@@ -483,11 +487,11 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         W_dataTW_data_numeric = self._compute_W_dataTW_data_numeric(var_values)
         return condition_number_and_e_optimality_cost(W_dataTW_data_numeric)
 
-    def _compute_joint_positions_numeric(self, var_values: np.ndarray) -> np.ndarray:
+    def _compute_joint_positions(self, var_values: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
     def _joint_limit_penalty(self, var_values: np.ndarray) -> float:
-        joint_positions_numeric = self._compute_joint_positions_numeric(var_values)
+        joint_positions_numeric = self._compute_joint_positions(var_values)
 
         num_violations = 0
         for i in range(self._num_joints):
@@ -682,7 +686,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
         )
         return W_dataTW_data_numeric
 
-    def _compute_joint_positions_numeric(self, var_values: np.ndarray) -> np.ndarray:
+    def _compute_joint_positions(self, var_values: np.ndarray) -> np.ndarray:
         joint_positions_numeric = eval_expression_mat(
             self._joint_data.joint_positions, self._symbolic_vars, var_values
         )
@@ -848,7 +852,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolicNumeric(
         W_dataTW_data = W_data.T @ W_data
         return W_dataTW_data
 
-    def _compute_joint_positions_numeric(self, var_values: np.ndarray) -> np.ndarray:
+    def _compute_joint_positions(self, var_values: np.ndarray) -> np.ndarray:
         joint_positions_numeric = eval_expression_mat(
             self._joint_data.joint_positions, self._symbolic_vars, var_values
         )
@@ -1009,7 +1013,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         W_dataTW_data = W_data.T @ W_data
         return W_dataTW_data
 
-    def _compute_joint_data_numeric(self, var_values: np.ndarray) -> JointData:
+    def _compute_joint_data(self, var_values: np.ndarray) -> JointData:
         a, b, q0 = np.split(
             var_values, [len(self._a_var), len(self._a_var) + len(self._b_var)]
         )
@@ -1024,8 +1028,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         )
         return joint_data
 
-    def _compute_joint_positions_numeric(self, var_values: np.ndarray) -> np.ndarray:
-        joint_data = self._compute_joint_data_numeric(var_values)
+    def _compute_joint_positions(self, var_values: np.ndarray) -> np.ndarray:
+        joint_data = self._compute_joint_data(var_values)
         return joint_data.joint_positions
 
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
@@ -1051,6 +1055,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         num_timesteps: int,
         time_horizon: float,
         plant: MultibodyPlant,
+        plant_context: Context,
         robot_model_instance_idx: ModelInstanceIndex,
         max_al_iterations: int,
         budget_per_iteration: int,
@@ -1104,6 +1109,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             use_optimization_progress_bar=False,
             logging_path=logging_path,
         )
+        self._plant_context = plant_context
         self._mu_initial = mu_initial
         self._optimizer = None
 
@@ -1125,7 +1131,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         # Add constraints
         self._add_bound_constraints()
         self._add_start_and_end_point_constraints()
-        # TODO: Add collision constraints
+        self._add_collision_constraints()
 
         self._ng_al = NevergradAugmentedLagrangian(
             max_al_iterations=max_al_iterations,
@@ -1145,14 +1151,14 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         Returns:
             np.ndarray: The joint positions for the given joint index.
         """
-        joint_positions_numeric = self._compute_joint_positions_numeric(
+        joint_positions_numeric = self._compute_joint_positions(
             var_values
         )  # Shape (T,N)
         return joint_positions_numeric[:, index].astype(float)
 
     def _add_bound_constraints(self) -> None:
         """Add position, velocity, and acceleration bound constraints."""
-        joint_data = self._compute_joint_data_numeric(self._symbolic_vars)
+        joint_data = self._compute_joint_data(self._symbolic_vars)
 
         position_lower_limits = self._plant.GetPositionLowerLimits()
         position_upper_limits = self._plant.GetPositionUpperLimits()
@@ -1185,12 +1191,35 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
 
     def _add_start_and_end_point_constraints(self) -> None:
         """Add constraints to start and end with zero velocities/ accelerations."""
-        joint_data = self._compute_joint_data_numeric(self._symbolic_vars)
+        joint_data = self._compute_joint_data(self._symbolic_vars)
         for i in range(self._num_joints):
             self._prog.AddLinearConstraint(joint_data.joint_velocities[0, i] == 0.0)
             self._prog.AddLinearConstraint(joint_data.joint_velocities[-1, i] == 0.0)
             self._prog.AddLinearConstraint(joint_data.joint_accelerations[0, i] == 0.0)
             self._prog.AddLinearConstraint(joint_data.joint_accelerations[-1, i] == 0.0)
+
+    def _add_collision_constraints(self, min_distance: float = 0.01) -> None:
+        """Add collision avoidance constraints."""
+        joint_positions_sym = self._compute_joint_positions(self._symbolic_vars)
+
+        def collision_constraint(time_idx: int, var_values: np.ndarray) -> np.ndarray:
+            joint_positions_numeric = eval_expression_vec(
+                joint_positions_sym[time_idx], self._symbolic_vars, var_values
+            )
+            constraint = MinimumDistanceLowerBoundConstraint(
+                plant=self._plant,
+                bound=min_distance,
+                plant_context=self._plant_context,
+            )
+            return constraint.Eval(joint_positions_numeric)
+
+        for i in range(self._num_timesteps):
+            self._prog.AddConstraint(
+                func=partial(collision_constraint, i),
+                lb=[0.0],
+                ub=[1.0],
+                vars=self._symbolic_vars,
+            )
 
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
         # Compute the initial Lagrange multiplier guess

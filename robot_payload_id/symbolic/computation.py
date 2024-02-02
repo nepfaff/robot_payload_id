@@ -150,6 +150,29 @@ def calc_lumped_parameters(
     return alpha_sym, alpha_estimated, alpha_gt
 
 
+def eval_expression_vec(
+    expression_vec: np.ndarray, symbolic_vars: np.ndarray, var_vals: np.ndarray
+) -> np.ndarray:
+    """Evaluate a (N,) array of Drake Exressions with a given mapping of symbolic
+    variables to values.
+
+    Args:
+        expression_vec (np.ndarray): The (N,) array of Drake Expressions to evaluate.
+        symbolic_vars (np.ndarray): The symbolic variables in the expressions of shape
+            (K,).
+        var_vals (np.ndarray): The values to substitute for the symbolic variables with
+            of shape (K,).
+
+    Returns:
+        np.ndarray: The evaluated expressions of shape (N,).
+    """
+    var_val_mapping = dict(zip(symbolic_vars, var_vals, strict=True))
+    evaluated_vec = np.empty(expression_vec.shape)
+    for i in range(expression_vec.shape[0]):
+        evaluated_vec[i] = expression_vec[i].Evaluate(var_val_mapping)
+    return evaluated_vec
+
+
 def eval_expression_mat(
     expression_mat: np.ndarray, symbolic_vars: np.ndarray, var_vals: np.ndarray
 ) -> np.ndarray:

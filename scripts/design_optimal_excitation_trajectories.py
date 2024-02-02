@@ -87,14 +87,14 @@ def main():
     parser.add_argument(
         "--max_al_iterations",
         type=int,
-        default=1000,
+        default=10,
         help="Maximum number of augmented Lagrangian iterations. Only used for "
         + "black-box with augmented Lagrangian optimization.",
     )
     parser.add_argument(
         "--budget",
         type=int,
-        default=1500,
+        default=3000,
         help="Budget for black-box optimization. If '--no_al' is set, then this is the "
         + "number of iterations to run the optimizer for at each augmented Lagrangian "
         + "iteration.",
@@ -109,7 +109,7 @@ def main():
     parser.add_argument(
         "--mu_multiplier",
         type=float,
-        default=1.1,
+        default=2.0,
         help="Multiplier for the augmented Lagrangian parameter. Only used for black-box "
         + "with augmented Lagrangian optimization.",
     )
@@ -199,11 +199,16 @@ def main():
             else "data/symbolic_data_matrix_iiwa"
         )
     model_path = (
-        "./models/one_link_arm.sdf" if use_one_link_arm else "./models/iiwa.dmd.yaml"
+        "./models/one_link_arm_with_obstacle.dmd.yaml"
+        if use_one_link_arm
+        else "./models/iiwa_with_obstacles.dmd.yaml"
     )
 
     arm_components = create_arm(arm_file_path=model_path, num_joints=num_joints)
     plant = arm_components.plant
+    plant_context = plant.GetMyContextFromRoot(
+        arm_components.diagram.CreateDefaultContext()
+    )
     robot_model_instance_idx = plant.GetModelInstanceByName("arm")
 
     optimizer = args.optimizer
@@ -260,6 +265,7 @@ def main():
                         num_timesteps=num_timesteps,
                         time_horizon=time_horizon,
                         plant=plant,
+                        plant_context=plant_context,
                         robot_model_instance_idx=robot_model_instance_idx,
                         max_al_iterations=max_al_iterations,
                         budget_per_iteration=budget,

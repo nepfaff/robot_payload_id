@@ -34,8 +34,8 @@ def create_arm(
     parser = get_parser(plant)
 
     # Add arm
-    arm = parser.AddModels(arm_file_path)[0]
-    plant.RenameModelInstance(arm, "arm")
+    parser.AddModels(arm_file_path)
+    arm = plant.GetModelInstanceByName("arm")
     plant.Finalize()
 
     placeholder_trajectory = PiecewisePolynomial(np.zeros((num_joints, 1)))
