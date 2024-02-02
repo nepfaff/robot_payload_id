@@ -7,7 +7,6 @@ from pydrake.all import (
     LogVectorOutput,
     MeshcatVisualizer,
     MultibodyPlant,
-    Parser,
     PiecewisePolynomial,
     StartMeshcat,
     TrajectorySource,
@@ -46,7 +45,7 @@ def create_arm(
 
     # Add Controller
     controller_plant = MultibodyPlant(time_step)
-    controller_parser = Parser(controller_plant)
+    controller_parser = get_parser(controller_plant)
     controller_parser.AddModels(arm_file_path)
     controller_plant.Finalize()
     arm_controller = builder.AddSystem(
