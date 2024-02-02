@@ -1201,15 +1201,15 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
     def _add_collision_constraints(self, min_distance: float = 0.01) -> None:
         """Add collision avoidance constraints."""
         joint_positions_sym = self._compute_joint_positions(self._symbolic_vars)
+        constraint = MinimumDistanceLowerBoundConstraint(
+            plant=self._plant,
+            bound=min_distance,
+            plant_context=self._plant_context,
+        )
 
         def collision_constraint(time_idx: int, var_values: np.ndarray) -> np.ndarray:
             joint_positions_numeric = eval_expression_vec(
                 joint_positions_sym[time_idx], self._symbolic_vars, var_values
-            )
-            constraint = MinimumDistanceLowerBoundConstraint(
-                plant=self._plant,
-                bound=min_distance,
-                plant_context=self._plant_context,
             )
             return constraint.Eval(joint_positions_numeric)
 
