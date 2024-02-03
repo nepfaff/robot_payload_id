@@ -28,10 +28,10 @@ class NevergradAugmentedLagrangian:
 
     def __init__(
         self,
-        max_al_iterations: int = 1000,
-        budget_per_iteration: int = 1500,
+        max_al_iterations: int = 10,
+        budget_per_iteration: int = 3000,
         mu_multiplier: float = 2.0,
-        mu_max: float = 1e5,
+        mu_max: float = 1e3,
         method: str = "OnePlusOne",
         constraint_tol: float = 1e-5,
     ):
