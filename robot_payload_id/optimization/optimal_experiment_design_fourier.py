@@ -432,10 +432,30 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         self._symbolic_vars = np.concatenate([self._a_var, self._b_var, self._q0_var])
 
         # Set initial guess
-        parameterization = ng.p.Array(
-            init=np.random.rand(len(self._symbolic_vars)) - 0.5
+        # Empirically, setting any terms after the first 5 to small values results
+        # in a decent initial data matrix condition number
+        self._initial_guess = (
+            np.random.rand(len(self._symbolic_vars)) - 0.5
+            if self._num_fourier_terms < 6
+            else np.concatenate(
+                [
+                    np.random.rand(5 * self._num_joints) - 0.5,
+                    (
+                        np.random.rand((self._num_fourier_terms - 5) * self._num_joints)
+                        - 0.5
+                    )
+                    * 0.01,
+                    np.random.rand(5 * self._num_joints) - 0.5,
+                    (
+                        np.random.rand((self._num_fourier_terms - 5) * self._num_joints)
+                        - 0.5
+                    )
+                    * 0.01,
+                    np.random.rand(self._num_joints) - 0.5,
+                ]
+            )
         )
-        self._initial_guess = parameterization.value
+        parameterization = ng.p.Array(init=self._initial_guess)
         wandb.log({"initial_guess": self._initial_guess})
 
         # Select optimizer
@@ -952,8 +972,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=self._num_timesteps,
             time_horizon=self._time_horizon,
-            a=a.reshape((self._num_joints, self._num_fourier_terms)),
-            b=b.reshape((self._num_joints, self._num_fourier_terms)),
+            a=a.reshape((self._num_joints, self._num_fourier_terms), order="F"),
+            b=b.reshape((self._num_joints, self._num_fourier_terms), order="F"),
             q0=q0,
             omega=self._omega,
             use_progress_bar=use_progress_bar,
@@ -1021,8 +1041,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=self._num_timesteps,
             time_horizon=self._time_horizon,
-            a=a.reshape((self._num_joints, self._num_fourier_terms)),
-            b=b.reshape((self._num_joints, self._num_fourier_terms)),
+            a=a.reshape((self._num_joints, self._num_fourier_terms), order="F"),
+            b=b.reshape((self._num_joints, self._num_fourier_terms), order="F"),
             q0=q0,
             omega=self._omega,
             use_progress_bar=False,
