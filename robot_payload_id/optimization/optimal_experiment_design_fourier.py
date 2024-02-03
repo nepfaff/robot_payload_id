@@ -14,6 +14,7 @@ import numpy as np
 
 from numpy import ndarray
 from pydrake.all import (
+    AugmentedLagrangianNonsmooth,
     AutoDiffXd,
     Context,
     MakeVectorVariable,
@@ -1085,7 +1086,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 for at each augmented Lagrangian iteration.
             mu_initial (float): The initial value of the penalty weights.
             mu_multiplier (float): We will multiply mu by mu_multiplier if the
-                equality constraint is not satisfied.
+                constraints are not satisfied.
             mu_max (float): The maximum value of the penalty weights.
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
@@ -1245,5 +1246,123 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         )
         self._log_optimization_result(a_value, b_value, q0_value)
         self._log_base_params_mapping(self._base_param_mapping)
+
+        return a_value, b_value, q0_value
+
+    @classmethod
+    def optimize_parallel(
+        cls,
+        num_joints: int,
+        cost_function: CostFunction,
+        num_fourier_terms: int,
+        omega: float,
+        num_timesteps: int,
+        time_horizon: float,
+        max_al_iterations: int,
+        budget_per_iteration: int,
+        mu_initial: float,
+        mu_multiplier: float,
+        mu_max: float,
+        model_path: str,
+        robot_model_instance_name: str,
+        num_workers: int,
+        nevergrad_method: str = "NGOpt",
+        logging_path: Optional[Path] = None,
+    ) -> Tuple[ndarray, ndarray, ndarray]:
+        """Optimizes the trajectory parameters in parallel.
+        NOTE: This method deals with the optimizer construction and should be called
+        as a classmethod.
+
+        Args:
+            num_joints (int): The number of joints in the arm.
+            cost_function (CostFunction): The cost function to use.
+            num_fourier_terms (int): The number of Fourier terms to use for the
+                trajectory parameterization.
+            omega (float): The frequency of the trajectory.
+            num_timesteps (int): The number of time steps to use for the trajectory.
+            time_horizon (float): The time horizon/ duration of the trajectory. The
+                sampling time step is computed as time_horizon / num_timesteps.
+            max_al_iterations (int): The maximum number of augmented Lagrangian
+                iterations to run.
+            budget_per_iteration (int): The number of iterations to run the optimizer
+                for at each augmented Lagrangian iteration.
+            mu_initial (float): The initial value of the penalty weights.
+            mu_multiplier (float): We will multiply mu by mu_multiplier if the
+                constraints are not satisfied.
+            mu_max (float): The maximum value of the penalty weights.
+            model_path (str): The path to the model file (e.g. SDFormat, URDF).
+            robot_model_instance_name (str): The name of the robot model instance.
+            num_workers (int): The number of workers to use for parallel optimization.
+            nevergrad_method (str): The method to use for the Nevergrad optimizer.
+                Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
+                for a complete list of methods.
+            logging_path (Path): The path to write the optimization logs to. If None,
+                then no logs are written.
+
+        Returns:
+            Tuple[ndarray, ndarray, ndarray]: The optimized trajectory parameters `a`,
+                `b`, and `q0`.
+        """
+        assert num_workers > 1, "Parallel optimization requires at least 2 workers."
+
+        def construct_optimizer():
+            arm_components = create_arm(arm_file_path=model_path, num_joints=num_joints)
+            plant = arm_components.plant
+            plant_context = plant.GetMyContextFromRoot(
+                arm_components.diagram.CreateDefaultContext()
+            )
+            robot_model_instance_idx = plant.GetModelInstanceByName(
+                robot_model_instance_name
+            )
+
+            return cls(
+                num_joints=num_joints,
+                cost_function=cost_function,
+                num_fourier_terms=num_fourier_terms,
+                omega=omega,
+                num_timesteps=num_timesteps,
+                time_horizon=time_horizon,
+                plant=plant,
+                plant_context=plant_context,
+                robot_model_instance_idx=robot_model_instance_idx,
+                max_al_iterations=max_al_iterations,
+                budget_per_iteration=budget_per_iteration,
+                mu_initial=mu_initial,
+                mu_multiplier=mu_multiplier,
+                mu_max=mu_max,
+                model_path=model_path,
+                nevergrad_method=nevergrad_method,
+                logging_path=logging_path,
+            )
+
+        def al_factory():
+            """A pickable factory for AugmentedLagrangianNonsmooth."""
+            optim = construct_optimizer()
+            al = AugmentedLagrangianNonsmooth(prog=optim._prog, include_x_bounds=False)
+            return al
+
+        optim = construct_optimizer()
+        al = AugmentedLagrangianNonsmooth(prog=optim._prog, include_x_bounds=False)
+        lambda_initial = np.ones(al.lagrangian_size())
+
+        x_val, _, _ = optim._ng_al.solve(
+            prog_or_al_factory=al_factory,
+            x_init=optim._initial_guess,
+            lambda_val=lambda_initial,
+            mu=mu_initial,
+            nevergrad_set_bounds=True,
+            num_workers=num_workers,
+        )
+
+        # Compute constraint violations
+        num_joint_limit_violations = optim._joint_limit_penalty(x_val)
+        wandb.run.summary["num_joint_limit_violations"] = num_joint_limit_violations
+
+        # Log optimization result
+        a_value, b_value, q0_value = np.split(
+            x_val, [len(optim._a_var), len(optim._a_var) + len(optim._b_var)]
+        )
+        optim._log_optimization_result(a_value, b_value, q0_value)
+        optim._log_base_params_mapping(optim._base_param_mapping)
 
         return a_value, b_value, q0_value
