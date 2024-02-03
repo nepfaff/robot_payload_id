@@ -987,7 +987,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         random_var_values = np.random.uniform(
             low=-1, high=1, size=len(self._symbolic_vars)
         )
-        W_data = self._compute_W_data(random_var_values, use_progress_bar=True)
+        W_data = self._compute_W_data(random_var_values, use_progress_bar=False)
 
         # NOTE: This might lead to running out of memory for large matrices. W_data
         # is sparse and hence it might be possible to use a sparse SVD. However,
@@ -1228,7 +1228,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
 
         # Optimize
         x_val, _, _ = self._ng_al.solve(
-            prog=self._prog,
+            prog_or_al_factory=self._prog,
             x_init=self._initial_guess,
             lambda_val=lambda_initial,
             mu=self._mu_initial,

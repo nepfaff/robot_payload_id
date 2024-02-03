@@ -483,7 +483,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
 
         # Optimize
         x_val, _, _ = self._ng_al.solve(
-            prog=self._prog,
+            prog_or_al_factory=self._prog,
             x_init=self._initial_decision_variable_guess,
             lambda_val=lambda_initial,
             mu=self._mu_initial,

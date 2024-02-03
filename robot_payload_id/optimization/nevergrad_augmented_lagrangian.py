@@ -1,4 +1,6 @@
-from typing import List, Tuple
+import multiprocessing as mp
+
+from typing import Callable, List, Tuple, Union
 
 import nevergrad as ng
 import numpy as np
@@ -7,6 +9,29 @@ from pydrake.all import AugmentedLagrangianNonsmooth, MathematicalProgram
 from tqdm import tqdm
 
 import wandb
+
+# Create a cache for multiprocessing
+_MAX_NUMWORKERS = 64
+_CACHED_AUGMENTED_LAGRANGIANS: List[Union[AugmentedLagrangianNonsmooth, None]] = [
+    None for _ in range(_MAX_NUMWORKERS)
+]
+
+
+def _multiprocessing_al_initializer(
+    nonsmooth_al: Callable[[], AugmentedLagrangianNonsmooth]
+):
+    """Initializes the cache for multiprocessing."""
+    global _CACHED_AUGMENTED_LAGRANGIANS
+    _CACHED_AUGMENTED_LAGRANGIANS[
+        mp.current_process()._identity[0] - 1
+    ] = nonsmooth_al()
+
+
+def _multiprocessing_al_cost_func(x: np.ndarray, lambda_val: np.ndarray, mu: float):
+    """The augmented Lagrangian cost function process for multiprocessing."""
+    global _CACHED_AUGMENTED_LAGRANGIANS
+    al = _CACHED_AUGMENTED_LAGRANGIANS[mp.current_process()._identity[0] - 1]
+    return al.Eval(x=x, lambda_val=lambda_val, mu=mu)
 
 
 class NevergradAugmentedLagrangian:
@@ -65,6 +90,8 @@ class NevergradAugmentedLagrangian:
         lambda_val: np.ndarray,
         mu: float,
         nevergrad_set_bounds: bool,
+        pool: Union[mp.Pool, None],
+        num_workers: int,
         numerically_stable_max_float: float = 1e10,
     ) -> Tuple[np.ndarray, np.ndarray, float]:
         """
@@ -104,19 +131,40 @@ class NevergradAugmentedLagrangian:
         # terms for each suggested x value.
         x_suggests: List[np.ndarray] = []
         cached_results: List[Tuple[float, np.ndarray, float]] = []
-        for _ in tqdm(
-            range(optimizer.budget),
-            total=optimizer.budget,
-            desc="  Nevergrad Iterations",
-            leave=False,
-        ):
-            x = optimizer.ask()
-            al_loss, constraint_residue, cost_function_val = nonsmooth_al.Eval(
-                x=x.value, lambda_val=lambda_val, mu=mu
-            )
-            x_suggests.append(x.value)
-            cached_results.append((al_loss, constraint_residue, cost_function_val))
-            optimizer.tell(x, al_loss)
+        if num_workers > 1:
+            num_iters = optimizer.budget // num_workers
+            for _ in tqdm(
+                range(num_iters),
+                total=num_iters,
+                desc="  Nevergrad Iterations",
+                leave=False,
+            ):
+                x_lst = [optimizer.ask() for _ in range(num_workers)]
+                args_list = [
+                    (x_lst[i].value, lambda_val, mu) for i in range(num_workers)
+                ]
+                results = pool.starmap(_multiprocessing_al_cost_func, args_list)
+                for i in range(num_workers):
+                    al_loss, constraint_residue, cost_function_val = results[i]
+                    x_suggests.append(x_lst[i].value)
+                    cached_results.append(
+                        (al_loss, constraint_residue, cost_function_val)
+                    )
+                    optimizer.tell(x_lst[i], al_loss)
+        else:
+            for _ in tqdm(
+                range(optimizer.budget),
+                total=optimizer.budget,
+                desc="  Nevergrad Iterations",
+                leave=False,
+            ):
+                x = optimizer.ask()
+                al_loss, constraint_residue, cost_function_val = nonsmooth_al.Eval(
+                    x=x.value, lambda_val=lambda_val, mu=mu
+                )
+                x_suggests.append(x.value)
+                cached_results.append((al_loss, constraint_residue, cost_function_val))
+                optimizer.tell(x, al_loss)
 
         # Get best result at this AL iteration
         recommendation = optimizer.provide_recommendation()
@@ -161,11 +209,14 @@ class NevergradAugmentedLagrangian:
 
     def solve(
         self,
-        prog: MathematicalProgram,
+        prog_or_al_factory: Union[
+            MathematicalProgram, Callable[[], AugmentedLagrangianNonsmooth]
+        ],
         x_init: np.ndarray,
         lambda_val: np.ndarray,
         mu: float,
         nevergrad_set_bounds: bool = True,
+        num_workers: int = 1,
         log_number_of_constraint_violations: bool = True,
         numerically_stable_max_float: float = 1e10,
     ) -> Tuple[np.ndarray, float, np.ndarray]:
@@ -174,7 +225,8 @@ class NevergradAugmentedLagrangian:
         Lagrangian.
 
         Args:
-            prog: A MathematicalProgram object.
+            prog_or_al_factory: A MathematicalProgram object or a function returning a
+                MathematicalProgram object.
             x_init: The initial guess of the decision variables.
             lambda_val: The initial guess of the Lagrangian multipliers.
             mu: The initial guess of the penalty weights. This must be strictly
@@ -184,6 +236,10 @@ class NevergradAugmentedLagrangian:
                 Nevergrad doesn't set the bounds, and the augmented Lagrangian will
                 include the penalty on violating the variable bounds. It is recommended
                 to set nevergrad_set_bounds to True.
+            num_workers: The number of workers to use for the optimization. If one,
+                then `prog_or_al_factory` is a MathematicalProgram object; otherwise,
+                `prog_or_al_factory` is a pickable function that returns the
+                augmented Lagrangian object.
             log_number_of_constraint_violations: If set to True, the number of
                 constraint violations will be computed and logged.
             numerically_stable_max_float: A numerically stable maximum float value. This
@@ -195,45 +251,74 @@ class NevergradAugmentedLagrangian:
             Tuple[np.ndarray, float, np.ndarray]: The optimal solution, the augmented
                 Lagrangian loss, and the constraint residue.
         """
-        # Construct the augmented Lagrangian
-        nonsmooth_al = AugmentedLagrangianNonsmooth(
-            prog, include_x_bounds=not nevergrad_set_bounds
-        )
-        lagrangian_size = nonsmooth_al.lagrangian_size()
-
         # Validate the input
-        assert lambda_val.shape[0] == lagrangian_size, "Invalid lambda_val size!"
+        assert num_workers > 0, "num_workers must be strictly positive."
+        assert not (
+            num_workers > 1 and isinstance(prog_or_al_factory, MathematicalProgram)
+        ), "num_workers must be 1 if prog_or_al_factory is a MathematicalProgram object."
+        assert not (
+            num_workers == 1 and callable(prog_or_al_factory)
+        ), "num_workers must be greater than 1 if prog_or_al_factory is a function."
         assert mu > 0, "Invalid mu! mu should be strictly positive."
+
+        # Construct the augmented Lagrangian
+        if num_workers == 1:
+            nonsmooth_al = AugmentedLagrangianNonsmooth(
+                prog_or_al_factory, include_x_bounds=not nevergrad_set_bounds
+            )
+            lagrangian_size = nonsmooth_al.lagrangian_size()
+        else:
+            nonsmooth_al = prog_or_al_factory()
+            lagrangian_size = nonsmooth_al.lagrangian_size()
+        assert lambda_val.shape[0] == lagrangian_size, "Invalid lambda_val size!"
 
         is_equality = nonsmooth_al.is_equality()
         x_val = x_init
-        for i in tqdm(
-            range(self._max_al_iters), total=self._max_al_iters, desc="AL Iterations"
-        ):
-            # Solve one augmented Lagrangian iteration
-            x_val, constraint_residue, loss = self._solve_al(
-                nonsmooth_al=nonsmooth_al,
-                x_init=x_val,
-                lambda_val=lambda_val,
-                mu=mu,
-                nevergrad_set_bounds=nevergrad_set_bounds,
-                numerically_stable_max_float=numerically_stable_max_float,
+        try:
+            pool = (
+                mp.Pool(
+                    num_workers,
+                    initializer=_multiprocessing_al_initializer,
+                    initargs=[prog_or_al_factory],
+                )
+                if num_workers > 1
+                else None
             )
+            for i in tqdm(
+                range(self._max_al_iters),
+                total=self._max_al_iters,
+                desc="AL Iterations",
+            ):
+                # Solve one augmented Lagrangian iteration
+                x_val, constraint_residue, loss = self._solve_al(
+                    nonsmooth_al=nonsmooth_al,
+                    x_init=x_val,
+                    lambda_val=lambda_val,
+                    mu=mu,
+                    nevergrad_set_bounds=nevergrad_set_bounds,
+                    pool=pool,
+                    num_workers=num_workers,
+                    numerically_stable_max_float=numerically_stable_max_float,
+                )
 
-            # Update the Lagrangian multipliers
-            equality_constraint_error = 0.0
-            inequality_constraint_error = 0.0
-            for j in range(lagrangian_size):
-                if is_equality[j]:
-                    lambda_val[j] -= constraint_residue[j] * mu
-                    equality_constraint_error += constraint_residue[j] ** 2
-                else:
-                    lambda_val[j] = np.maximum(
-                        lambda_val[j] - constraint_residue[j] * mu, 0
-                    )
-                    inequality_constraint_error += (
-                        np.maximum(-constraint_residue[j], 0) ** 2
-                    )
+                # Update the Lagrangian multipliers
+                equality_constraint_error = 0.0
+                inequality_constraint_error = 0.0
+                for j in range(lagrangian_size):
+                    if is_equality[j]:
+                        lambda_val[j] -= constraint_residue[j] * mu
+                        equality_constraint_error += constraint_residue[j] ** 2
+                    else:
+                        lambda_val[j] = np.maximum(
+                            lambda_val[j] - constraint_residue[j] * mu, 0
+                        )
+                        inequality_constraint_error += (
+                            np.maximum(-constraint_residue[j], 0) ** 2
+                        )
+        finally:
+            if pool is not None:
+                pool.close()
+                pool.join()
 
             # If the constraint error is large, then increase mu to place more emphasis
             # on satisfying the constraints. If the constraint error is small, then
