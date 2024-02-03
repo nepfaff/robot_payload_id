@@ -1063,7 +1063,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         mu_multiplier: float,
         mu_max: float,
         model_path: str,
-        nevergrad_method: str = "OnePlusOne",
+        nevergrad_method: str = "NGOpt",
         logging_path: Optional[Path] = None,
     ):
         """
