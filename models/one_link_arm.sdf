@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <sdf version="1.7">
-  <model name="one_link_arm">
+  <model name="arm">
     <link name="base">
         <inertial>
           <pose>0 0 0 0 0 0</pose>
