@@ -102,7 +102,7 @@ def main():
     parser.add_argument(
         "--mu_initial",
         type=float,
-        default=1.0,
+        default=10.0,
         help="Initial value of the augmented Lagrangian parameter. Only used for "
         + "black-box with augmented Lagrangian optimization.",
     )
@@ -237,6 +237,7 @@ def main():
             num_joints=num_joints,
             cost_function=cost_function,
             plant=plant,
+            plant_context=plant_context,
             robot_model_instance_idx=robot_model_instance_idx,
             model_path=model_path,
             num_timesteps=num_timesteps,

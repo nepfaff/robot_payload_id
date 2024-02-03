@@ -14,7 +14,9 @@ from numpy import ndarray
 from pydrake.all import (
     BsplineBasis,
     BsplineTrajectory,
+    Context,
     KinematicTrajectoryOptimization,
+    MinimumDistanceLowerBoundConstraint,
     ModelInstanceIndex,
     MultibodyPlant,
 )
@@ -182,6 +184,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         num_joints: int,
         cost_function: CostFunction,
         plant: MultibodyPlant,
+        plant_context: Context,
         robot_model_instance_idx: ModelInstanceIndex,
         model_path: str,
         num_timesteps: int,
@@ -203,6 +206,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             num_joints (int): The number of joints in the arm.
             cost_function (CostFunction): The cost function to use.
             plant (MultibodyPlant): The plant to use for adding constraints.
+            plant_context (Context): The plant context to use for adding constraints.
             robot_model_instance_idx (ModelInstanceIndex): The model instance index of
                 the robot. Used for adding constraints.
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
@@ -244,6 +248,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             traj_initial=traj_initial,
             logging_path=logging_path,
         )
+        self._plant_context = plant_context
         self._mu_initial = mu_initial
         self._nevergrad_method = nevergrad_method
 
@@ -287,7 +292,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
         self._add_bound_constraints()
         self._add_start_and_end_point_constraints()
-        # TODO: Add collision constraints
+        self._add_collision_constraints()
 
         # TODO: Make method configurable. This should be configurable for all Nevergrad
         # optimizers.
@@ -459,6 +464,17 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         self._trajopt.AddPathAccelerationConstraint(
             lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
         )
+
+    def _add_collision_constraints(self, min_distance: float = 0.01) -> None:
+        """Add collision avoidance constraints."""
+        constraint = MinimumDistanceLowerBoundConstraint(
+            plant=self._plant,
+            bound=min_distance,
+            plant_context=self._plant_context,
+        )
+        evaluate_at_s = np.linspace(0, 1, 3 * self._max_trajectory_duration * 100)
+        for s in evaluate_at_s:
+            self._trajopt.AddPathPositionConstraint(constraint, s)
 
     def optimize(self) -> BsplineTrajectoryAttributes:
         # Compute the initial Lagrange multiplier guess

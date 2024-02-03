@@ -73,7 +73,7 @@ def main():
     # Create arm
     num_joints = 1 if args.use_one_link_arm else 7
     urdf_path = (
-        "./models/one_link_arm.urdf"
+        "./models/one_link_arm.sdf"
         if args.use_one_link_arm
         else "./models/iiwa.dmd.yaml"
     )
