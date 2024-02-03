@@ -2,6 +2,7 @@ import argparse
 import logging
 import time
 
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -152,6 +153,13 @@ def main():
         help="Nevergrad method to use. Only used for black-box optimization.",
     )
     parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=1,
+        help="Number of workers to use for parallel optimization. Ignores if the "
+        + "optimizer doesn't support parallel optimization.",
+    )
+    parser.add_argument(
         "--logging_path",
         type=Path,
         default=None,
@@ -224,6 +232,7 @@ def main():
     mu_multiplier = args.mu_multiplier
     mu_max = args.mu_max
     nevergrad_method = args.nevergrad_method
+    num_workers = args.num_workers
 
     if args.use_bspline:
         assert (
@@ -258,22 +267,44 @@ def main():
         if optimizer != "snopt":
             if not args.no_al:
                 black_box_optimizer = (
-                    ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
+                    (
+                        ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
+                            num_joints=num_joints,
+                            cost_function=cost_function,
+                            num_fourier_terms=num_fourier_terms,
+                            omega=omega,
+                            num_timesteps=num_timesteps,
+                            time_horizon=time_horizon,
+                            plant=plant,
+                            plant_context=plant_context,
+                            robot_model_instance_idx=robot_model_instance_idx,
+                            max_al_iterations=max_al_iterations,
+                            budget_per_iteration=budget,
+                            mu_initial=mu_initial,
+                            mu_multiplier=mu_multiplier,
+                            mu_max=mu_max,
+                            model_path=model_path,
+                            nevergrad_method=nevergrad_method,
+                            logging_path=logging_path,
+                        )
+                    )
+                    if num_workers == 1
+                    else partial(
+                        ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric.optimize_parallel,
                         num_joints=num_joints,
                         cost_function=cost_function,
                         num_fourier_terms=num_fourier_terms,
                         omega=omega,
                         num_timesteps=num_timesteps,
                         time_horizon=time_horizon,
-                        plant=plant,
-                        plant_context=plant_context,
-                        robot_model_instance_idx=robot_model_instance_idx,
                         max_al_iterations=max_al_iterations,
                         budget_per_iteration=budget,
                         mu_initial=mu_initial,
                         mu_multiplier=mu_multiplier,
                         mu_max=mu_max,
                         model_path=model_path,
+                        robot_model_instance_name="arm",
+                        num_workers=num_workers,
                         nevergrad_method=nevergrad_method,
                         logging_path=logging_path,
                     )
@@ -355,6 +386,8 @@ def main():
 
     logging.info("Starting optimization")
     if optimizer == "black_box":
+        if num_workers > 1 and callable(black_box_optimizer):
+            black_box_optimizer()
         black_box_optimizer.optimize()
     elif optimizer == "snopt":
         snopt_optimizer.set_initial_guess(
