@@ -55,7 +55,7 @@ def main():
         else "./models/iiwa_with_obstacles.dmd.yaml"
     )
     arm_components = create_arm(
-        arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
+        arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0, use_meshcat=True
     )
 
     # Load trajectory parameters

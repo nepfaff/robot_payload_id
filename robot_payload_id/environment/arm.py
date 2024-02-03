@@ -16,7 +16,10 @@ from robot_payload_id.utils import ArmComponents, get_parser
 
 
 def create_arm(
-    arm_file_path: str, num_joints: int, time_step: float = 0.0
+    arm_file_path: str,
+    num_joints: int,
+    time_step: float = 0.0,
+    use_meshcat: bool = False,
 ) -> ArmComponents:
     """Creates a robotic arm system.
 
@@ -71,10 +74,16 @@ def create_arm(
     )
 
     # Meshcat
-    meshcat = StartMeshcat()
-    if num_joints < 3:
-        meshcat.Set2dRenderMode()
-    meshcat_visualizer = MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat)
+    if use_meshcat:
+        meshcat = StartMeshcat()
+        if num_joints < 3:
+            meshcat.Set2dRenderMode()
+        meshcat_visualizer = MeshcatVisualizer.AddToBuilder(
+            builder, scene_graph, meshcat
+        )
+    else:
+        meshcat = None
+        meshcat_visualizer = None
 
     state_logger = LogVectorOutput(plant.get_state_output_port(), builder)
     commanded_torque_logger = LogVectorOutput(
