@@ -315,42 +315,44 @@ class NevergradAugmentedLagrangian:
                         inequality_constraint_error += (
                             np.maximum(-constraint_residue[j], 0) ** 2
                         )
+
+                # If the constraint error is large, then increase mu to place more emphasis
+                # on satisfying the constraints. If the constraint error is small, then
+                # the current mu is doing a good job of maintaining near-feasibility.
+                # TODO: Consider decreasing mu by a fraction of mu_multiplier if the
+                # constraint error is small.
+                constraint_error = (
+                    equality_constraint_error + inequality_constraint_error
+                )
+                if constraint_error > self._constraint_tol * lagrangian_size:
+                    mu = np.minimum(mu * self._mu_multiplier, self._mu_max)
+
+                # Log results
+                wandb.log(
+                    {
+                        "AL Iteration": i + 1,
+                        "constraint_error": constraint_error,
+                        "equality_constraint_error": equality_constraint_error,
+                        "inequality_constraint_error": inequality_constraint_error,
+                    }
+                )
+                # Compute and log number of constraint violations
+                if log_number_of_constraint_violations:
+                    num_constraint_violations = 0
+                    for j in range(lagrangian_size):
+                        if is_equality[j]:
+                            if constraint_residue[j] ** 2 > self._constraint_tol:
+                                num_constraint_violations += 1
+                        else:
+                            if (
+                                np.maximum(-constraint_residue[j], 0) ** 2
+                                > self._constraint_tol
+                            ):
+                                num_constraint_violations += 1
+                    wandb.log({"num_constraint_violations": num_constraint_violations})
         finally:
             if pool is not None:
                 pool.close()
                 pool.join()
-
-            # If the constraint error is large, then increase mu to place more emphasis
-            # on satisfying the constraints. If the constraint error is small, then
-            # the current mu is doing a good job of maintaining near-feasibility.
-            # TODO: Consider decreasing mu by a fraction of mu_multiplier if the
-            # constraint error is small.
-            constraint_error = equality_constraint_error + inequality_constraint_error
-            if constraint_error > self._constraint_tol * lagrangian_size:
-                mu = np.minimum(mu * self._mu_multiplier, self._mu_max)
-
-            # Log results
-            wandb.log(
-                {
-                    "AL Iteration": i + 1,
-                    "constraint_error": constraint_error,
-                    "equality_constraint_error": equality_constraint_error,
-                    "inequality_constraint_error": inequality_constraint_error,
-                }
-            )
-            # Compute and log number of constraint violations
-            if log_number_of_constraint_violations:
-                num_constraint_violations = 0
-                for j in range(lagrangian_size):
-                    if is_equality[j]:
-                        if constraint_residue[j] ** 2 > self._constraint_tol:
-                            num_constraint_violations += 1
-                    else:
-                        if (
-                            np.maximum(-constraint_residue[j], 0) ** 2
-                            > self._constraint_tol
-                        ):
-                            num_constraint_violations += 1
-                wandb.log({"num_constraint_violations": num_constraint_violations})
 
         return x_val, loss, constraint_residue
