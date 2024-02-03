@@ -11,9 +11,9 @@ from tqdm import tqdm
 import wandb
 
 # Create a cache for multiprocessing
-_MAX_NUMWORKERS = 64
+_MAX_NUM_WORKERS = 64
 _CACHED_AUGMENTED_LAGRANGIANS: List[Union[AugmentedLagrangianNonsmooth, None]] = [
-    None for _ in range(_MAX_NUMWORKERS)
+    None for _ in range(_MAX_NUM_WORKERS)
 ]
 
 
