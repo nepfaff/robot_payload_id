@@ -143,11 +143,9 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
             BsplineTrajectory(
                 basis=BsplineBasis(
                     order=spline_order,
-                    knots=np.linspace(
-                        0.0,
-                        (min_trajectory_duration + max_trajectory_duration) / 2.0,
-                        num_control_points + spline_order,
-                    ),
+                    num_basis_functions=num_control_points,
+                    initial_parameter_value=0.0,
+                    final_parameter_value=max_trajectory_duration,
                 ),
                 control_points=np.zeros((num_joints, num_control_points)),
             )
@@ -301,18 +299,15 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             method=self._nevergrad_method,
         )
 
-    def _compute_decision_variable_initial_guess(self) -> np.ndarray:
-        """Computes the initial guess for the decision variables from the initial
-        trajectory guess."""
-
     def _extract_bspline_trajectory_attributes(
         self, var_values: np.ndarray
     ) -> BsplineTrajectoryAttributes:
         """Extracts the B-spline trajectory attributes from the decision variable
         values."""
         control_points = np.asarray(var_values[:-1]).reshape((self._num_joints, -1))
-        traj_duration = var_values[-1]
+        traj_duration = np.abs(var_values[-1])
         scaled_knots = np.array(self._trajopt.basis().knots()) * traj_duration
+        assert scaled_knots[0] == 0.0, "Trajectory must start at time 0!"
         return BsplineTrajectoryAttributes(
             spline_order=self._trajopt.basis().order(),
             control_points=control_points,
