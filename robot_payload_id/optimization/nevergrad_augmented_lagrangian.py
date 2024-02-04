@@ -6,7 +6,11 @@ from typing import Callable, List, Tuple, Union
 import nevergrad as ng
 import numpy as np
 
-from pydrake.all import AugmentedLagrangianNonsmooth, MathematicalProgram
+from pydrake.all import (
+    AugmentedLagrangianNonsmooth,
+    BoundingBoxConstraint,
+    MathematicalProgram,
+)
 from tqdm import tqdm
 
 import wandb
@@ -224,31 +228,43 @@ class NevergradAugmentedLagrangian:
             zip(list(set(constraint_types)), [0] * len(constraint_types))
         )
 
-        is_equality = nonsmooth_al.is_equality()
+        # See Drake augmented_lagrangian.cc::EvalAugmentedLagrangian for context
         lag_idx = 0
         for constraint, constraint_type in zip(constraints, constraint_types):
-            if is_equality[lag_idx]:
-                # Constraint adds one Lagrange multiplier
-                if constraint_residue[lag_idx] ** 2 > self._constraint_tol:
-                    constraint_type_violations_map[constraint_type] += 1
-                lag_idx += 1
-            else:
-                # Constraint adds 0 to 2 Lagrange multipliers
-                if not np.isinf(constraint.lower_bound()):
-                    if (
-                        np.maximum(-constraint_residue[lag_idx], 0) ** 2
-                        > self._constraint_tol
-                    ):
-                        constraint_type_violations_map[constraint_type] += 1
-                    lag_idx += 1
+            if isinstance(constraint, BoundingBoxConstraint):
+                # No residuals exist for these bounds
+                continue
 
-                if not np.isinf(constraint.upper_bound()):
-                    if (
-                        np.maximum(-constraint_residue[lag_idx], 0) ** 2
-                        > self._constraint_tol
-                    ):
+            for i in range(constraint.num_constraints()):
+                lb = constraint.lower_bound()[i]
+                ub = constraint.upper_bound()[i]
+                if lb == ub:
+                    # Constraint adds one Lagrange multiplier
+                    if constraint_residue[lag_idx] ** 2 > self._constraint_tol:
                         constraint_type_violations_map[constraint_type] += 1
                     lag_idx += 1
+                else:
+                    # Constraint adds 0 to 2 Lagrange multipliers
+                    if not np.isinf(lb):
+                        if (
+                            np.maximum(-constraint_residue[lag_idx], 0) ** 2
+                            > self._constraint_tol
+                        ):
+                            constraint_type_violations_map[constraint_type] += 1
+                        lag_idx += 1
+
+                    if not np.isinf(ub):
+                        if (
+                            np.maximum(-constraint_residue[lag_idx], 0) ** 2
+                            > self._constraint_tol
+                        ):
+                            constraint_type_violations_map[constraint_type] += 1
+                        lag_idx += 1
+
+        if nonsmooth_al.include_x_bounds():
+            logging.warning(
+                "Skipping to log constraint violations for decision variable bounds."
+            )
 
         num_constraint_violations = sum(list(constraint_type_violations_map.values()))
         wandb.log(
