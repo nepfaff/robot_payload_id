@@ -58,7 +58,7 @@ class NevergradAugmentedLagrangian:
         budget_per_iteration: int = 3000,
         mu_multiplier: float = 2.0,
         mu_max: float = 1e3,
-        method: str = "OnePlusOne",
+        method: str = "NGOpt",
         constraint_tol: float = 1e-5,
     ):
         """
