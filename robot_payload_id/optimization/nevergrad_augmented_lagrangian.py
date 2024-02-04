@@ -123,7 +123,9 @@ class NevergradAugmentedLagrangian:
 
         # Select optimizer and set initial guess
         optimizer = ng.optimizers.registry[self._method](
-            parametrization=x_array, budget=self._budget_per_iteration, num_workers=1
+            parametrization=x_array,
+            budget=self._budget_per_iteration,
+            num_workers=num_workers,
         )
         optimizer.suggest(x_init)
 
