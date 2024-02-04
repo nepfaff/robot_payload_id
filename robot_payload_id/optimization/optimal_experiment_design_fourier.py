@@ -42,7 +42,7 @@ from robot_payload_id.symbolic import (
     eval_expression_mat_derivative,
     eval_expression_vec,
 )
-from robot_payload_id.utils import JointData
+from robot_payload_id.utils import JointData, name_constraint
 
 from .nevergrad_augmented_lagrangian import NevergradAugmentedLagrangian
 from .nevergrad_util import NevergradLossLogger, NevergradWandbLogger
@@ -1179,6 +1179,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
 
     def _add_bound_constraints(self) -> None:
         """Add position, velocity, and acceleration bound constraints."""
+
+        def no_limit(lower, upper):
+            return np.isinf(lower) and np.isinf(upper)
+
         joint_data = self._compute_joint_data(self._symbolic_vars)
 
         position_lower_limits = self._plant.GetPositionLowerLimits()
@@ -1190,34 +1194,66 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         for i in range(self._num_timesteps):
             for j in range(self._num_joints):
                 # Position bounds
-                self._prog.AddConstraint(
-                    joint_data.joint_positions[i, j],
-                    position_lower_limits[j],
-                    position_upper_limits[j],
-                )
+                if not no_limit(position_lower_limits[j], position_upper_limits[j]):
+                    name_constraint(
+                        self._prog.AddConstraint(
+                            joint_data.joint_positions[i, j],
+                            position_lower_limits[j],
+                            position_upper_limits[j],
+                        ),
+                        f"positionBound_joint_{j}_time_{i}",
+                    )
 
                 # Velocity bounds
-                self._prog.AddConstraint(
-                    joint_data.joint_velocities[i, j],
-                    velocity_lower_limits[j],
-                    velocity_upper_limits[j],
-                )
+                if not no_limit(velocity_lower_limits[j], velocity_upper_limits[j]):
+                    name_constraint(
+                        self._prog.AddConstraint(
+                            joint_data.joint_velocities[i, j],
+                            velocity_lower_limits[j],
+                            velocity_upper_limits[j],
+                        ),
+                        f"velocityBound_joint_{j}_time_{i}",
+                    )
 
                 # Acceleration bounds
-                self._prog.AddConstraint(
-                    joint_data.joint_accelerations[i, j],
-                    acceleration_lower_limits[j],
-                    acceleration_upper_limits[j],
-                )
+                if not no_limit(
+                    acceleration_lower_limits[j], acceleration_upper_limits[j]
+                ):
+                    name_constraint(
+                        self._prog.AddConstraint(
+                            joint_data.joint_accelerations[i, j],
+                            acceleration_lower_limits[j],
+                            acceleration_upper_limits[j],
+                        ),
+                        f"accelerationBound_joint_{j}_time_{i}",
+                    )
 
     def _add_start_and_end_point_constraints(self) -> None:
         """Add constraints to start and end with zero velocities/ accelerations."""
         joint_data = self._compute_joint_data(self._symbolic_vars)
         for i in range(self._num_joints):
-            self._prog.AddLinearConstraint(joint_data.joint_velocities[0, i] == 0.0)
-            self._prog.AddLinearConstraint(joint_data.joint_velocities[-1, i] == 0.0)
-            self._prog.AddLinearConstraint(joint_data.joint_accelerations[0, i] == 0.0)
-            self._prog.AddLinearConstraint(joint_data.joint_accelerations[-1, i] == 0.0)
+            name_constraint(
+                self._prog.AddLinearConstraint(joint_data.joint_positions[0, i] == 0.0),
+                f"startPosition_joint_{i}",
+            )
+            name_constraint(
+                self._prog.AddLinearConstraint(
+                    joint_data.joint_positions[-1, i] == 0.0
+                ),
+                f"endPosition_joint_{i}",
+            )
+            name_constraint(
+                self._prog.AddLinearConstraint(
+                    joint_data.joint_velocities[0, i] == 0.0
+                ),
+                f"startVelocity_joint_{i}",
+            )
+            name_constraint(
+                self._prog.AddLinearConstraint(
+                    joint_data.joint_velocities[-1, i] == 0.0
+                ),
+                f"endVelocity_joint_{i}",
+            )
 
     def _add_collision_constraints(self, min_distance: float = 0.01) -> None:
         """Add collision avoidance constraints."""
@@ -1235,11 +1271,14 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             return constraint.Eval(joint_positions_numeric)
 
         for i in range(self._num_timesteps):
-            self._prog.AddConstraint(
-                func=partial(collision_constraint, i),
-                lb=[0.0],
-                ub=[1.0],
-                vars=self._symbolic_vars,
+            name_constraint(
+                self._prog.AddConstraint(
+                    func=partial(collision_constraint, i),
+                    lb=[0.0],
+                    ub=[1.0],
+                    vars=self._symbolic_vars,
+                ),
+                f"collisionAvoidance_time_{i}",
             )
 
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
