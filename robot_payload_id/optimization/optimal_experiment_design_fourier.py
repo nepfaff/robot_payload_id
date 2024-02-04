@@ -1233,16 +1233,6 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         joint_data = self._compute_joint_data(self._symbolic_vars)
         for i in range(self._num_joints):
             name_constraint(
-                self._prog.AddLinearConstraint(joint_data.joint_positions[0, i] == 0.0),
-                f"startPosition_joint_{i}",
-            )
-            name_constraint(
-                self._prog.AddLinearConstraint(
-                    joint_data.joint_positions[-1, i] == 0.0
-                ),
-                f"endPosition_joint_{i}",
-            )
-            name_constraint(
                 self._prog.AddLinearConstraint(
                     joint_data.joint_velocities[0, i] == 0.0
                 ),
@@ -1253,6 +1243,18 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                     joint_data.joint_velocities[-1, i] == 0.0
                 ),
                 f"endVelocity_joint_{i}",
+            )
+            name_constraint(
+                self._prog.AddLinearConstraint(
+                    joint_data.joint_accelerations[0, i] == 0.0
+                ),
+                f"startAcceleration_joint_{i}",
+            )
+            name_constraint(
+                self._prog.AddLinearConstraint(
+                    joint_data.joint_accelerations[-1, i] == 0.0
+                ),
+                f"endAcceleration_joint_{i}",
             )
 
     def _add_collision_constraints(self, min_distance: float = 0.01) -> None:
