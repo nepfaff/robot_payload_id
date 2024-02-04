@@ -1245,7 +1245,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
         # Compute the initial Lagrange multiplier guess
         num_lambda = self._ng_al.compute_num_lambda(self._prog)
-        lambda_initial = np.ones(num_lambda)
+        lambda_initial = np.zeros(num_lambda)
 
         # Optimize
         x_val, _, _ = self._ng_al.solve(
@@ -1363,7 +1363,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
 
         optim = construct_optimizer()
         al = AugmentedLagrangianNonsmooth(prog=optim._prog, include_x_bounds=False)
-        lambda_initial = np.ones(al.lagrangian_size())
+        lambda_initial = np.zeros(al.lagrangian_size())
 
         x_val, _, _ = optim._ng_al.solve(
             prog_or_al_factory=al_factory,

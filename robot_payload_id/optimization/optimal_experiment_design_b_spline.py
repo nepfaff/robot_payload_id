@@ -479,7 +479,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
     def optimize(self) -> BsplineTrajectoryAttributes:
         # Compute the initial Lagrange multiplier guess
         num_lambda = self._ng_al.compute_num_lambda(self._prog)
-        lambda_initial = np.random.rand(num_lambda)
+        lambda_initial = np.zeros(num_lambda)
 
         # Optimize
         x_val, _, _ = self._ng_al.solve(
