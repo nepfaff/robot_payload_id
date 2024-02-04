@@ -388,7 +388,8 @@ def main():
     if optimizer == "black_box":
         if num_workers > 1 and callable(black_box_optimizer):
             black_box_optimizer()
-        black_box_optimizer.optimize()
+        else:
+            black_box_optimizer.optimize()
     elif optimizer == "snopt":
         snopt_optimizer.set_initial_guess(
             a=np.random.rand(num_joints * num_fourier_terms) - 0.5,
