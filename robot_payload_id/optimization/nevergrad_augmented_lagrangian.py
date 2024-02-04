@@ -1,3 +1,4 @@
+import logging
 import multiprocessing as mp
 
 from typing import Callable, List, Tuple, Union
@@ -209,6 +210,57 @@ class NevergradAugmentedLagrangian:
         )
         return al.lagrangian_size()
 
+    def _compute_and_log_constraint_violations(
+        self,
+        nonsmooth_al: AugmentedLagrangianNonsmooth,
+        constraint_residue: np.ndarray,
+    ) -> None:
+        constraints = [c.evaluator() for c in nonsmooth_al.prog().GetAllConstraints()]
+        constraint_names = [c.get_description() for c in constraints]
+        constraint_types = [name.split("_")[0] for name in constraint_names]
+
+        # Assumes that constraint name has the form "name_..."
+        constraint_type_violations_map = dict(
+            zip(list(set(constraint_types)), [0] * len(constraint_types))
+        )
+
+        is_equality = nonsmooth_al.is_equality()
+        lag_idx = 0
+        for constraint, constraint_type in zip(constraints, constraint_types):
+            if is_equality[lag_idx]:
+                # Constraint adds one Lagrange multiplier
+                if constraint_residue[lag_idx] ** 2 > self._constraint_tol:
+                    constraint_type_violations_map[constraint_type] += 1
+                lag_idx += 1
+            else:
+                # Constraint adds 0 to 2 Lagrange multipliers
+                if not np.isinf(constraint.lower_bound()):
+                    if (
+                        np.maximum(-constraint_residue[lag_idx], 0) ** 2
+                        > self._constraint_tol
+                    ):
+                        constraint_type_violations_map[constraint_type] += 1
+                    lag_idx += 1
+
+                if not np.isinf(constraint.upper_bound()):
+                    if (
+                        np.maximum(-constraint_residue[lag_idx], 0) ** 2
+                        > self._constraint_tol
+                    ):
+                        constraint_type_violations_map[constraint_type] += 1
+                    lag_idx += 1
+
+        num_constraint_violations = sum(list(constraint_type_violations_map.values()))
+        wandb.log(
+            {
+                "num_constraint_violations": num_constraint_violations,
+                **{
+                    "constraint_violation_" + key: value
+                    for key, value in constraint_type_violations_map.items()
+                },
+            }
+        )
+
     def solve(
         self,
         prog_or_al_factory: Union[
@@ -286,6 +338,7 @@ class NevergradAugmentedLagrangian:
                 if num_workers > 1
                 else None
             )
+            logging.info("Starting Nevergrad augmented Lagrangian optimization.")
             for i in tqdm(
                 range(self._max_al_iters),
                 total=self._max_al_iters,
@@ -326,7 +379,7 @@ class NevergradAugmentedLagrangian:
                 constraint_error = (
                     equality_constraint_error + inequality_constraint_error
                 )
-                if constraint_error > self._constraint_tol * lagrangian_size:
+                if constraint_error > self._constraint_tol:
                     mu = np.minimum(mu * self._mu_multiplier, self._mu_max)
 
                 # Log results
@@ -340,21 +393,15 @@ class NevergradAugmentedLagrangian:
                 )
                 # Compute and log number of constraint violations
                 if log_number_of_constraint_violations:
-                    num_constraint_violations = 0
-                    for j in range(lagrangian_size):
-                        if is_equality[j]:
-                            if constraint_residue[j] ** 2 > self._constraint_tol:
-                                num_constraint_violations += 1
-                        else:
-                            if (
-                                np.maximum(-constraint_residue[j], 0) ** 2
-                                > self._constraint_tol
-                            ):
-                                num_constraint_violations += 1
-                    wandb.log({"num_constraint_violations": num_constraint_violations})
+                    self._compute_and_log_constraint_violations(
+                        nonsmooth_al=nonsmooth_al,
+                        constraint_residue=constraint_residue,
+                    )
+
         finally:
             if pool is not None:
                 pool.close()
                 pool.join()
+                logging.info("Cleaned up pool.")
 
         return x_val, loss, constraint_residue
