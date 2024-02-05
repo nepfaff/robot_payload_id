@@ -7,6 +7,8 @@ import numpy as np
 
 from pydrake.all import BsplineBasis, BsplineTrajectory, Simulator
 
+import wandb
+
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
 )
@@ -43,9 +45,22 @@ def main():
         help="The time horizon/ duration of the trajectory. This should correspond to "
         + "the optimal experiment design parameter.",
     )
+    parser.add_argument(
+        "--use_wandb",
+        action="store_true",
+        help="Use Weights and Biases for logging.",
+    )
     args = parser.parse_args()
     num_timesteps = args.num_timesteps
     traj_parameter_path = args.traj_parameter_path
+
+    use_wandb = args.use_wandb
+    if use_wandb:
+        wandb.init(
+            project="robot_payload_id_visualized_trajectories",
+            name=f"visualized_trajectory: {str(traj_parameter_path)}",
+            config=vars(args),
+        )
 
     # Create arm
     num_joints = 1 if args.use_one_link_arm else 7
@@ -121,6 +136,10 @@ def main():
 
     arm_components.meshcat_visualizer.StopRecording()
     arm_components.meshcat_visualizer.PublishRecording()
+
+    if use_wandb:
+        html = arm_components.meshcat.StaticHtml()
+        wandb.log({"trajectory": wandb.Html(html)})
 
 
 if __name__ == "__main__":
