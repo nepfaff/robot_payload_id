@@ -146,7 +146,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
             shape (num_joints, num_fourier_terms).
         q0 (np.ndarray): The `q0` parameters for the trajectory of type AutoDiffXd and
             shape (num_joints,).
-        omega (float): The frequency of the trajectory.
+        omega (float): The frequency of the trajectory. The period is 2 * pi / omega.
         plant (MultibodyPlant, optional): The plant to generate data for. If None, then
             the torques will be set to zero.
         use_progress_bar (bool, optional): Whether to use a progress bar.
@@ -247,7 +247,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
             shape (num_joints, num_fourier_terms).
         q0 (np.ndarray): The `q0` parameters for the trajectory of type AutoDiffXd and
             shape (num_joints,).
-        omega (float): The frequency of the trajectory.
+        omega (float): The frequency of the trajectory. The period is 2 * pi / omega.
         plant (MultibodyPlant, optional): The plant to generate data for. If None, then
             the torques will be set to zero.
         use_progress_bar (bool, optional): Whether to use a progress bar.
