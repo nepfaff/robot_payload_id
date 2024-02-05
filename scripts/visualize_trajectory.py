@@ -76,8 +76,12 @@ def main():
     # Load trajectory parameters
     is_fourier_series = os.path.exists(traj_parameter_path / "a_value.npy")
     if is_fourier_series:
-        a_data = np.load(traj_parameter_path / "a_value.npy").reshape((num_joints, -1))
-        b_data = np.load(traj_parameter_path / "b_value.npy").reshape((num_joints, -1))
+        a_data = np.load(traj_parameter_path / "a_value.npy").reshape(
+            (num_joints, -1), order="F"
+        )
+        b_data = np.load(traj_parameter_path / "b_value.npy").reshape(
+            (num_joints, -1), order="F"
+        )
         q0_data = np.load(traj_parameter_path / "q0_value.npy")
 
         joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
