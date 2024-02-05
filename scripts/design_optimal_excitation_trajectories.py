@@ -58,7 +58,9 @@ def main():
         "--omega",
         type=float,
         default=0.3 * np.pi,
-        help="Frequency of the trajectory.",
+        help="Frequency of the Fourier series trajectory. The period of the trajectory "
+        + "is 2 * pi / omega. Hence, halfing the period will double the unique Fourier "
+        + "series trajectory duration.",
     )
     parser.add_argument(
         "--num_timesteps",
