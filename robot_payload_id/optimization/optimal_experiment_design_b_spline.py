@@ -142,7 +142,7 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
                 traj_attrs_initial = BsplineTrajectoryAttributes.load(traj_initial)
                 traj_initial = BsplineTrajectory(
                     basis=BsplineBasis(
-                        order=traj_attrs_initial.spline_order,
+                        order=int(traj_attrs_initial.spline_order),
                         knots=traj_attrs_initial.knots,
                     ),
                     control_points=traj_attrs_initial.control_points,
