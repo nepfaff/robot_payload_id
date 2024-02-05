@@ -64,12 +64,15 @@ class BsplineTrajectoryAttributes:
     def log(self, logging_path: Optional[Path] = None) -> None:
         """Logs the B-spline trajectory attributes to wandb. If logging_path is not
         None, then the attributes are also saved to disk."""
-        np.save(
-            os.path.join(wandb.run.dir, "spline_order.npy"),
-            np.array([self.spline_order]),
-        )
-        np.save(os.path.join(wandb.run.dir, "control_points.npy"), self.control_points)
-        np.save(os.path.join(wandb.run.dir, "knots.npy"), self.knots)
+        if wandb.run is not None:
+            np.save(
+                os.path.join(wandb.run.dir, "spline_order.npy"),
+                np.array([self.spline_order]),
+            )
+            np.save(
+                os.path.join(wandb.run.dir, "control_points.npy"), self.control_points
+            )
+            np.save(os.path.join(wandb.run.dir, "knots.npy"), self.knots)
         if logging_path is not None:
             np.save(logging_path / "spline_order.npy", np.array([self.spline_order]))
             np.save(logging_path / "control_points.npy", self.control_points)
