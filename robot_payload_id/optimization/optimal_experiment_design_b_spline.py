@@ -304,6 +304,14 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             method=self._nevergrad_method,
         )
 
+    def _log_base_params_mapping(self, base_param_mapping: np.ndarray) -> None:
+        np.save(
+            os.path.join(wandb.run.dir, "base_param_mapping.npy"),
+            base_param_mapping,
+        )
+        if self._logging_path is not None:
+            np.save(self._logging_path / "base_param_mapping.npy", base_param_mapping)
+
     def _extract_bspline_trajectory_attributes(
         self, var_values: np.ndarray
     ) -> BsplineTrajectoryAttributes:
