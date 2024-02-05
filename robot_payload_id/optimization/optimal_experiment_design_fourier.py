@@ -1297,10 +1297,6 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             nevergrad_set_bounds=True,
         )
 
-        # Compute constraint violations
-        num_joint_limit_violations = self._joint_limit_penalty(x_val)
-        wandb.run.summary["num_joint_limit_violations"] = num_joint_limit_violations
-
         # Log optimization result
         a_value, b_value, q0_value = np.split(
             x_val, [len(self._a_var), len(self._a_var) + len(self._b_var)]
@@ -1414,10 +1410,6 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             nevergrad_set_bounds=True,
             num_workers=num_workers,
         )
-
-        # Compute constraint violations
-        num_joint_limit_violations = optim._joint_limit_penalty(x_val)
-        wandb.run.summary["num_joint_limit_violations"] = num_joint_limit_violations
 
         # Log optimization result
         a_value, b_value, q0_value = np.split(
