@@ -123,6 +123,19 @@ class NevergradAugmentedLagrangian:
                 numerically_stable_max_float,
                 nonsmooth_al.x_up(),
             )
+
+            # Check if initial guess is within bounds and clip if necessary
+            is_out_of_bounds = np.logical_or(
+                x_init < lower_bound, x_init > upper_bound
+            ).any()
+            if is_out_of_bounds:
+                logging.warning(
+                    "Initial guess is out of bounds. Clipping initial guess to bounds."
+                )
+                wandb.run.summary["clipped_initial_guess"] = True
+                x_init = np.clip(x_init, lower_bound, upper_bound)
+                x_array.value = x_init
+
             x_array.set_bounds(lower_bound, upper_bound)
             wandb.run.summary["nevergrad_set_bounds"] = True
 
