@@ -6,7 +6,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import numpy as np
 
@@ -78,6 +78,15 @@ class BsplineTrajectoryAttributes:
             np.save(logging_path / "control_points.npy", self.control_points)
             np.save(logging_path / "knots.npy", self.knots)
 
+    @classmethod
+    def load(cls, path: Path) -> "BsplineTrajectoryAttributes":
+        """Loads the B-spline trajectory attributes from disk."""
+        return BsplineTrajectoryAttributes(
+            spline_order=np.load(path / "spline_order.npy"),
+            control_points=np.load(path / "control_points.npy"),
+            knots=np.load(path / "knots.npy"),
+        )
+
 
 class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
     """
@@ -96,7 +105,7 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
         min_trajectory_duration: float,
         max_trajectory_duration: float,
         spline_order: int = 4,
-        traj_initial: Optional[BsplineTrajectory] = None,
+        traj_initial: Optional[Union[BsplineTrajectory, Path]] = None,
         logging_path: Optional[Path] = None,
     ):
         """
@@ -117,6 +126,9 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
             traj_initial (Optional[BsplineTrajectory]): The initial guess for the
                 trajectory. If None, then a zero trajectory over the interval
                 [0, (min_trajectory_duration + max_trajectory_duration) / 2.0] is used.
+                If a path is provided, then the trajectory is loaded from the path.
+                Such a path must be a directory containing 'spline_order.npy',
+                'control_points.npy', and 'knots.npy'.
             logging_path (Path): The path to write the optimization logs to. If None,
                 then no logs are written.
         """
@@ -126,12 +138,23 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
         ), "min_trajectory_duration must be less than max_trajectory_duration!"
         # Validate initial guess
         if traj_initial is not None:
+            if isinstance(traj_initial, Path):
+                traj_attrs_initial = BsplineTrajectoryAttributes.load(traj_initial)
+                traj_initial = BsplineTrajectory(
+                    basis=BsplineBasis(
+                        order=traj_attrs_initial.spline_order,
+                        knots=traj_attrs_initial.knots,
+                    ),
+                    control_points=traj_attrs_initial.control_points,
+                )
             assert traj_initial.start_time() == 0.0, "Trajectory must start at time 0!"
             assert traj_initial.end_time() <= max_trajectory_duration
             assert traj_initial.end_time() >= min_trajectory_duration
             assert traj_initial.basis().order() == spline_order
-            assert traj_initial.control_points().shape[0] == num_joints
-            assert traj_initial.control_points().shape[1] == num_control_points
+            assert (
+                np.array(traj_initial.control_points()).shape[0] == num_control_points
+            )
+            assert np.array(traj_initial.control_points()).shape[1] == num_joints
 
         super().__init__(
             num_joints=num_joints,
@@ -160,6 +183,7 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
         )
         self._trajopt = KinematicTrajectoryOptimization(self._initial_traj_guess)
         self._prog = self._trajopt.get_mutable_prog()
+        wandb.run.summary["num_decision_variables"] = self._prog.num_vars()
 
         if traj_initial is not None:
             self._trajopt.SetInitialGuess(traj_initial)
@@ -202,7 +226,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         mu_max: float,
         nevergrad_method: str = "NGOpt",
         spline_order: int = 4,
-        traj_initial: Optional[BsplineTrajectory] = None,
+        traj_initial: Optional[Union[BsplineTrajectory, Path]] = None,
         logging_path: Optional[Path] = None,
     ):
         """
@@ -236,6 +260,9 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             traj_initial (Optional[BsplineTrajectory]): The initial guess for the
                 trajectory. If None, then a zero trajectory over the interval
                 [0, (min_trajectory_duration + max_trajectory_duration) / 2.0] is used.
+                If a path is provided, then the trajectory is loaded from the path.
+                Such a path must be a directory containing 'spline_order.npy',
+                'control_points.npy', and 'knots.npy'.
             logging_path (Path): The path to write the optimization logs to. If None,
                 then no logs are written.
         """
@@ -484,7 +511,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             bound=min_distance,
             plant_context=self._plant_context,
         )
-        evaluate_at_s = np.linspace(0, 1, 3 * self._max_trajectory_duration * 100)
+        evaluate_at_s = np.linspace(0, 1, int(3 * self._max_trajectory_duration * 100))
         for s in evaluate_at_s:
             self._trajopt.AddPathPositionConstraint(constraint, s)
 

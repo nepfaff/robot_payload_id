@@ -169,6 +169,13 @@ def main():
         + "optimization.",
     )
     parser.add_argument(
+        "--traj_initial",
+        type=Path,
+        default=None,
+        help="Path to the initial B-spline trajectory. If provided, the initial "
+        + "trajectory will be used to initialize the B-spline trajectory optimization.",
+    )
+    parser.add_argument(
         "--wandb_mode",
         type=str,
         default="online",
@@ -236,6 +243,7 @@ def main():
     nevergrad_method = args.nevergrad_method
     num_workers = args.num_workers
     num_control_points = args.num_control_points
+    traj_initial = args.traj_initial
 
     if args.use_bspline:
         assert (
@@ -264,6 +272,7 @@ def main():
                 mu_max=mu_max,
                 nevergrad_method=nevergrad_method,
                 spline_order=4,
+                traj_initial=traj_initial,
                 logging_path=logging_path,
             )
             if num_workers == 1
@@ -284,6 +293,7 @@ def main():
                 mu_max=mu_max,
                 nevergrad_method=nevergrad_method,
                 spline_order=4,
+                traj_initial=traj_initial,
                 num_workers=num_workers,
                 logging_path=logging_path,
             )
