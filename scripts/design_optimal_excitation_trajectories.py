@@ -235,6 +235,7 @@ def main():
     mu_max = args.mu_max
     nevergrad_method = args.nevergrad_method
     num_workers = args.num_workers
+    num_control_points = args.num_control_points
 
     if args.use_bspline:
         assert (
@@ -244,25 +245,48 @@ def main():
             not args.no_al
         ), "Augmented Lagrangian is required for B-spline optimization."
 
-        black_box_optimizer = ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
-            num_joints=num_joints,
-            cost_function=cost_function,
-            plant=plant,
-            plant_context=plant_context,
-            robot_model_instance_idx=robot_model_instance_idx,
-            model_path=model_path,
-            num_timesteps=num_timesteps,
-            num_control_points=args.num_control_points,
-            min_trajectory_duration=time_horizon / 2.0,
-            max_trajectory_duration=time_horizon,
-            max_al_iterations=max_al_iterations,
-            budget_per_iteration=budget,
-            mu_initial=mu_initial,
-            mu_multiplier=mu_multiplier,
-            mu_max=mu_max,
-            nevergrad_method=nevergrad_method,
-            spline_order=4,
-            logging_path=logging_path,
+        black_box_optimizer = (
+            ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
+                num_joints=num_joints,
+                cost_function=cost_function,
+                plant=plant,
+                plant_context=plant_context,
+                robot_model_instance_idx=robot_model_instance_idx,
+                model_path=model_path,
+                num_timesteps=num_timesteps,
+                num_control_points=num_control_points,
+                min_trajectory_duration=time_horizon / 2.0,
+                max_trajectory_duration=time_horizon,
+                max_al_iterations=max_al_iterations,
+                budget_per_iteration=budget,
+                mu_initial=mu_initial,
+                mu_multiplier=mu_multiplier,
+                mu_max=mu_max,
+                nevergrad_method=nevergrad_method,
+                spline_order=4,
+                logging_path=logging_path,
+            )
+            if num_workers == 1
+            else partial(
+                ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric.optimize_parallel,
+                num_joints=num_joints,
+                cost_function=cost_function,
+                model_path=model_path,
+                robot_model_instance_name="arm",
+                num_timesteps=num_timesteps,
+                num_control_points=num_control_points,
+                min_trajectory_duration=time_horizon / 2.0,
+                max_trajectory_duration=time_horizon,
+                max_al_iterations=max_al_iterations,
+                budget_per_iteration=budget,
+                mu_initial=mu_initial,
+                mu_multiplier=mu_multiplier,
+                mu_max=mu_max,
+                nevergrad_method=nevergrad_method,
+                spline_order=4,
+                num_workers=num_workers,
+                logging_path=logging_path,
+            )
         )
     else:
         # Create the black-box optimizer

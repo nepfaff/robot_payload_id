@@ -12,6 +12,7 @@ import numpy as np
 
 from numpy import ndarray
 from pydrake.all import (
+    AugmentedLagrangianNonsmooth,
     BsplineBasis,
     BsplineTrajectory,
     Context,
@@ -196,7 +197,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         mu_initial: float,
         mu_multiplier: float,
         mu_max: float,
-        nevergrad_method: str = "OnePlusOne",
+        nevergrad_method: str = "NGOpt",
         spline_order: int = 4,
         traj_initial: Optional[BsplineTrajectory] = None,
         logging_path: Optional[Path] = None,
@@ -403,7 +404,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         random_var_values = np.random.uniform(
             low=-1, high=1, size=len(self._prog.decision_variables())
         )
-        W_data = self._compute_W_data(random_var_values, use_progress_bar=True)
+        W_data = self._compute_W_data(random_var_values)
 
         # NOTE: This might lead to running out of memory for large matrices. W_data
         # is sparse and hence it might be possible to use a sparse SVD. However,
@@ -500,5 +501,125 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
 
         bspline_traj_attributes = self._extract_bspline_trajectory_attributes(x_val)
         bspline_traj_attributes.log(self._logging_path)
+
+        return bspline_traj_attributes
+
+    @classmethod
+    def optimize_parallel(
+        cls,
+        num_joints: int,
+        cost_function: CostFunction,
+        model_path: str,
+        robot_model_instance_name: str,
+        num_timesteps: int,
+        num_control_points: int,
+        min_trajectory_duration: float,
+        max_trajectory_duration: float,
+        max_al_iterations: int,
+        budget_per_iteration: int,
+        mu_initial: float,
+        mu_multiplier: float,
+        mu_max: float,
+        num_workers: int,
+        nevergrad_method: str = "NGOpt",
+        spline_order: int = 4,
+        traj_initial: Optional[BsplineTrajectory] = None,
+        logging_path: Optional[Path] = None,
+    ) -> BsplineTrajectoryAttributes:
+        """Optimizes the trajectory parameters in parallel.
+        NOTE: This method deals with the optimizer construction and should be called
+        as a classmethod.
+
+        Args:
+            num_joints (int): The number of joints in the arm.
+            cost_function (CostFunction): The cost function to use.
+            model_path (str): The path to the model file (e.g. SDFormat, URDF).
+            robot_model_instance_name (str): The name of the robot model instance in the
+                plant.
+            num_timesteps (int): The number of equally spaced timesteps to sample the
+                trajectory at for constructing the data matrix.
+            num_control_points (int): The number of control points to use for the
+                B-spline trajectory.
+            min_trajectory_duration (float): The minimum duration of the trajectory.
+                This must be positive.
+            max_trajectory_duration (float): The maximum duration of the trajectory.
+            max_al_iterations (int): The maximum number of augmented Lagrangian
+                iterations to run.
+            budget_per_iteration (int): The number of iterations to run the optimizer
+                for at each augmented Lagrangian iteration.
+            mu_initial (float): The initial value of the penalty weights.
+            mu_multiplier (float): We will multiply mu by mu_multiplier if the
+                equality constraint is not satisfied.
+            mu_max (float): The maximum value of the penalty weights.
+            num_workers (int): The number of workers to use for parallel optimization.
+            nevergrad_method (str): The method to use for the Nevergrad optimizer.
+                Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
+                for a complete list of methods.
+            spline_order (int): The order of the B-spline basis to use.
+            traj_initial (Optional[BsplineTrajectory]): The initial guess for the
+                trajectory. If None, then a zero trajectory over the interval
+                [0, (min_trajectory_duration + max_trajectory_duration) / 2.0] is used.
+            logging_path (Path): The path to write the optimization logs to. If None,
+                then no logs are written.
+
+        Returns:
+            BsplineTrajectoryAttributes: The optimized B-spline trajectory attributes.
+        """
+        assert num_workers > 1, "Parallel optimization requires at least 2 workers."
+
+        def construct_optimizer():
+            arm_components = create_arm(arm_file_path=model_path, num_joints=num_joints)
+            plant_context = arm_components.plant.GetMyContextFromRoot(
+                arm_components.diagram.CreateDefaultContext()
+            )
+            robot_model_instance_idx = arm_components.plant.GetModelInstanceByName(
+                robot_model_instance_name
+            )
+
+            return cls(
+                num_joints=num_joints,
+                cost_function=cost_function,
+                plant=arm_components.plant,
+                plant_context=plant_context,
+                robot_model_instance_idx=robot_model_instance_idx,
+                model_path=model_path,
+                num_timesteps=num_timesteps,
+                num_control_points=num_control_points,
+                min_trajectory_duration=min_trajectory_duration,
+                max_trajectory_duration=max_trajectory_duration,
+                max_al_iterations=max_al_iterations,
+                budget_per_iteration=budget_per_iteration,
+                mu_initial=mu_initial,
+                mu_multiplier=mu_multiplier,
+                mu_max=mu_max,
+                nevergrad_method=nevergrad_method,
+                spline_order=spline_order,
+                traj_initial=traj_initial,
+                logging_path=logging_path,
+            )
+
+        def al_factory():
+            """A pickable factory for AugmentedLagrangianNonsmooth."""
+            optim = construct_optimizer()
+            al = AugmentedLagrangianNonsmooth(prog=optim._prog, include_x_bounds=False)
+            return al
+
+        optim = construct_optimizer()
+        al = AugmentedLagrangianNonsmooth(prog=optim._prog, include_x_bounds=False)
+        lambda_initial = np.zeros(al.lagrangian_size())
+
+        x_val, _, _ = optim._ng_al.solve(
+            prog_or_al_factory=al_factory,
+            x_init=optim._initial_decision_variable_guess,
+            lambda_val=lambda_initial,
+            mu=mu_initial,
+            nevergrad_set_bounds=True,
+            num_workers=num_workers,
+        )
+
+        # Log optimization result
+        bspline_traj_attributes = optim._extract_bspline_trajectory_attributes(x_val)
+        bspline_traj_attributes.log(optim._logging_path)
+        optim._log_base_params_mapping(optim._base_param_mapping)
 
         return bspline_traj_attributes
