@@ -272,6 +272,10 @@ def main():
     final_num_control_points = num_control_points - num_control_points_step
     print(f"Final number of control points: {final_num_control_points}")
     print(f"Number of iterations: {iters}")
+    print(
+        "Optimal cost (increase number of control points to decrease): "
+        + f"{result.get_optimal_cost()}"
+    )
 
     # Save the trajectory
     save_dir.mkdir(parents=True, exist_ok=True)
