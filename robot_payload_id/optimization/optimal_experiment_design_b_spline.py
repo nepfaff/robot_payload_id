@@ -27,7 +27,7 @@ import wandb
 from robot_payload_id.data import extract_numeric_data_matrix_autodiff
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import create_autodiff_plant
-from robot_payload_id.utils import JointData
+from robot_payload_id.utils import JointData, name_unnamed_constraints
 
 from .nevergrad_augmented_lagrangian import NevergradAugmentedLagrangian
 from .optimal_experiment_design_base import (
@@ -322,6 +322,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         self._trajopt.AddDurationConstraint(
             lb=min_trajectory_duration, ub=max_trajectory_duration
         )
+        name_unnamed_constraints(self._prog, "duration")
         self._add_bound_constraints()
         self._add_start_and_end_point_constraints()
         self._add_collision_constraints()
@@ -483,29 +484,36 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             lb=self._plant.GetPositionLowerLimits(),
             ub=self._plant.GetPositionUpperLimits(),
         )
+        name_unnamed_constraints(self._prog, "positionBounds")
         self._trajopt.AddVelocityBounds(
             lb=self._plant.GetVelocityLowerLimits(),
             ub=self._plant.GetVelocityUpperLimits(),
         )
+        name_unnamed_constraints(self._prog, "velocityBounds")
         self._trajopt.AddAccelerationBounds(
             lb=self._plant.GetAccelerationLowerLimits(),
             ub=self._plant.GetAccelerationUpperLimits(),
         )
+        name_unnamed_constraints(self._prog, "accelerationBounds")
 
     def _add_start_and_end_point_constraints(self) -> None:
         """Add constraints to start and end with zero velocities/ accelerations."""
         self._trajopt.AddPathVelocityConstraint(
             lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
         )
+        name_unnamed_constraints(self._prog, "startVelocity")
         self._trajopt.AddPathVelocityConstraint(
             lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
         )
+        name_unnamed_constraints(self._prog, "endVelocity")
         self._trajopt.AddPathAccelerationConstraint(
             lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
         )
+        name_unnamed_constraints(self._prog, "startAcceleration")
         self._trajopt.AddPathAccelerationConstraint(
             lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
         )
+        name_unnamed_constraints(self._prog, "endAcceleration")
 
     def _add_collision_constraints(self, min_distance: float = 0.01) -> None:
         """Add collision avoidance constraints."""
@@ -517,6 +525,9 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         evaluate_at_s = np.linspace(0, 1, int(3 * self._max_trajectory_duration * 100))
         for s in evaluate_at_s:
             self._trajopt.AddPathPositionConstraint(constraint, s)
+            name_unnamed_constraints(
+                self._prog, f"collisionAvoidance_normalized_time_{s}"
+            )
 
     def optimize(self) -> BsplineTrajectoryAttributes:
         # Compute the initial Lagrange multiplier guess
