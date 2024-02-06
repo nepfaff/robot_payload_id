@@ -289,6 +289,7 @@ class NevergradAugmentedLagrangian:
                 },
             }
         )
+        wandb.run.summary["num_constraints"] = len(constraints)
 
     def solve(
         self,
