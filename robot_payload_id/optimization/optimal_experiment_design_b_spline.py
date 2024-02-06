@@ -166,6 +166,7 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
         self._min_trajectory_duration = min_trajectory_duration
         self._max_trajectory_duration = max_trajectory_duration
         self._logging_path = logging_path
+        self._num_control_points = num_control_points
 
         # Create optimization problem
         self._initial_traj_guess = (
@@ -348,7 +349,11 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
     ) -> BsplineTrajectoryAttributes:
         """Extracts the B-spline trajectory attributes from the decision variable
         values."""
-        control_points = np.asarray(var_values[:-1]).reshape((self._num_joints, -1))
+        control_points = (
+            np.array(var_values[:-1])
+            .reshape((self._num_control_points, self._num_joints))
+            .T
+        )
         traj_duration = np.abs(var_values[-1])
         scaled_knots = np.array(self._trajopt.basis().knots()) * traj_duration
         assert scaled_knots[0] == 0.0, "Trajectory must start at time 0!"
