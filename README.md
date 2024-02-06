@@ -46,7 +46,26 @@ python scripts/design_optimal_excitation_trajectories.py  \
 --num_fourier_terms 5 --num_timesteps 1000 --use_one_link_arm --logging_path logs/traj
 ```
 
-#### Visualize the designed trajectories
+### Use a Fourier series trajectory as an initial guess for BSpline trajectory optimization
+
+First, convert the optimized Fourier series trajectory into a BSpline trajectory:
+```bash
+python scripts/create_bspline_traj_from_fourier_series.py \
+--traj_parameter_path logs/fourier_series_traj \
+--save_dir logs/converted_trajs/bspline_traj \
+--num_control_points_initial 30 --num_timesteps 30
+```
+
+Second, use the converted trajectory as the initial guess:
+```bash
+python scripts/design_optimal_excitation_trajectories.py  \
+--optimizer "black_box" --cost_function "condition_number_and_e_optimality" \
+--num_timesteps 1000 --use_one_link_arm --logging_path logs/traj_bspline \
+--traj_initial logs/converted_trajs/bspline_traj --use_bspline \
+--num_control_points 30
+```
+
+### Visualize the designed trajectories
 
 Make sure to use the same parameters for `num_timesteps` and `time_horizon` as were used
 for the optimal trajectory design.
