@@ -326,8 +326,6 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         self._add_start_and_end_point_constraints()
         self._add_collision_constraints()
 
-        # TODO: Make method configurable. This should be configurable for all Nevergrad
-        # optimizers.
         self._ng_al = NevergradAugmentedLagrangian(
             max_al_iterations=max_al_iterations,
             budget_per_iteration=budget_per_iteration,
@@ -443,7 +441,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
 
         # NOTE: This might lead to running out of memory for large matrices. W_data
         # is sparse and hence it might be possible to use a sparse SVD. However,
-        # this would make reconstruction difficutl.
+        # this would make reconstruction difficult.
         logging.info(
             "Computing SVD for base parameter mapping. This might take a while for "
             + "large data matrices."
