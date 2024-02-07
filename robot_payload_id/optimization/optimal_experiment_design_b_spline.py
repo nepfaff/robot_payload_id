@@ -17,6 +17,7 @@ from pydrake.all import (
     BsplineTrajectory,
     Context,
     KinematicTrajectoryOptimization,
+    LinearEqualityConstraint,
     MinimumDistanceLowerBoundConstraint,
     ModelInstanceIndex,
     MultibodyPlant,
@@ -498,22 +499,36 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
 
     def _add_start_and_end_point_constraints(self) -> None:
         """Add constraints to start and end with zero velocities/ accelerations."""
-        self._trajopt.AddPathVelocityConstraint(
-            lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
+        zero_constraint = LinearEqualityConstraint(
+            Aeq=np.concatenate(
+                (
+                    np.zeros((self._num_joints, self._num_joints)),
+                    np.eye(self._num_joints),
+                ),
+                axis=1,
+            ),
+            beq=np.zeros(self._num_joints),
+        )
+
+        self._trajopt.AddVelocityConstraintAtNormalizedTime(
+            constraint=zero_constraint, s=0
         )
         name_unnamed_constraints(self._prog, "startVelocity")
-        self._trajopt.AddPathVelocityConstraint(
-            lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
+        self._trajopt.AddVelocityConstraintAtNormalizedTime(
+            constraint=zero_constraint, s=1
         )
         name_unnamed_constraints(self._prog, "endVelocity")
-        self._trajopt.AddPathAccelerationConstraint(
-            lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
-        )
-        name_unnamed_constraints(self._prog, "startAcceleration")
-        self._trajopt.AddPathAccelerationConstraint(
-            lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
-        )
-        name_unnamed_constraints(self._prog, "endAcceleration")
+
+        # NOTE: These aren't meaningful at the moment as acceleration on the normalized
+        # time trajectory is different to acceleration on the actual trajectory
+        # self._trajopt.AddPathAccelerationConstraint(
+        #     lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
+        # )
+        # name_unnamed_constraints(self._prog, "startAcceleration")
+        # self._trajopt.AddPathAccelerationConstraint(
+        #     lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
+        # )
+        # name_unnamed_constraints(self._prog, "endAcceleration")
 
     def _add_collision_constraints(self, min_distance: float = 0.01) -> None:
         """Add collision avoidance constraints."""
