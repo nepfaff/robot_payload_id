@@ -13,6 +13,7 @@ from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
 )
 from robot_payload_id.environment import create_arm
+from robot_payload_id.optimization import BsplineTrajectoryAttributes
 from robot_payload_id.utils import JointData
 
 
@@ -93,13 +94,10 @@ def main():
             q0=q0_data,
         )
     else:
-        control_points = np.load(traj_parameter_path / "control_points.npy")
-        knots = np.load(traj_parameter_path / "knots.npy")
-        spline_order = int(np.load(traj_parameter_path / "spline_order.npy")[0])
-
+        traj_attrs = BsplineTrajectoryAttributes.load(traj_parameter_path)
         traj = BsplineTrajectory(
-            basis=BsplineBasis(order=spline_order, knots=knots),
-            control_points=control_points,
+            basis=BsplineBasis(order=traj_attrs.spline_order, knots=traj_attrs.knots),
+            control_points=traj_attrs.control_points,
         )
 
         # Sample the trajectory
