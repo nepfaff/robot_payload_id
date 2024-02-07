@@ -82,8 +82,8 @@ class BsplineTrajectoryAttributes:
     @classmethod
     def load(cls, path: Path) -> "BsplineTrajectoryAttributes":
         """Loads the B-spline trajectory attributes from disk."""
-        return BsplineTrajectoryAttributes(
-            spline_order=np.load(path / "spline_order.npy"),
+        return cls(
+            spline_order=int(np.load(path / "spline_order.npy")[0]),
             control_points=np.load(path / "control_points.npy"),
             knots=np.load(path / "knots.npy"),
         )
@@ -143,7 +143,7 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
                 traj_attrs_initial = BsplineTrajectoryAttributes.load(traj_initial)
                 traj_initial = BsplineTrajectory(
                     basis=BsplineBasis(
-                        order=int(traj_attrs_initial.spline_order),
+                        order=traj_attrs_initial.spline_order,
                         knots=traj_attrs_initial.knots,
                     ),
                     control_points=traj_attrs_initial.control_points,
@@ -156,6 +156,7 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
                 np.array(traj_initial.control_points()).shape[0] == num_control_points
             )
             assert np.array(traj_initial.control_points()).shape[1] == num_joints
+            logging.info("Using initial trajectory guess.")
 
         super().__init__(
             num_joints=num_joints,
@@ -170,7 +171,7 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
         self._num_control_points = num_control_points
 
         # Create optimization problem
-        self._initial_traj_guess = (
+        initial_traj_guess = (
             BsplineTrajectory(
                 basis=BsplineBasis(
                     order=spline_order,
@@ -183,12 +184,13 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
             if traj_initial is None
             else traj_initial
         )
-        self._trajopt = KinematicTrajectoryOptimization(self._initial_traj_guess)
+        self._trajopt = KinematicTrajectoryOptimization(initial_traj_guess)
         self._prog = self._trajopt.get_mutable_prog()
         wandb.run.summary["num_decision_variables"] = self._prog.num_vars()
 
-        if traj_initial is not None:
-            self._trajopt.SetInitialGuess(traj_initial)
+        self._initial_decision_variable_guess = self._prog.GetInitialGuess(
+            self._prog.decision_variables()
+        )
 
     @abstractmethod
     def optimize(self) -> BsplineTrajectoryAttributes:
@@ -292,12 +294,6 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             CostFunction.CONDITION_NUMBER_AND_E_OPTIMALITY: self._condition_number_and_e_optimality_cost,
         }
         self._cost_function_func = cost_function_to_cost[cost_function]
-
-        # Set initial parameter guess
-        self._initial_decision_variable_guess = np.append(
-            np.array(self._initial_traj_guess.control_points()).flatten(),
-            self._initial_traj_guess.end_time(),
-        )
 
         # Create autodiff plant components
         arm_components = create_arm(
