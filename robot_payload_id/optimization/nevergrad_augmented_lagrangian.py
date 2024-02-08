@@ -1,7 +1,7 @@
 import logging
 import multiprocessing as mp
 
-from typing import Callable, List, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import nevergrad as ng
 import numpy as np
@@ -302,6 +302,9 @@ class NevergradAugmentedLagrangian:
         nevergrad_set_bounds: bool = True,
         num_workers: int = 1,
         log_number_of_constraint_violations: bool = True,
+        log_check_point_callback: Optional[
+            Callable[[np.ndarray, int, Dict[str, Any]], None]
+        ] = None,
         numerically_stable_max_float: float = 1e10,
     ) -> Tuple[np.ndarray, float, np.ndarray]:
         """
@@ -326,6 +329,10 @@ class NevergradAugmentedLagrangian:
                 augmented Lagrangian object.
             log_number_of_constraint_violations: If set to True, the number of
                 constraint violations will be computed and logged.
+            log_check_point_callback: A callback function that is called at the end of
+                each augmented Lagrangian iteration. The callback function should take
+                three arguments: The current decision variables, the augmented
+                Lagrangian iteration, and a dictionary of additional information to log.
             numerically_stable_max_float: A numerically stable maximum float value. This
                 is used to replace inf in the bounds of the decision variables. Ideally,
                 this is a bit bigger than the largest value of interest but as small
@@ -426,6 +433,14 @@ class NevergradAugmentedLagrangian:
                     self._compute_and_log_constraint_violations(
                         nonsmooth_al=nonsmooth_al,
                         constraint_residue=constraint_residue,
+                    )
+
+                # Log check point
+                if log_check_point_callback is not None:
+                    log_check_point_callback(
+                        x_val,
+                        i,
+                        dict(wandb.run.summary) if wandb.run is not None else {},
                     )
 
         finally:
