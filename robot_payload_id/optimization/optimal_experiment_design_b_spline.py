@@ -135,8 +135,8 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
         """
         assert min_trajectory_duration > 0, "min_trajectory_duration must be positive!"
         assert (
-            min_trajectory_duration < max_trajectory_duration
-        ), "min_trajectory_duration must be less than max_trajectory_duration!"
+            min_trajectory_duration <= max_trajectory_duration
+        ), "min_trajectory_duration must be less than or equal to max_trajectory_duration!"
         # Validate initial guess
         if traj_initial is not None:
             if isinstance(traj_initial, Path):
@@ -228,6 +228,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         mu_initial: float,
         mu_multiplier: float,
         mu_max: float,
+        constraint_acceleration_endpoints: bool = False,
         nevergrad_method: str = "NGOpt",
         spline_order: int = 4,
         traj_initial: Optional[Union[BsplineTrajectory, Path]] = None,
@@ -257,6 +258,8 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             mu_multiplier (float): We will multiply mu by mu_multiplier if the
                 equality constraint is not satisfied.
             mu_max (float): The maximum value of the penalty weights.
+            constraint_acceleration_endpoints (bool): Whether to add acceleration
+                constraints at the start and end of the trajectory.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -285,6 +288,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
         self._plant_context = plant_context
         self._mu_initial = mu_initial
+        self._constraint_acceleration_endpoints = constraint_acceleration_endpoints
         self._nevergrad_method = nevergrad_method
 
         # Select cost function
@@ -316,10 +320,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
 
         # Add constraints
-        self._trajopt.AddDurationConstraint(
-            lb=min_trajectory_duration, ub=max_trajectory_duration
-        )
-        name_unnamed_constraints(self._prog, "duration")
+        self._add_traj_duration_constraint()
         self._add_bound_constraints()
         self._add_start_and_end_point_constraints()
         self._add_collision_constraints()
@@ -475,6 +476,17 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             W_dataTW_data_numeric, e_optimality_weight
         )
 
+    def _add_traj_duration_constraint(self) -> None:
+        if self._min_trajectory_duration == self._max_trajectory_duration:
+            self._prog.AddLinearEqualityConstraint(
+                self._prog.decision_variables()[-1] == self._max_trajectory_duration
+            )
+        else:
+            self._trajopt.AddDurationConstraint(
+                lb=self._min_trajectory_duration, ub=self._max_trajectory_duration
+            )
+        name_unnamed_constraints(self._prog, "duration")
+
     def _add_bound_constraints(self) -> None:
         """Add position, velocity, and acceleration bound constraints."""
         self._trajopt.AddPositionBounds(
@@ -515,16 +527,15 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
         name_unnamed_constraints(self._prog, "endVelocity")
 
-        # NOTE: These aren't meaningful at the moment as acceleration on the normalized
-        # time trajectory is different to acceleration on the actual trajectory
-        # self._trajopt.AddPathAccelerationConstraint(
-        #     lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
-        # )
-        # name_unnamed_constraints(self._prog, "startAcceleration")
-        # self._trajopt.AddPathAccelerationConstraint(
-        #     lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
-        # )
-        # name_unnamed_constraints(self._prog, "endAcceleration")
+        if self._constraint_acceleration_endpoints:
+            self._trajopt.AddPathAccelerationConstraint(
+                lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
+            )
+            name_unnamed_constraints(self._prog, "startAcceleration")
+            self._trajopt.AddPathAccelerationConstraint(
+                lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
+            )
+            name_unnamed_constraints(self._prog, "endAcceleration")
 
     def _add_collision_constraints(self, min_distance: float = 0.01) -> None:
         """Add collision avoidance constraints."""
