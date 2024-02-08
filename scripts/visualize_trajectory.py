@@ -120,6 +120,24 @@ def main():
             sample_times_s=sample_times_s,
         )
 
+    # Log some joint data stats
+    print(
+        "Max abs joint velocities: ",
+        np.max(np.abs(joint_data.joint_velocities), axis=0),
+    )
+    print(
+        "Mean abs joint velocities: ",
+        np.mean(np.abs(joint_data.joint_velocities), axis=0),
+    )
+    print(
+        "Max abs joint accelerations: ",
+        np.max(np.abs(joint_data.joint_accelerations), axis=0),
+    )
+    print(
+        "Mean abs joint accelerations: ",
+        np.mean(np.abs(joint_data.joint_accelerations), axis=0),
+    )
+
     simulator = Simulator(arm_components.diagram)
     simulator.set_target_realtime_rate(1.0)
 
