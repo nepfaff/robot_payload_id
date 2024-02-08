@@ -6,11 +6,12 @@ from abc import abstractmethod
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import nevergrad as ng
 import numpy as np
+import yaml
 
 from numpy import ndarray
 from pydrake.all import (
@@ -463,18 +464,6 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
             parametrization=parameterization,
             budget=budget,
         )
-        # self._optimizer = ng.families.NonObjectOptimizer(
-        #     method="NLOPT", random_restart=True
-        # )(
-        #     parametrization=parameterization,
-        #     budget=budget,
-        # )
-        # NOTE: Cost function must be pickable for parallelization
-        # self._optimizer = ng.optimizers.NGOpt(
-        #     parametrization=len(self._symbolic_vars),
-        #     budget=budget,
-        #     num_workers=16,
-        # )
         self._optimizer.suggest(parameterization.value)
         wandb.run.summary["optimizer_name"] = self._optimizer.name
 
@@ -536,7 +525,11 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         )
 
     def _log_optimization_result(
-        self, a_value: np.ndarray, b_value: np.ndarray, q0_value: np.ndarray
+        self,
+        a_value: np.ndarray,
+        b_value: np.ndarray,
+        q0_value: np.ndarray,
+        subpath: str = "",
     ) -> None:
         if self._logging_path is not None:
             # Create accumulated minimum loss plot
@@ -553,31 +546,27 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
                 plt.xlabel("Iteration")
                 plt.ylabel("Minimum loss")
                 plt.legend(["Accumulated minimum loss", "First minimum loss"])
-                plt.savefig(self._logging_path / "accumulated_min_losses.png")
+                plt.savefig(self._logging_path / subpath / "accumulated_min_losses.png")
 
-        np.save(os.path.join(wandb.run.dir, "a_value.npy"), a_value)
-        np.save(os.path.join(wandb.run.dir, "b_value.npy"), b_value)
-        np.save(os.path.join(wandb.run.dir, "q0_value.npy"), q0_value)
+        if wandb.run is not None:
+            np.save(os.path.join(wandb.run.dir, subpath, "a_value.npy"), a_value)
+            np.save(os.path.join(wandb.run.dir, subpath, "b_value.npy"), b_value)
+            np.save(os.path.join(wandb.run.dir, subpath, "q0_value.npy"), q0_value)
         if self._logging_path is not None:
-            np.save(self._logging_path / "a_value.npy", a_value)
-            np.save(self._logging_path / "b_value.npy", b_value)
-            np.save(self._logging_path / "q0_value.npy", q0_value)
+            np.save(self._logging_path / subpath / "a_value.npy", a_value)
+            np.save(self._logging_path / subpath / "b_value.npy", b_value)
+            np.save(self._logging_path / subpath / "q0_value.npy", q0_value)
 
     def _log_base_params_mapping(self, base_param_mapping: np.ndarray) -> None:
-        np.save(
-            os.path.join(wandb.run.dir, "base_param_mapping.npy"),
-            base_param_mapping,
-        )
+        if wandb.run is not None:
+            np.save(
+                os.path.join(wandb.run.dir, "base_param_mapping.npy"),
+                base_param_mapping,
+            )
         if self._logging_path is not None:
             np.save(self._logging_path / "base_param_mapping.npy", base_param_mapping)
 
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
-        # Optimize in parallel
-        # with futures.ProcessPoolExecutor(max_workers=self._optimizer.num_workers) as executor:
-        #     recommendation = self._optimizer.minimize(
-        #         self._combined_objective, executor=executor, batch_mode=True
-        #     )
-
         logging.info("Starting optimization...")
         optimization_start = time.time()
         recommendation = self._optimizer.minimize(self._combined_objective)
@@ -959,6 +948,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         )
         wandb.run.summary["num_params"] = self._base_param_mapping.shape[0]
         wandb.run.summary["num_identifiable_params"] = self._base_param_mapping.shape[1]
+        self._log_base_params_mapping(self._base_param_mapping)
 
     def _compute_W_data(
         self,
@@ -1283,6 +1273,28 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 f"collisionAvoidance_time_{i}",
             )
 
+    def _extract_and_log_optimization_result(
+        self,
+        var_values: np.ndarray,
+        al_idx: int,
+        meta_data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Augmented Lagrangian callback to extract and log the optimization result at
+        each augmented Lagrangian iteration."""
+        subpath = f"al_{al_idx}"
+        (self._logging_path / subpath).mkdir(exist_ok=True)
+
+        a_value, b_value, q0_value = np.split(
+            var_values, [len(self._a_var), len(self._a_var) + len(self._b_var)]
+        )
+        self._log_optimization_result(a_value, b_value, q0_value, subpath=subpath)
+
+        yaml_path = self._logging_path / subpath / "meta_data.yaml"
+        with open(yaml_path, "w") as file:
+            yaml.dump(meta_data, file)
+
+        logging.info(f"Logged results for augmented Lagrangian iteration {al_idx}.")
+
     def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
         # Compute the initial Lagrange multiplier guess
         num_lambda = self._ng_al.compute_num_lambda(self._prog)
@@ -1295,15 +1307,13 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             lambda_val=lambda_initial,
             mu=self._mu_initial,
             nevergrad_set_bounds=True,
+            log_check_point_callback=self._extract_and_log_optimization_result,
         )
 
         # Log optimization result
         a_value, b_value, q0_value = np.split(
             x_val, [len(self._a_var), len(self._a_var) + len(self._b_var)]
         )
-        self._log_optimization_result(a_value, b_value, q0_value)
-        self._log_base_params_mapping(self._base_param_mapping)
-
         return a_value, b_value, q0_value
 
     @classmethod
@@ -1409,13 +1419,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             mu=mu_initial,
             nevergrad_set_bounds=True,
             num_workers=num_workers,
+            log_check_point_callback=optim._extract_and_log_optimization_result,
         )
 
-        # Log optimization result
         a_value, b_value, q0_value = np.split(
             x_val, [len(optim._a_var), len(optim._a_var) + len(optim._b_var)]
         )
-        optim._log_optimization_result(a_value, b_value, q0_value)
-        optim._log_base_params_mapping(optim._base_param_mapping)
-
         return a_value, b_value, q0_value

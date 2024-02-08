@@ -6,9 +6,10 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
+import yaml
 
 from numpy import ndarray
 from pydrake.all import (
@@ -313,6 +314,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
         wandb.run.summary["num_params"] = self._base_param_mapping.shape[0]
         wandb.run.summary["num_identifiable_params"] = self._base_param_mapping.shape[1]
+        self._log_base_params_mapping(self._base_param_mapping)
 
         # Add cost
         self._prog.AddCost(
@@ -334,10 +336,11 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
 
     def _log_base_params_mapping(self, base_param_mapping: np.ndarray) -> None:
-        np.save(
-            os.path.join(wandb.run.dir, "base_param_mapping.npy"),
-            base_param_mapping,
-        )
+        if wandb.run is not None:
+            np.save(
+                os.path.join(wandb.run.dir, "base_param_mapping.npy"),
+                base_param_mapping,
+            )
         if self._logging_path is not None:
             np.save(self._logging_path / "base_param_mapping.npy", base_param_mapping)
 
@@ -551,6 +554,28 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 self._prog, f"collisionAvoidance_normalized_time_{s}"
             )
 
+    def _extract_and_log_optimization_result(
+        self,
+        var_values: np.ndarray,
+        al_idx: int,
+        meta_data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Augmented Lagrangian callback to extract and log the optimization result at
+        each augmented Lagrangian iteration."""
+        subpath = f"al_{al_idx}"
+        (self._logging_path / subpath).mkdir(exist_ok=True)
+
+        bspline_traj_attributes = self._extract_bspline_trajectory_attributes(
+            var_values
+        )
+        bspline_traj_attributes.log(self._logging_path / subpath)
+
+        yaml_path = self._logging_path / subpath / "meta_data.yaml"
+        with open(yaml_path, "w") as file:
+            yaml.dump(meta_data, file)
+
+        logging.info(f"Logged results for augmented Lagrangian iteration {al_idx}.")
+
     def optimize(self) -> BsplineTrajectoryAttributes:
         # Compute the initial Lagrange multiplier guess
         num_lambda = self._ng_al.compute_num_lambda(self._prog)
@@ -563,11 +588,10 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             lambda_val=lambda_initial,
             mu=self._mu_initial,
             nevergrad_set_bounds=True,
+            log_check_point_callback=self._extract_and_log_optimization_result,
         )
 
         bspline_traj_attributes = self._extract_bspline_trajectory_attributes(x_val)
-        bspline_traj_attributes.log(self._logging_path)
-
         return bspline_traj_attributes
 
     @classmethod
@@ -681,11 +705,8 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             mu=mu_initial,
             nevergrad_set_bounds=True,
             num_workers=num_workers,
+            log_check_point_callback=optim._extract_and_log_optimization_result,
         )
 
-        # Log optimization result
         bspline_traj_attributes = optim._extract_bspline_trajectory_attributes(x_val)
-        bspline_traj_attributes.log(optim._logging_path)
-        optim._log_base_params_mapping(optim._base_param_mapping)
-
         return bspline_traj_attributes
