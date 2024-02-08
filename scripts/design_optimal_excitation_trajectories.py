@@ -105,14 +105,14 @@ def main():
     parser.add_argument(
         "--mu_initial",
         type=float,
-        default=10.0,
+        default=5.0,
         help="Initial value of the augmented Lagrangian parameter. Only used for "
         + "black-box with augmented Lagrangian optimization.",
     )
     parser.add_argument(
         "--mu_multiplier",
         type=float,
-        default=2.0,
+        default=1.5,
         help="Multiplier for the augmented Lagrangian parameter. Only used for black-box "
         + "with augmented Lagrangian optimization.",
     )
