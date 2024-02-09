@@ -12,6 +12,7 @@ from pydrake.all import (
     MathematicalProgram,
 )
 from tqdm import tqdm
+from wandb.sdk.wandb_summary import SummarySubDict
 
 import wandb
 
@@ -437,11 +438,12 @@ class NevergradAugmentedLagrangian:
 
                 # Log check point
                 if log_check_point_callback is not None:
-                    log_check_point_callback(
-                        x_val,
-                        i,
-                        dict(wandb.run.summary) if wandb.run is not None else {},
-                    )
+                    meta_data = dict(wandb.run.summary) if wandb.run is not None else {}
+                    for key, value in meta_data.items():
+                        if isinstance(value, SummarySubDict):
+                            meta_data[key] = dict(value)
+
+                    log_check_point_callback(x_val, i, meta_data)
 
         finally:
             if pool is not None:

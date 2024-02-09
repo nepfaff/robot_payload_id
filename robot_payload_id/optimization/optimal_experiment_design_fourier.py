@@ -549,6 +549,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
                 plt.savefig(self._logging_path / subpath / "accumulated_min_losses.png")
 
         if wandb.run is not None:
+            if not os.path.exists(os.path.join(wandb.run.dir, subpath)):
+                os.mkdir(os.path.join(wandb.run.dir, subpath))
             np.save(os.path.join(wandb.run.dir, subpath, "a_value.npy"), a_value)
             np.save(os.path.join(wandb.run.dir, subpath, "b_value.npy"), b_value)
             np.save(os.path.join(wandb.run.dir, subpath, "q0_value.npy"), q0_value)

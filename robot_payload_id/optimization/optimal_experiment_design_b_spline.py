@@ -67,6 +67,7 @@ class BsplineTrajectoryAttributes:
         """Logs the B-spline trajectory attributes to wandb. If logging_path is not
         None, then the attributes are also saved to disk."""
         if wandb.run is not None:
+            # NOTE: This overwrites the previous log
             np.save(
                 os.path.join(wandb.run.dir, "spline_order.npy"),
                 np.array([self.spline_order]),
