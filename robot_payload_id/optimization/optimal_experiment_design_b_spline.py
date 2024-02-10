@@ -78,8 +78,8 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
                 This must be positive.
             max_trajectory_duration (float): The maximum duration of the trajectory.
             spline_order (int): The order of the B-spline basis to use.
-            traj_initial (Optional[BsplineTrajectory]): The initial guess for the
-                trajectory. If None, then a zero trajectory over the interval
+            traj_initial (Optional[Union[BsplineTrajectory, Path]]): The initial guess
+                for the trajectory. If None, then a zero trajectory over the interval
                 [0, (min_trajectory_duration + max_trajectory_duration) / 2.0] is used.
                 If a path is provided, then the trajectory is loaded from the path.
                 Such a path must be a directory containing 'spline_order.npy',
@@ -218,8 +218,8 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
             spline_order (int): The order of the B-spline basis to use.
-            traj_initial (Optional[BsplineTrajectory]): The initial guess for the
-                trajectory. If None, then a zero trajectory over the interval
+            traj_initial (Optional[Union[BsplineTrajectory, Path]]): The initial guess
+                for the trajectory. If None, then a zero trajectory over the interval
                 [0, (min_trajectory_duration + max_trajectory_duration) / 2.0] is used.
                 If a path is provided, then the trajectory is loaded from the path.
                 Such a path must be a directory containing 'spline_order.npy',
