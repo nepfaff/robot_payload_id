@@ -46,6 +46,9 @@ python scripts/design_optimal_excitation_trajectories.py  \
 --num_fourier_terms 5 --num_timesteps 1000 --use_one_link_arm --logging_path logs/traj
 ```
 
+*Hint:* Run on multiple cores using `--num_workers`. When using multiple workers,
+using `--log_level ERROR` is needed for nice progress bars.
+
 ### Use a Fourier series trajectory as an initial guess for BSpline trajectory optimization
 
 First, convert the optimized Fourier series trajectory into a BSpline trajectory:
@@ -53,7 +56,7 @@ First, convert the optimized Fourier series trajectory into a BSpline trajectory
 python scripts/create_bspline_traj_from_fourier_series.py \
 --traj_parameter_path logs/fourier_series_traj \
 --save_dir logs/converted_trajs/bspline_traj \
---num_control_points_initial 30 --num_timesteps 30
+--num_control_points_initial 30 --num_timesteps 1000
 ```
 
 Second, use the converted trajectory as the initial guess:
@@ -64,6 +67,10 @@ python scripts/design_optimal_excitation_trajectories.py  \
 --traj_initial logs/converted_trajs/bspline_traj --use_bspline \
 --num_control_points 30
 ```
+
+*Note:* When using multiple workers for BSpline optimization, it is best to use `CMAstd`
+as the optimizer. The default optimizers seem to have bugs (see
+[issue](https://github.com/facebookresearch/nevergrad/issues/1593)).
 
 ### Visualize the designed trajectories
 
