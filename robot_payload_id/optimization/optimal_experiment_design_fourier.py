@@ -1339,6 +1339,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         robot_model_instance_name: str,
         num_workers: int,
         nevergrad_method: str = "NGOpt",
+        traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         logging_path: Optional[Path] = None,
     ) -> FourierSeriesTrajectoryAttributes:
         """Optimizes the trajectory parameters in parallel.
@@ -1368,6 +1369,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
+            traj_initial (Union[FourierSeriesTrajectoryAttributes, Path]): The initial
+                trajectory parameters. If a path is provided, then the trajectory
+                parameters are loaded from the path. If None, then the initial guess is
+                randomly generated.
             logging_path (Path): The path to write the optimization logs to. If None,
                 then no logs are written.
 
@@ -1404,6 +1409,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 mu_max=mu_max,
                 model_path=model_path,
                 nevergrad_method=nevergrad_method,
+                traj_initial=traj_initial,
                 logging_path=logging_path,
             )
 
