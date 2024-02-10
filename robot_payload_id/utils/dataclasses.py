@@ -1,10 +1,15 @@
+import os
+
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Optional, Union
 
 import numpy as np
 import pydrake.symbolic as sym
 
 from pydrake.all import (
+    BsplineBasis,
+    BsplineTrajectory,
     Context,
     Diagram,
     Meshcat,
@@ -13,6 +18,8 @@ from pydrake.all import (
     TrajectorySource,
     VectorLogSink,
 )
+
+import wandb
 
 
 @dataclass
@@ -211,3 +218,132 @@ class ArmPlantComponents:
     """The plant parameters."""
     state_variables: Optional[SymJointStateVariables] = None
     """The symbolic plant state variables."""
+
+
+@dataclass
+class BsplineTrajectoryAttributes:
+    """A data class to hold the attributes of a B-spline trajectory."""
+
+    spline_order: int
+    """The order of the B-spline basis to use."""
+    control_points: np.ndarray
+    """The control points of the B-spline trajectory of shape
+    (num_joints, num_control_points)."""
+    knots: np.ndarray
+    """The knots of the B-spline basis of shape (num_knots,)."""
+
+    @classmethod
+    def from_bspline_trajectory(cls, traj: BsplineTrajectory) -> None:
+        """Sets the attributes from a B-spline trajectory."""
+        assert traj.start_time() == 0.0, "Trajectory must start at time 0!"
+        return cls(
+            spline_order=traj.basis().order(),
+            control_points=traj.control_points(),
+            knots=np.array(traj.basis().knots()) * traj.end_time(),
+        )
+
+    def log(self, logging_path: Optional[Path] = None) -> None:
+        """Logs the B-spline trajectory attributes to wandb. If logging_path is not
+        None, then the attributes are also saved to disk."""
+        if wandb.run is not None:
+            # NOTE: This overwrites the previous log
+            np.save(
+                os.path.join(wandb.run.dir, "spline_order.npy"),
+                np.array([self.spline_order]),
+            )
+            np.save(
+                os.path.join(wandb.run.dir, "control_points.npy"), self.control_points
+            )
+            np.save(os.path.join(wandb.run.dir, "knots.npy"), self.knots)
+        if logging_path is not None:
+            np.save(logging_path / "spline_order.npy", np.array([self.spline_order]))
+            np.save(logging_path / "control_points.npy", self.control_points)
+            np.save(logging_path / "knots.npy", self.knots)
+
+    @classmethod
+    def load(cls, path: Path) -> "BsplineTrajectoryAttributes":
+        """Loads the B-spline trajectory attributes from disk."""
+        return cls(
+            spline_order=int(np.load(path / "spline_order.npy")[0]),
+            control_points=np.load(path / "control_points.npy"),
+            knots=np.load(path / "knots.npy"),
+        )
+
+    def to_bspline_trajectory(self) -> BsplineTrajectory:
+        """Converts the attributes to a B-spline trajectory."""
+        return BsplineTrajectory(
+            basis=BsplineBasis(order=self.spline_order, knots=self.knots),
+            control_points=self.control_points,
+        )
+
+
+@dataclass
+class FourierSeriesTrajectoryAttributes:
+    """A data class to hold the attributes of a finite Fourier series trajectory."""
+
+    a_values: int
+    """The `a` parameters of shape (num_joints, num_fourier_terms)."""
+    b_values: np.ndarray
+    """The `b` parameters of shape (num_joints, num_fourier_terms)."""
+    q0_values: np.ndarray
+    """The `q0` parameters of shape (num_joints,)."""
+    omega: float
+    """The frequency of the trajectory in radians."""
+
+    def log(self, logging_path: Optional[Path] = None) -> None:
+        """Logs the trajectory attributes to wandb. If logging_path is not None, then
+        the attributes are also saved to disk."""
+        if wandb.run is not None:
+            # NOTE: This overwrites the previous log
+            np.save(os.path.join(wandb.run.dir, "a_value.npy"), self.a_values)
+            np.save(os.path.join(wandb.run.dir, "b_value.npy"), self.b_values)
+            np.save(os.path.join(wandb.run.dir, "q0_value.npy"), self.q0_values)
+            np.save(os.path.join(wandb.run.dir, "omega.npy"), np.array([self.omega]))
+        if logging_path is not None:
+            np.save(logging_path / "a_value.npy", self.a_values)
+            np.save(logging_path / "b_value.npy", self.b_values)
+            np.save(logging_path / "q0_value.npy", self.q0_values)
+            np.save(logging_path / "omega.npy", np.array([self.omega]))
+
+    @classmethod
+    def from_flattened_data(
+        cls,
+        a_values: np.ndarray,
+        b_values: np.ndarray,
+        q0_values: np.ndarray,
+        omega: float,
+        num_joints: int,
+    ) -> "FourierSeriesTrajectoryAttributes":
+        """Creates a FourierSeriesTrajectoryAttributes object from flattened data."""
+        return cls(
+            a_values=a_values.reshape((num_joints, -1), order="F"),
+            b_values=b_values.reshape((num_joints, -1), order="F"),
+            q0_values=q0_values,
+            omega=omega,
+        )
+
+    @classmethod
+    def load(
+        cls, path: Path, num_joints: Optional[int] = None
+    ) -> "FourierSeriesTrajectoryAttributes":
+        """Loads the trajectory attributes from disk."""
+        a_values = np.load(path / "a_value.npy")
+        b_values = np.load(path / "b_value.npy")
+        q0_values = np.load(path / "q0_value.npy")
+        omega = int(np.load(path / "omega.npy")[0])
+
+        if len(a_values.shape) == 1:
+            assert (
+                num_joints is not None
+            ), "num_joints must be provided when loading flattened data!"
+            return cls.from_flattened_data(
+                a_values=a_values,
+                b_values=b_values,
+                q0_values=q0_values,
+                omega=omega,
+                num_joints=num_joints,
+            )
+
+        return cls(
+            a_values=a_values, b_values=b_values, q0_values=q0_values, omega=omega
+        )

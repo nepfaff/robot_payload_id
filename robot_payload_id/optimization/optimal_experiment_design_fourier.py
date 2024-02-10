@@ -6,14 +6,12 @@ from abc import abstractmethod
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
-import matplotlib.pyplot as plt
 import nevergrad as ng
 import numpy as np
 import yaml
 
-from numpy import ndarray
 from pydrake.all import (
     AugmentedLagrangianNonsmooth,
     AutoDiffXd,
@@ -43,10 +41,14 @@ from robot_payload_id.symbolic import (
     eval_expression_mat_derivative,
     eval_expression_vec,
 )
-from robot_payload_id.utils import JointData, name_constraint
+from robot_payload_id.utils import (
+    FourierSeriesTrajectoryAttributes,
+    JointData,
+    name_constraint,
+)
 
 from .nevergrad_augmented_lagrangian import NevergradAugmentedLagrangian
-from .nevergrad_util import NevergradLossLogger, NevergradWandbLogger
+from .nevergrad_util import NevergradWandbLogger
 from .optimal_experiment_design_base import (
     CostFunction,
     ExcitationTrajectoryOptimizerBase,
@@ -100,12 +102,11 @@ class ExcitationTrajectoryOptimizerFourier(ExcitationTrajectoryOptimizerBase):
         self._time_horizon = time_horizon
 
     @abstractmethod
-    def optimize(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def optimize(self) -> FourierSeriesTrajectoryAttributes:
         """Optimizes the trajectory parameters.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray]: The optimized trajectory
-                parameters `a`, `b`, and `q0`.
+            FourierSeriesTrajectoryAttributes: The optimized trajectory parameters.
         """
         raise NotImplementedError
 
@@ -191,10 +192,13 @@ class ExcitationTrajectoryOptimizerFourierSnopt(ExcitationTrajectoryOptimizerFou
         self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=num_timesteps,
             time_horizon=time_horizon,
-            a=self._a_var.reshape((num_joints, num_fourier_terms)),
-            b=self._b_var.reshape((num_joints, num_fourier_terms)),
-            q0=self._q0_var,
-            omega=omega,
+            traj_attrs=FourierSeriesTrajectoryAttributes.from_flattened_data(
+                a_values=self._a_var,
+                b_values=self._b_var,
+                q0_values=self._q0_var,
+                omega=omega,
+                num_joints=num_joints,
+            ),
         )
         W_data_raw = reexpress_symbolic_data_matrix(
             W_sym=W_sym,
@@ -306,13 +310,13 @@ class ExcitationTrajectoryOptimizerFourierSnopt(ExcitationTrajectoryOptimizerFou
         self._prog.SetInitialGuess(self._b_var, b)
         self._prog.SetInitialGuess(self._q0_var, q0)
 
-    def optimize(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def optimize(self) -> FourierSeriesTrajectoryAttributes:
         """Optimizes the trajectory parameters using SNOPT.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray]: The optimized trajectory
-                parameters `a`, `b`, and `q0`. NOTE: The final parameters are returned
-                regardless of whether the optimization was successful.
+            FourierSeriesTrajectoryAttributes: The optimized trajectory
+                parameters. NOTE: The final parameters are returned regardless of
+                whether the optimization was successful.
         """
         logging.info("Starting optimization...")
         optimization_start = time.time()
@@ -353,10 +357,11 @@ class ExcitationTrajectoryOptimizerFourierSnopt(ExcitationTrajectoryOptimizerFou
                 ),
             )
 
-        return (
-            res.GetSolution(self._a_var),
-            res.GetSolution(self._b_var),
-            res.GetSolution(self._q0_var),
+        return FourierSeriesTrajectoryAttributes(
+            a_values=res.GetSolution(self._a_var),
+            b_values=res.GetSolution(self._b_var),
+            q0_values=res.GetSolution(self._q0_var),
+            omega=self._omega,
         )
 
 
@@ -471,8 +476,6 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
             self._optimizer.register_callback("tell", ng.callbacks.ProgressBar())
         if logging_path is not None:
             logging_path.mkdir(parents=True, exist_ok=True)
-            self._loss_logger = NevergradLossLogger(logging_path / "losses.txt")
-            self._optimizer.register_callback("tell", self._loss_logger)
         self._optimizer.register_callback("tell", NevergradWandbLogger(self._optimizer))
 
         cost_function_to_cost = {
@@ -519,45 +522,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         wandb.log({"num_joint_limit_violations": num_violations})
         return num_violations
 
-    def _combined_objective(self, var_values: ndarray) -> float:
+    def _combined_objective(self, var_values: np.ndarray) -> float:
         return self._cost_function_func(var_values) + 100.0 * self._joint_limit_penalty(
             var_values
         )
-
-    def _log_optimization_result(
-        self,
-        a_value: np.ndarray,
-        b_value: np.ndarray,
-        q0_value: np.ndarray,
-        subpath: str = "",
-    ) -> None:
-        if self._logging_path is not None:
-            # Create accumulated minimum loss plot
-            losses = self._loss_logger.load()
-            if len(losses) > 0:
-                # Clip to make graph more readable
-                cliped_losses = np.clip(losses, a_min=None, a_max=1e8)
-                accumulated_min_losses = np.minimum.accumulate(cliped_losses)
-                min_loss_first_idx = np.argmin(accumulated_min_losses)
-                plt.plot(accumulated_min_losses)
-                plt.axvline(x=min_loss_first_idx, color="r")
-                plt.yscale("log")
-                plt.title("Accumulated Minimum Loss")
-                plt.xlabel("Iteration")
-                plt.ylabel("Minimum loss")
-                plt.legend(["Accumulated minimum loss", "First minimum loss"])
-                plt.savefig(self._logging_path / subpath / "accumulated_min_losses.png")
-
-        if wandb.run is not None:
-            if not os.path.exists(os.path.join(wandb.run.dir, subpath)):
-                os.mkdir(os.path.join(wandb.run.dir, subpath))
-            np.save(os.path.join(wandb.run.dir, subpath, "a_value.npy"), a_value)
-            np.save(os.path.join(wandb.run.dir, subpath, "b_value.npy"), b_value)
-            np.save(os.path.join(wandb.run.dir, subpath, "q0_value.npy"), q0_value)
-        if self._logging_path is not None:
-            np.save(self._logging_path / subpath / "a_value.npy", a_value)
-            np.save(self._logging_path / subpath / "b_value.npy", b_value)
-            np.save(self._logging_path / subpath / "q0_value.npy", q0_value)
 
     def _log_base_params_mapping(self, base_param_mapping: np.ndarray) -> None:
         if wandb.run is not None:
@@ -568,7 +536,25 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         if self._logging_path is not None:
             np.save(self._logging_path / "base_param_mapping.npy", base_param_mapping)
 
-    def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
+    def _extract_fourier_trajectory_attributes(
+        self, var_values: np.ndarray
+    ) -> FourierSeriesTrajectoryAttributes:
+        """Extracts the Fourier series trajectory attributes from the decision variable
+        values."""
+        a_values, b_values, q0_values = (
+            var_values[: len(self._a_var)],
+            var_values[len(self._a_var) : len(self._a_var) + len(self._b_var)],
+            var_values[len(self._a_var) + len(self._b_var) :],
+        )
+        return FourierSeriesTrajectoryAttributes.from_flattened_data(
+            a_values=a_values,
+            b_values=b_values,
+            q0_values=q0_values,
+            omega=self._omega,
+            num_joints=self._num_joints,
+        )
+
+    def optimize(self) -> FourierSeriesTrajectoryAttributes:
         logging.info("Starting optimization...")
         optimization_start = time.time()
         recommendation = self._optimizer.minimize(self._combined_objective)
@@ -582,16 +568,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         wandb.run.summary["final_loss"] = final_loss
 
         # Log optimization result
-        a_value, b_value, q0_value = (
-            recommendation.value[: len(self._a_var)],
-            recommendation.value[
-                len(self._a_var) : len(self._a_var) + len(self._b_var)
-            ],
-            recommendation.value[len(self._a_var) + len(self._b_var) :],
-        )
-        self._log_optimization_result(a_value, b_value, q0_value)
+        traj_attrs = self._extract_fourier_trajectory_attributes(recommendation.value)
+        traj_attrs.log(logging_path=self._logging_path)
 
-        return a_value, b_value, q0_value
+        return traj_attrs
 
 
 class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
@@ -646,10 +626,6 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
                 then the symbolic data matrix is re-computed.
             model_path (str): The path to the model file (e.g. SDFormat, URDF). Only
                 used if `data_matrix_dir_path` is None.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray]: The optimized trajectory
-                parameters `a`, `b`, and `q0`.
         """
         super().__init__(
             num_joints=num_joints,
@@ -674,10 +650,13 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
         self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=num_timesteps,
             time_horizon=time_horizon,
-            a=self._a_var.reshape((num_joints, num_fourier_terms)),
-            b=self._b_var.reshape((num_joints, num_fourier_terms)),
-            q0=self._q0_var,
-            omega=omega,
+            traj_attrs=FourierSeriesTrajectoryAttributes.from_flattened_data(
+                a_values=self._a_var,
+                b_values=self._b_var,
+                q0_values=self._q0_var,
+                omega=omega,
+                num_joints=num_joints,
+            ),
         )
 
         # Express symbolic data matrix in terms of decision variables
@@ -758,10 +737,6 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolicNumeric(
                 then the symbolic data matrix is re-computed.
             model_path (str): The path to the model file (e.g. SDFormat, URDF). Only
                 used if `data_matrix_dir_path` is None.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray]: The optimized trajectory
-                parameters `a`, `b`, and `q0`.
         """
         super().__init__(
             num_joints=num_joints,
@@ -789,10 +764,13 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolicNumeric(
         self._joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=num_timesteps,
             time_horizon=time_horizon,
-            a=self._a_var.reshape((num_joints, num_fourier_terms)),
-            b=self._b_var.reshape((num_joints, num_fourier_terms)),
-            q0=self._q0_var,
-            omega=omega,
+            traj_attrs=FourierSeriesTrajectoryAttributes.from_flattened_data(
+                a_values=self._a_var,
+                b_values=self._b_var,
+                q0_values=self._q0_var,
+                omega=omega,
+                num_joints=num_joints,
+            ),
         )
 
         self._joint_symbolic_vars_expressions = np.concatenate(
@@ -958,16 +936,11 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         base_param_mapping: Optional[np.ndarray] = None,
         use_progress_bar: bool = False,
     ) -> np.ndarray:
-        a, b, q0 = np.split(
-            var_values, [len(self._a_var), len(self._a_var) + len(self._b_var)]
-        )
+        traj_attrs = self._extract_fourier_trajectory_attributes(var_values)
         joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=self._num_timesteps,
             time_horizon=self._time_horizon,
-            a=a.reshape((self._num_joints, self._num_fourier_terms), order="F"),
-            b=b.reshape((self._num_joints, self._num_fourier_terms), order="F"),
-            q0=q0,
-            omega=self._omega,
+            traj_attrs=traj_attrs,
             use_progress_bar=use_progress_bar,
         )
 
@@ -1027,16 +1000,11 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         return W_dataTW_data
 
     def _compute_joint_data(self, var_values: np.ndarray) -> JointData:
-        a, b, q0 = np.split(
-            var_values, [len(self._a_var), len(self._a_var) + len(self._b_var)]
-        )
+        traj_attrs = self._extract_fourier_trajectory_attributes(var_values)
         joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             num_timesteps=self._num_timesteps,
             time_horizon=self._time_horizon,
-            a=a.reshape((self._num_joints, self._num_fourier_terms), order="F"),
-            b=b.reshape((self._num_joints, self._num_fourier_terms), order="F"),
-            q0=q0,
-            omega=self._omega,
+            traj_attrs=traj_attrs,
             use_progress_bar=False,
         )
         return joint_data
@@ -1044,10 +1012,6 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
     def _compute_joint_positions(self, var_values: np.ndarray) -> np.ndarray:
         joint_data = self._compute_joint_data(var_values)
         return joint_data.joint_positions
-
-    def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
-        self._log_base_params_mapping(self._base_param_mapping)
-        return super().optimize()
 
 
 class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
@@ -1284,20 +1248,22 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         """Augmented Lagrangian callback to extract and log the optimization result at
         each augmented Lagrangian iteration."""
         subpath = f"al_{al_idx}"
-        (self._logging_path / subpath).mkdir(exist_ok=True)
+        if self._logging_path is not None:
+            logging_path = self._logging_path / subpath
+            logging_path.mkdir(exist_ok=True)
 
-        a_value, b_value, q0_value = np.split(
-            var_values, [len(self._a_var), len(self._a_var) + len(self._b_var)]
-        )
-        self._log_optimization_result(a_value, b_value, q0_value, subpath=subpath)
+            yaml_path = logging_path / "meta_data.yaml"
+            with open(yaml_path, "w") as file:
+                yaml.dump(meta_data, file)
+        else:
+            logging_path = None
 
-        yaml_path = self._logging_path / subpath / "meta_data.yaml"
-        with open(yaml_path, "w") as file:
-            yaml.dump(meta_data, file)
+        traj_attrs = self._extract_fourier_trajectory_attributes(var_values)
+        traj_attrs.log(logging_path=logging_path)
 
         logging.info(f"Logged results for augmented Lagrangian iteration {al_idx}.")
 
-    def optimize(self) -> Tuple[ndarray, ndarray, ndarray]:
+    def optimize(self) -> FourierSeriesTrajectoryAttributes:
         # Compute the initial Lagrange multiplier guess
         num_lambda = self._ng_al.compute_num_lambda(self._prog)
         lambda_initial = np.zeros(num_lambda)
@@ -1312,11 +1278,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             log_check_point_callback=self._extract_and_log_optimization_result,
         )
 
-        # Log optimization result
-        a_value, b_value, q0_value = np.split(
-            x_val, [len(self._a_var), len(self._a_var) + len(self._b_var)]
-        )
-        return a_value, b_value, q0_value
+        traj_attrs = self._extract_fourier_trajectory_attributes(x_val)
+        return traj_attrs
 
     @classmethod
     def optimize_parallel(
@@ -1337,7 +1300,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         num_workers: int,
         nevergrad_method: str = "NGOpt",
         logging_path: Optional[Path] = None,
-    ) -> Tuple[ndarray, ndarray, ndarray]:
+    ) -> FourierSeriesTrajectoryAttributes:
         """Optimizes the trajectory parameters in parallel.
         NOTE: This method deals with the optimizer construction and should be called
         as a classmethod.
@@ -1369,7 +1332,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 then no logs are written.
 
         Returns:
-            Tuple[ndarray, ndarray, ndarray]: The optimized trajectory parameters `a`,
+            Tuple[ndarray, np.ndarray, np.ndarray]: The optimized trajectory parameters `a`,
                 `b`, and `q0`.
         """
         assert num_workers > 1, "Parallel optimization requires at least 2 workers."
@@ -1424,7 +1387,5 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             log_check_point_callback=optim._extract_and_log_optimization_result,
         )
 
-        a_value, b_value, q0_value = np.split(
-            x_val, [len(optim._a_var), len(optim._a_var) + len(optim._b_var)]
-        )
-        return a_value, b_value, q0_value
+        traj_attrs = optim._extract_fourier_trajectory_attributes(x_val)
+        return traj_attrs

@@ -16,8 +16,11 @@ from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
 )
 from robot_payload_id.environment import create_arm
-from robot_payload_id.optimization import BsplineTrajectoryAttributes
-from robot_payload_id.utils import JointData
+from robot_payload_id.utils import (
+    BsplineTrajectoryAttributes,
+    FourierSeriesTrajectoryAttributes,
+    JointData,
+)
 
 
 def extract_bspline_trajectory_attributes(
@@ -185,20 +188,12 @@ def main():
     )
 
     # Load Fourier series parameters and compute joint data
-    a_data = np.load(traj_parameter_path / "a_value.npy").reshape(
-        (num_joints, -1), order="F"
-    )
-    b_data = np.load(traj_parameter_path / "b_value.npy").reshape(
-        (num_joints, -1), order="F"
-    )
-    q0_data = np.load(traj_parameter_path / "q0_value.npy")
+    fourier_traj_attrs = FourierSeriesTrajectoryAttributes.load(traj_parameter_path)
     joint_data_gt = compute_autodiff_joint_data_from_fourier_series_traj_params1(
         plant=arm_components.plant,
         num_timesteps=num_timesteps,
         time_horizon=trajectory_duration,
-        a=a_data,
-        b=b_data,
-        q0=q0_data,
+        traj_attrs=fourier_traj_attrs,
     )
 
     num_control_points = num_control_points_initial

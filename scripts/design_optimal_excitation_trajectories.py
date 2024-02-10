@@ -20,6 +20,7 @@ from robot_payload_id.optimization import (
     ExcitationTrajectoryOptimizerFourierBlackBoxSymbolicNumeric,
     ExcitationTrajectoryOptimizerFourierSnopt,
 )
+from robot_payload_id.utils import FourierSeriesTrajectoryAttributes
 
 
 def main():
@@ -434,8 +435,10 @@ def main():
         )
         snopt_optimizer.optimize()
     else:
-        a, b, q0 = black_box_optimizer.optimize()
-        snopt_optimizer.set_initial_guess(a, b, q0)
+        traj_attrs: FourierSeriesTrajectoryAttributes = black_box_optimizer.optimize()
+        snopt_optimizer.set_initial_guess(
+            traj_attrs.a_values, traj_attrs.b_values, traj_attrs.q0_values
+        )
         snopt_optimizer.optimize()
 
 

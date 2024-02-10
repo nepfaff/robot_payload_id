@@ -5,7 +5,7 @@ import numpy as np
 from pydrake.all import AutoDiffXd, MultibodyForces_, MultibodyPlant
 from tqdm import tqdm
 
-from robot_payload_id.utils import JointData
+from robot_payload_id.utils import FourierSeriesTrajectoryAttributes, JointData
 
 
 def generate_random_joint_data(
@@ -123,10 +123,7 @@ def compute_autodiff_joint_data_from_simple_sinusoidal_traj_params(
 def compute_autodiff_joint_data_from_fourier_series_traj_params(
     num_timesteps: int,
     time_horizon: float,
-    a: np.ndarray,
-    b: np.ndarray,
-    q0: np.ndarray,
-    omega: float = 0.2 * np.pi,
+    traj_attrs: FourierSeriesTrajectoryAttributes,
     plant: Optional[MultibodyPlant] = None,
     use_progress_bar: bool = True,
 ) -> JointData:
@@ -140,13 +137,8 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
         num_timesteps (int): The number of datapoints to generate.
         time_horizon (float): The time horizon/ duration of the trajectory. The sampling
             time step is computed as time_horizon / num_timesteps.
-        a (np.ndarray): The `a` parameters for the trajectory of type AutoDiffXd and
-            shape (num_joints, num_fourier_terms).
-        b (np.ndarray): The `b` parameters for the trajectory of type AutoDiffXd and
-            shape (num_joints, num_fourier_terms).
-        q0 (np.ndarray): The `q0` parameters for the trajectory of type AutoDiffXd and
-            shape (num_joints,).
-        omega (float): The frequency of the trajectory. The period is 2 * pi / omega.
+        traj_attrs (FourierSeriesTrajectoryAttributes): The Fourier series trajectory
+            parameters. A recommended value for omega is 0.2 * np.pi.
         plant (MultibodyPlant, optional): The plant to generate data for. If None, then
             the torques will be set to zero.
         use_progress_bar (bool, optional): Whether to use a progress bar.
@@ -154,6 +146,11 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
     Returns:
         JointData: The generated joint data.
     """
+    a = traj_attrs.a_values
+    b = traj_attrs.b_values
+    q0 = traj_attrs.q0_values
+    omega = traj_attrs.omega
+
     # Compute the joint positions, velocities, and accelerations
     q = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
     q_dot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
@@ -223,10 +220,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
 def compute_autodiff_joint_data_from_fourier_series_traj_params1(
     num_timesteps: int,
     time_horizon: float,
-    a: np.ndarray,
-    b: np.ndarray,
-    q0: np.ndarray,
-    omega: float = 0.3 * np.pi,
+    traj_attrs: FourierSeriesTrajectoryAttributes,
     plant: Optional[MultibodyPlant] = None,
     use_progress_bar: bool = True,
 ) -> JointData:
@@ -241,13 +235,8 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
         num_timesteps (int): The number of datapoints to generate.
         time_horizon (float): The time horizon/ duration of the trajectory. The sampling
             time step is computed as time_horizon / num_timesteps.
-        a (np.ndarray): The `a` parameters for the trajectory of type AutoDiffXd and
-            shape (num_joints, num_fourier_terms).
-        b (np.ndarray): The `b` parameters for the trajectory of type AutoDiffXd and
-            shape (num_joints, num_fourier_terms).
-        q0 (np.ndarray): The `q0` parameters for the trajectory of type AutoDiffXd and
-            shape (num_joints,).
-        omega (float): The frequency of the trajectory. The period is 2 * pi / omega.
+        traj_attrs (FourierSeriesTrajectoryAttributes): The Fourier series trajectory
+            parameters. A recommended value for omega is 0.3 * np.pi.
         plant (MultibodyPlant, optional): The plant to generate data for. If None, then
             the torques will be set to zero.
         use_progress_bar (bool, optional): Whether to use a progress bar.
@@ -255,6 +244,11 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
     Returns:
         JointData: The generated joint data.
     """
+    a = traj_attrs.a_values
+    b = traj_attrs.b_values
+    q0 = traj_attrs.q0_values
+    omega = traj_attrs.omega
+
     # Compute the joint positions, velocities, and accelerations
     q = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
     q_dot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
