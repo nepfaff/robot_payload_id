@@ -481,7 +481,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
             self._initial_guess = np.concatenate([a_flattened, b_flattened, q0_values])
 
         parameterization = ng.p.Array(init=self._initial_guess)
-        wandb.log({"initial_guess": self._initial_guess})
+
+        # Log initial guess
+        if logging_path is not None:
+            np.save(logging_path / "initial_guess.npy", self._initial_guess)
 
         # Select optimizer
         self._optimizer = ng.optimizers.registry[self._nevergrad_method](
