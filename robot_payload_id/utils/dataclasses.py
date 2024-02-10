@@ -330,7 +330,7 @@ class FourierSeriesTrajectoryAttributes:
         a_values = np.load(path / "a_value.npy")
         b_values = np.load(path / "b_value.npy")
         q0_values = np.load(path / "q0_value.npy")
-        omega = int(np.load(path / "omega.npy")[0])
+        omega = float(np.load(path / "omega.npy")[0])
 
         if len(a_values.shape) == 1:
             assert (

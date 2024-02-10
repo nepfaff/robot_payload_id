@@ -152,9 +152,10 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
     omega = traj_attrs.omega
 
     # Compute the joint positions, velocities, and accelerations
-    q = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
-    q_dot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
-    q_ddot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
+    num_joints, num_terms = a.shape
+    q = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
+    q_dot = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
+    q_ddot = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
     num_terms = a.shape[1]
     times = np.linspace(0, time_horizon, num_timesteps)
     for t in tqdm(
@@ -163,7 +164,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
         desc="Generating joint data from traj params.",
         disable=not use_progress_bar,
     ):
-        for i in range(len(a)):
+        for i in range(num_joints):
             time = times[t]
             q[t, i] = (
                 sum(
@@ -250,10 +251,10 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
     omega = traj_attrs.omega
 
     # Compute the joint positions, velocities, and accelerations
-    q = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
-    q_dot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
-    q_ddot = np.zeros((num_timesteps, len(a)), dtype=AutoDiffXd)
-    num_terms = a.shape[1]
+    num_joints, num_terms = a.shape
+    q = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
+    q_dot = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
+    q_ddot = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
     times = np.linspace(0, time_horizon, num_timesteps)
     for t in tqdm(
         range(num_timesteps),
@@ -261,7 +262,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
         desc="Generating joint data from traj params.",
         disable=not use_progress_bar,
     ):
-        for i in range(len(a)):
+        for i in range(num_joints):
             time = times[t]
             q[t, i] = (
                 sum(
