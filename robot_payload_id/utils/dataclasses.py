@@ -2,7 +2,7 @@ import os
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pydrake.symbolic as sym
@@ -320,6 +320,19 @@ class FourierSeriesTrajectoryAttributes:
             b_values=b_values.reshape((num_joints, -1), order="F"),
             q0_values=q0_values,
             omega=omega,
+        )
+
+    def to_flattened_data(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+        """
+        Converts the attributes to flattened data.
+
+        Returns: A tuple (a_values, b_values, q0_values, omega) of flattened arrays.
+        """
+        return (
+            self.a_values.flatten(order="F"),
+            self.b_values.flatten(order="F"),
+            self.q0_values,
+            self.omega,
         )
 
     @classmethod

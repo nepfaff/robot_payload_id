@@ -173,8 +173,7 @@ def main():
         "--traj_initial",
         type=Path,
         default=None,
-        help="Path to the initial B-spline trajectory. If provided, the initial "
-        + "trajectory will be used to initialize the B-spline trajectory optimization.",
+        help="Path to the initial trajectory.",
     )
     parser.add_argument(
         "--wandb_mode",
@@ -322,6 +321,7 @@ def main():
                             mu_max=mu_max,
                             model_path=model_path,
                             nevergrad_method=nevergrad_method,
+                            traj_initial=traj_initial,
                             logging_path=logging_path,
                         )
                     )
@@ -343,6 +343,7 @@ def main():
                         robot_model_instance_name="arm",
                         num_workers=num_workers,
                         nevergrad_method=nevergrad_method,
+                        traj_initial=traj_initial,
                         logging_path=logging_path,
                     )
                 )
@@ -362,6 +363,7 @@ def main():
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
                         nevergrad_method=nevergrad_method,
+                        traj_initial=traj_initial,
                         logging_path=logging_path,
                         data_matrix_dir_path=data_matrix_dir_path,
                         model_path=model_path,
@@ -383,6 +385,7 @@ def main():
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
                         nevergrad_method=nevergrad_method,
+                        traj_initial=traj_initial,
                         logging_path=logging_path,
                         data_matrix_dir_path=data_matrix_dir_path,
                         model_path=model_path,
@@ -401,6 +404,7 @@ def main():
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
                         nevergrad_method=nevergrad_method,
+                        traj_initial=traj_initial,
                         logging_path=logging_path,
                         model_path=model_path,
                     )

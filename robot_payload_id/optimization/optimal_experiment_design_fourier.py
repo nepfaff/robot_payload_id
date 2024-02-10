@@ -6,7 +6,7 @@ from abc import abstractmethod
 from datetime import timedelta
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import nevergrad as ng
 import numpy as np
@@ -386,6 +386,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
         nevergrad_method: str = "NGOpt",
+        traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         use_optimization_progress_bar: bool = True,
         logging_path: Optional[Path] = None,
     ):
@@ -406,6 +407,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
+            traj_initial (Union[FourierSeriesTrajectoryAttributes, Path]): The initial
+                trajectory parameters. If a path is provided, then the trajectory
+                parameters are loaded from the path. If None, then the initial guess is
+                randomly generated.
             use_optimization_progress_bar (bool): Whether to show a progress bar for the
                 optimization. This might lead to a small performance hit.
             logging_path (Path): The path to write the optimization logs to. If None,
@@ -438,29 +443,43 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         self._symbolic_vars = np.concatenate([self._a_var, self._b_var, self._q0_var])
 
         # Set initial guess
-        # Empirically, setting any terms after the first 5 to small values results
-        # in a decent initial data matrix condition number
-        self._initial_guess = (
-            np.random.rand(len(self._symbolic_vars)) - 0.5
-            if self._num_fourier_terms < 6
-            else np.concatenate(
-                [
-                    np.random.rand(5 * self._num_joints) - 0.5,
-                    (
-                        np.random.rand((self._num_fourier_terms - 5) * self._num_joints)
-                        - 0.5
-                    )
-                    * 0.01,
-                    np.random.rand(5 * self._num_joints) - 0.5,
-                    (
-                        np.random.rand((self._num_fourier_terms - 5) * self._num_joints)
-                        - 0.5
-                    )
-                    * 0.01,
-                    np.random.rand(self._num_joints) - 0.5,
-                ]
+        if traj_initial is None:
+            # Empirically, setting any terms after the first 5 to small values results
+            # in a decent initial data matrix condition number
+            self._initial_guess = (
+                np.random.rand(len(self._symbolic_vars)) - 0.5
+                if self._num_fourier_terms < 6
+                else np.concatenate(
+                    [
+                        np.random.rand(5 * self._num_joints) - 0.5,
+                        (
+                            np.random.rand(
+                                (self._num_fourier_terms - 5) * self._num_joints
+                            )
+                            - 0.5
+                        )
+                        * 0.01,
+                        np.random.rand(5 * self._num_joints) - 0.5,
+                        (
+                            np.random.rand(
+                                (self._num_fourier_terms - 5) * self._num_joints
+                            )
+                            - 0.5
+                        )
+                        * 0.01,
+                        np.random.rand(self._num_joints) - 0.5,
+                    ]
+                )
             )
-        )
+        else:
+            if isinstance(traj_initial, Path):
+                traj_attrs = FourierSeriesTrajectoryAttributes.load(traj_initial)
+                assert traj_attrs.omega == self._omega, "Trajectory frequency mismatch!"
+            else:
+                traj_attrs = traj_initial
+            a_flattened, b_flattened, q0_values, _ = traj_attrs.to_flattened_data()
+            self._initial_guess = np.concatenate([a_flattened, b_flattened, q0_values])
+
         parameterization = ng.p.Array(init=self._initial_guess)
         wandb.log({"initial_guess": self._initial_guess})
 
@@ -595,6 +614,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
         nevergrad_method: str = "NGOpt",
+        traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         use_optimization_progress_bar: bool = True,
         logging_path: Optional[Path] = None,
         data_matrix_dir_path: Optional[Path] = None,
@@ -617,6 +637,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
+            traj_initial (Union[FourierSeriesTrajectoryAttributes, Path]): The initial
+                trajectory parameters. If a path is provided, then the trajectory
+                parameters are loaded from the path. If None, then the initial guess is
+                randomly generated.
             use_optimization_progress_bar (bool): Whether to show a progress bar for the
                 optimization. This might lead to a small performance hit.
             logging_path (Path): The path to write the optimization logs to. If None,
@@ -638,6 +662,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxSymbolic(
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
             nevergrad_method=nevergrad_method,
+            traj_initial=traj_initial,
             use_optimization_progress_bar=use_optimization_progress_bar,
             logging_path=logging_path,
         )
@@ -872,6 +897,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         budget: int,
         model_path: str,
         nevergrad_method: str = "NGOpt",
+        traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         use_optimization_progress_bar: bool = True,
         logging_path: Optional[Path] = None,
     ):
@@ -893,6 +919,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
+            traj_initial (Union[FourierSeriesTrajectoryAttributes, Path]): The initial
+                trajectory parameters. If a path is provided, then the trajectory
+                parameters are loaded from the path. If None, then the initial guess is
+                randomly generated.
             use_optimization_progress_bar (bool): Whether to show a progress bar for the
                 optimization. This might lead to a small performance hit.
             logging_path (Path): The path to write the optimization logs to. If None,
@@ -910,6 +940,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget,
             nevergrad_method=nevergrad_method,
+            traj_initial=traj_initial,
             use_optimization_progress_bar=use_optimization_progress_bar,
             logging_path=logging_path,
         )
@@ -1041,6 +1072,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         mu_max: float,
         model_path: str,
         nevergrad_method: str = "NGOpt",
+        traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         logging_path: Optional[Path] = None,
     ):
         """
@@ -1068,6 +1100,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
+            traj_initial (Union[FourierSeriesTrajectoryAttributes, Path]): The initial
+                trajectory parameters. If a path is provided, then the trajectory
+                parameters are loaded from the path. If None, then the initial guess is
+                randomly generated.
             logging_path (Path): The path to write the optimization logs to. If None,
                 then no logs are written.
         """
@@ -1083,6 +1119,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             budget=budget_per_iteration,
             model_path=model_path,
             nevergrad_method=nevergrad_method,
+            traj_initial=traj_initial,
             use_optimization_progress_bar=False,
             logging_path=logging_path,
         )
