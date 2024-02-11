@@ -91,6 +91,7 @@ def solve_inertial_param_sdp(
                 Iyy=prog.NewContinuousVariables(1, f"Iyy{i}")[0],
                 Iyz=prog.NewContinuousVariables(1, f"Iyz{i}")[0],
                 Izz=prog.NewContinuousVariables(1, f"Izz{i}")[0],
+                rotor_inertia=prog.NewContinuousVariables(1, f"rotor_inertia{i}")[0],
             )
         )
 
@@ -143,6 +144,11 @@ def solve_inertial_param_sdp(
     pseudo_inertias = construct_psuedo_inertias(variables)
     for pseudo_inertia in pseudo_inertias:
         prog.AddPositiveSemidefiniteConstraint(pseudo_inertia - 1e-6 * np.identity(4))
+
+    # Reflected rotor inertia feasibility constraints
+    rotor_inertias = np.array([var.rotor_inertia for var in variables])
+    for rotor_inertia in rotor_inertias:
+        prog.AddConstraint(rotor_inertia >= 0)
 
     options = None
     if solver_kPrintToConsole:

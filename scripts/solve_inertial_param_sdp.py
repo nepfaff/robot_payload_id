@@ -8,6 +8,7 @@ import numpy as np
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
+    compute_base_param_mapping,
     extract_numeric_data_matrix_autodiff,
 )
 from robot_payload_id.environment import create_arm
@@ -124,18 +125,36 @@ def main():
             joint_torques=np.zeros_like(q_numeric),
             sample_times_s=sample_times_s,
         )
-    if args.remove_unidentifiable_params:
-        base_param_mapping_path = traj_parameter_path / "base_param_mapping.npy"
-        if not os.path.exists(base_param_mapping_path):
-            base_param_mapping_path = traj_parameter_path / "../base_param_mapping.npy"
-        base_param_mapping = np.load(base_param_mapping_path)
-    else:
-        base_param_mapping = None
 
     # Generate data matrix
     W_data_raw, tau_data = extract_numeric_data_matrix_autodiff(
-        arm_components=arm_components, joint_data=joint_data
+        arm_components=arm_components,
+        joint_data=joint_data,
+        add_rotor_inertia=True,
     )
+
+    if args.remove_unidentifiable_params:
+        # Load base parameter mapping
+        base_param_mapping_path = traj_parameter_path / "base_param_mapping.npy"
+        if not os.path.exists(base_param_mapping_path):
+            base_param_mapping_path = traj_parameter_path / "../base_param_mapping.npy"
+        logging.info(f"Loading base parameter mapping from {base_param_mapping_path}")
+        base_param_mapping = np.load(base_param_mapping_path)
+
+        # Recompute base parameter mapping if it has wrong shape
+        if W_data_raw.shape[1] != base_param_mapping.shape[0]:
+            logging.warning(
+                "Base parameter mapping has wrong shape! Recomputing the base "
+                + "parameter mapping..."
+            )
+            base_param_mapping = compute_base_param_mapping(W_data_raw)
+
+        logging.info(
+            f"{base_param_mapping.shape[1]} out of {base_param_mapping.shape[0]} "
+            + "parameters are identifiable."
+        )
+    else:
+        base_param_mapping = None
 
     if base_param_mapping is None:
         W_data = W_data_raw

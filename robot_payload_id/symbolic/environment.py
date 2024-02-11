@@ -7,6 +7,7 @@ import pydrake.symbolic as sym
 from pydrake.all import (
     AutoDiffXd,
     ExtractValue,
+    JointActuator,
     MathematicalProgram,
     MultibodyPlant,
     RigidBody,
@@ -178,11 +179,15 @@ def create_symbolic_plant(
     )
 
 
-def create_autodiff_plant(arm_components: ArmComponents) -> ArmPlantComponents:
+def create_autodiff_plant(
+    arm_components: ArmComponents, add_rotor_inertia: bool
+) -> ArmPlantComponents:
     """Creates an autodiff plant for a robotic arm system.
 
     Args:
         arm_components (ArmComponents): The components of the robotic arm system.
+        add_rotor_inertia (bool): Whether to add autodiff reflected rotor inertia
+            parameters.
 
     Returns:
         ArmPlantComponents: The autodiff plant and associated autodiff components.
@@ -193,13 +198,20 @@ def create_autodiff_plant(arm_components: ArmComponents) -> ArmPlantComponents:
 
     # Create the autodiff parameters
     ad_parameters: List[JointParameters] = []
-    num_inertial_params = arm_components.num_joints * 10
+    num_params_per_joint = 11 if add_rotor_inertia else 10
+    num_params = arm_components.num_joints * num_params_per_joint
     for i in range(arm_components.num_joints):
         try:
             # There is no hope to identify link 0, so we skip it
             link: RigidBody = ad_plant.GetBodyByName(f"iiwa_link_{i+1}")
+            joint_actuator: JointActuator = ad_plant.GetJointActuatorByName(
+                f"iiwa_joint_{i+1}"
+            )
         except:
             link: RigidBody = ad_plant.GetBodyByName(f"link{i + 1}")
+            joint_actuator: JointActuator = ad_plant.GetJointActuatorByName(
+                f"joint{i+1}"
+            )
 
         m_val = link.get_mass(ad_plant_context).value()
 
@@ -218,49 +230,56 @@ def create_autodiff_plant(arm_components: ArmComponents) -> ArmPlantComponents:
         Izz_val = ExtractValue(spatial_inertia.CopyToFullMatrix6()[:3, :3])[2, 2]
 
         # Create autodiff variables for the inertial parameters
-        m_vec = np.zeros(num_inertial_params)
-        m_vec[(i * 10)] = 1
+        m_vec = np.zeros(num_params)
+        m_vec[(i * num_params_per_joint)] = 1
         m_ad = AutoDiffXd(m_val, m_vec)
 
-        cx_vec = np.zeros(num_inertial_params)
-        cx_vec[(i * 10) + 1] = 1
+        cx_vec = np.zeros(num_params)
+        cx_vec[(i * num_params_per_joint) + 1] = 1
         hx_ad = AutoDiffXd(cx_val * m_val, cx_vec)
         cx_ad = hx_ad / m_ad
-        cy_vec = np.zeros(num_inertial_params)
-        cy_vec[(i * 10) + 2] = 1
+        cy_vec = np.zeros(num_params)
+        cy_vec[(i * num_params_per_joint) + 2] = 1
         hy_ad = AutoDiffXd(cy_val * m_val, cy_vec)
         cy_ad = hy_ad / m_ad
-        cz_vec = np.zeros(num_inertial_params)
-        cz_vec[(i * 10) + 3] = 1
+        cz_vec = np.zeros(num_params)
+        cz_vec[(i * num_params_per_joint) + 3] = 1
         hz_ad = AutoDiffXd(cz_val * m_val, cz_vec)
         cz_ad = hz_ad / m_ad
         com_ad = [cx_ad, cy_ad, cz_ad]
 
-        Ixx_vec = np.zeros(num_inertial_params)
-        Ixx_vec[(i * 10) + 4] = 1
+        Ixx_vec = np.zeros(num_params)
+        Ixx_vec[(i * num_params_per_joint) + 4] = 1
         Ixx_ad = AutoDiffXd(Ixx_val, Ixx_vec)
         Gxx_ad = Ixx_ad / m_ad
-        Ixy_vec = np.zeros(num_inertial_params)
-        Ixy_vec[(i * 10) + 5] = 1
+        Ixy_vec = np.zeros(num_params)
+        Ixy_vec[(i * num_params_per_joint) + 5] = 1
         Ixy_ad = AutoDiffXd(Ixy_val, Ixy_vec)
         Gxy_ad = Ixy_ad / m_ad
-        Ixz_vec = np.zeros(num_inertial_params)
-        Ixz_vec[(i * 10) + 6] = 1
+        Ixz_vec = np.zeros(num_params)
+        Ixz_vec[(i * num_params_per_joint) + 6] = 1
         Ixz_ad = AutoDiffXd(Ixz_val, Ixz_vec)
         Gxz_ad = Ixz_ad / m_ad
-        Iyy_vec = np.zeros(num_inertial_params)
-        Iyy_vec[(i * 10) + 7] = 1
+        Iyy_vec = np.zeros(num_params)
+        Iyy_vec[(i * num_params_per_joint) + 7] = 1
         Iyy_ad = AutoDiffXd(Iyy_val, Iyy_vec)
         Gyy_ad = Iyy_ad / m_ad
-        Iyz_vec = np.zeros(num_inertial_params)
-        Iyz_vec[(i * 10) + 8] = 1
+        Iyz_vec = np.zeros(num_params)
+        Iyz_vec[(i * num_params_per_joint) + 8] = 1
         Iyz_ad = AutoDiffXd(Iyz_val, Iyz_vec)
         Gyz_ad = Iyz_ad / m_ad
-        Izz_vec = np.zeros(num_inertial_params)
-        Izz_vec[(i * 10) + 9] = 1
+        Izz_vec = np.zeros(num_params)
+        Izz_vec[(i * num_params_per_joint) + 9] = 1
         Izz_ad = AutoDiffXd(Izz_val, Izz_vec)
         Gzz_ad = Izz_ad / m_ad
         G_ad = UnitInertia_[AutoDiffXd](Gxx_ad, Gyy_ad, Gzz_ad, Gxy_ad, Gxz_ad, Gyz_ad)
+
+        if add_rotor_inertia:
+            rotor_inertia_vec = np.zeros(num_params)
+            rotor_inertia_vec[(i * num_params_per_joint) + 10] = 1
+            rotor_inertia_ad = AutoDiffXd(
+                joint_actuator.default_rotor_inertia(), rotor_inertia_vec
+            )
 
         ad_parameters.append(
             JointParameters(
@@ -283,6 +302,7 @@ def create_autodiff_plant(arm_components: ArmComponents) -> ArmPlantComponents:
                 Iyy=Iyy_ad,
                 Iyz=Iyz_ad,
                 Izz=Izz_ad,
+                rotor_inertia=rotor_inertia_ad if add_rotor_inertia else None,
             )
         )
 
@@ -291,6 +311,8 @@ def create_autodiff_plant(arm_components: ArmComponents) -> ArmPlantComponents:
             m_ad, com_ad, G_ad, skip_validity_check=True
         )
         link.SetSpatialInertiaInBodyFrame(ad_plant_context, spatial_inertia_ad)
+        if add_rotor_inertia:
+            joint_actuator.SetRotorInertia(ad_plant_context, rotor_inertia_ad)
 
     return ArmPlantComponents(
         plant=ad_plant,

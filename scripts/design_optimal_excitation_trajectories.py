@@ -176,6 +176,11 @@ def main():
         help="Path to the initial trajectory.",
     )
     parser.add_argument(
+        "--add_rotor_inertia",
+        action="store_true",
+        help="Add reflected rotor inertia to the optimization.",
+    )
+    parser.add_argument(
         "--wandb_mode",
         type=str,
         default="online",
@@ -244,6 +249,7 @@ def main():
     num_workers = args.num_workers
     num_control_points = args.num_control_points
     traj_initial = args.traj_initial
+    add_rotor_inertia = args.add_rotor_inertia
 
     if args.use_bspline:
         assert (
@@ -270,6 +276,7 @@ def main():
                 mu_initial=mu_initial,
                 mu_multiplier=mu_multiplier,
                 mu_max=mu_max,
+                add_rotor_inertia=add_rotor_inertia,
                 nevergrad_method=nevergrad_method,
                 spline_order=4,
                 traj_initial=traj_initial,
@@ -291,6 +298,7 @@ def main():
                 mu_initial=mu_initial,
                 mu_multiplier=mu_multiplier,
                 mu_max=mu_max,
+                add_rotor_inertia=add_rotor_inertia,
                 nevergrad_method=nevergrad_method,
                 spline_order=4,
                 traj_initial=traj_initial,
@@ -320,6 +328,7 @@ def main():
                             mu_multiplier=mu_multiplier,
                             mu_max=mu_max,
                             model_path=model_path,
+                            add_rotor_inertia=add_rotor_inertia,
                             nevergrad_method=nevergrad_method,
                             traj_initial=traj_initial,
                             logging_path=logging_path,
@@ -342,6 +351,7 @@ def main():
                         model_path=model_path,
                         robot_model_instance_name="arm",
                         num_workers=num_workers,
+                        add_rotor_inertia=add_rotor_inertia,
                         nevergrad_method=nevergrad_method,
                         traj_initial=traj_initial,
                         logging_path=logging_path,
@@ -403,6 +413,7 @@ def main():
                         plant=plant,
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
+                        add_rotor_inertia=add_rotor_inertia,
                         nevergrad_method=nevergrad_method,
                         traj_initial=traj_initial,
                         logging_path=logging_path,

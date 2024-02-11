@@ -29,6 +29,7 @@ import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
+    compute_base_param_mapping,
     extract_numeric_data_matrix_autodiff,
     reexpress_symbolic_data_matrix,
     remove_structurally_unidentifiable_columns,
@@ -899,6 +900,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         robot_model_instance_idx: ModelInstanceIndex,
         budget: int,
         model_path: str,
+        add_rotor_inertia: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         use_optimization_progress_bar: bool = True,
@@ -919,6 +921,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
                 the robot. Used for adding constraints.
             budget (int): The number of iterations to run the optimizer for.
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
+            add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -947,12 +950,13 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             use_optimization_progress_bar=use_optimization_progress_bar,
             logging_path=logging_path,
         )
+        self._add_rotor_inertia = add_rotor_inertia
 
         self._arm_components = create_arm(
             arm_file_path=model_path, num_joints=num_joints, time_step=0.0
         )
         self._ad_plant_components = create_autodiff_plant(
-            arm_components=self._arm_components
+            arm_components=self._arm_components, add_rotor_inertia=add_rotor_inertia
         )
 
         self._base_param_mapping = self._compute_base_param_mapping()
@@ -982,6 +986,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         W_data_raw, _ = extract_numeric_data_matrix_autodiff(
             arm_components=self._ad_plant_components,
             joint_data=joint_data,
+            add_rotor_inertia=self._add_rotor_inertia,
             use_progress_bar=use_progress_bar,
         )
 
@@ -1008,19 +1013,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             low=-1, high=1, size=len(self._symbolic_vars)
         )
         W_data = self._compute_W_data(random_var_values, use_progress_bar=False)
-
-        # NOTE: This might lead to running out of memory for large matrices. W_data
-        # is sparse and hence it might be possible to use a sparse SVD. However,
-        # this would make reconstruction difficutl.
-        logging.info(
-            "Computing SVD for base parameter mapping. This might take a while for "
-            + "large data matrices."
-        )
-        svd_start = time.time()
-        _, S, VT = np.linalg.svd(W_data)
-        logging.info(f"SVD took {timedelta(seconds=time.time() - svd_start)}")
-        V = VT.T
-        base_param_mapping = V[:, np.abs(S) > 1e-6]
+        base_param_mapping = compute_base_param_mapping(W_data)
 
         assert (
             base_param_mapping.shape[1] > 0
@@ -1074,6 +1067,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         mu_multiplier: float,
         mu_max: float,
         model_path: str,
+        add_rotor_inertia: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         logging_path: Optional[Path] = None,
@@ -1100,6 +1094,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 constraints are not satisfied.
             mu_max (float): The maximum value of the penalty weights.
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
+            add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -1121,6 +1116,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             robot_model_instance_idx=robot_model_instance_idx,
             budget=budget_per_iteration,
             model_path=model_path,
+            add_rotor_inertia=add_rotor_inertia,
             nevergrad_method=nevergrad_method,
             traj_initial=traj_initial,
             use_optimization_progress_bar=False,
@@ -1338,6 +1334,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         model_path: str,
         robot_model_instance_name: str,
         num_workers: int,
+        add_rotor_inertia: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         logging_path: Optional[Path] = None,
@@ -1366,6 +1363,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
             robot_model_instance_name (str): The name of the robot model instance.
             num_workers (int): The number of workers to use for parallel optimization.
+            add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -1408,6 +1406,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 mu_multiplier=mu_multiplier,
                 mu_max=mu_max,
                 model_path=model_path,
+                add_rotor_inertia=add_rotor_inertia,
                 nevergrad_method=nevergrad_method,
                 traj_initial=traj_initial,
                 logging_path=logging_path,

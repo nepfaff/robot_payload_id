@@ -77,6 +77,7 @@ class JointParameters:
     Gyy: Union[sym.Variable, float, None] = None
     Gyz: Union[sym.Variable, float, None] = None
     Gzz: Union[sym.Variable, float, None] = None
+    rotor_inertia: Union[sym.Variable, float, None] = None
 
     # Lumped parameters that the dynamics are linear in (h=mc, I=mG)
     hx: Union[sym.Variable, float, None] = None
@@ -92,10 +93,10 @@ class JointParameters:
     def get_base_param_list(self) -> List[sym.Variable]:
         """
         Returns a list of Drake's base inertial parameters for the joint.
-        The output is of form [m, cx, cy, cz, Gxx, Gxy, Gxz, Gyy, Gyz, Gzz], where m is
-        the mass, cx, cy, and cz are the center of mass, and Gxx, Gxy, Gxz, Gyy, Gyz,
-        and Gzz are the rotational unit inertia matrix elements. Note that elements
-        that are None are not included in the output.
+        The output is of form [m, cx, cy, cz, Gxx, Gxy, Gxz, Gyy, Gyz, Gzz,
+        rotor_inertia], where m is the mass, cx, cy, and cz are the center of mass, and
+        Gxx, Gxy, Gxz, Gyy, Gyz, and Gzz are the rotational unit inertia matrix
+        elements. Note that elements that are None are not included in the output.
         """
         param_list = [self.m]
         if self.cx is not None:
@@ -116,16 +117,19 @@ class JointParameters:
             param_list.append(self.Gyz)
         if self.Gzz is not None:
             param_list.append(self.Gzz)
+        if self.rotor_inertia is not None:
+            param_list.append(self.rotor_inertia)
         return param_list
 
     def get_lumped_param_list(self) -> List[sym.Variable]:
         """
         Returns a list of the lumped parameters that the dynamics are linear in for the
         joint.
-        The output is of form [m, hx, hy, hz, Ixx, Ixy, Ixz, Iyy, Iyz, Izz], where m is
-        the mass, hx, hy, and hz are the mass times the center of mass, and Ixx, Ixy,
-        Ixz, Iyy, Iyz, and Izz are the rotational inertia matrix elements. Note that
-        elements that are None are not included in the output.
+        The output is of form [m, hx, hy, hz, Ixx, Ixy, Ixz, Iyy, Iyz, Izz,
+        rotor_inertia], where m is the mass, hx, hy, and hz are the mass times the
+        center of mass, and Ixx, Ixy, Ixz, Iyy, Iyz, and Izz are the rotational inertia
+        matrix elements. Note that elements that are None are not included in the
+        output.
         """
         param_list = [self.m]
         if self.hx is not None:
@@ -146,6 +150,8 @@ class JointParameters:
             param_list.append(self.Iyz)
         if self.Izz is not None:
             param_list.append(self.Izz)
+        if self.rotor_inertia is not None:
+            param_list.append(self.rotor_inertia)
         return param_list
 
     def get_inertia_matrix(self) -> np.ndarray:

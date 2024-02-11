@@ -24,7 +24,10 @@ from pydrake.all import (
 
 import wandb
 
-from robot_payload_id.data import extract_numeric_data_matrix_autodiff
+from robot_payload_id.data import (
+    compute_base_param_mapping,
+    extract_numeric_data_matrix_autodiff,
+)
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import create_autodiff_plant
 from robot_payload_id.utils import (
@@ -182,6 +185,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         mu_initial: float,
         mu_multiplier: float,
         mu_max: float,
+        add_rotor_inertia: bool,
         constraint_acceleration_endpoints: bool = False,
         nevergrad_method: str = "NGOpt",
         spline_order: int = 4,
@@ -212,6 +216,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             mu_multiplier (float): We will multiply mu by mu_multiplier if the
                 equality constraint is not satisfied.
             mu_max (float): The maximum value of the penalty weights.
+            add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
             constraint_acceleration_endpoints (bool): Whether to add acceleration
                 constraints at the start and end of the trajectory.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
@@ -242,6 +247,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
         self._plant_context = plant_context
         self._mu_initial = mu_initial
+        self._add_rotor_inertia = add_rotor_inertia
         self._constraint_acceleration_endpoints = constraint_acceleration_endpoints
         self._nevergrad_method = nevergrad_method
 
@@ -257,7 +263,9 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         arm_components = create_arm(
             arm_file_path=model_path, num_joints=num_joints, time_step=0.0
         )
-        self._ad_plant_components = create_autodiff_plant(arm_components=arm_components)
+        self._ad_plant_components = create_autodiff_plant(
+            arm_components=arm_components, add_rotor_inertia=add_rotor_inertia
+        )
 
         # Compute base parameter mapping
         self._base_param_mapping = self._compute_base_param_mapping()
@@ -361,6 +369,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         W_data_raw, _ = extract_numeric_data_matrix_autodiff(
             arm_components=self._ad_plant_components,
             joint_data=joint_data,
+            add_rotor_inertia=self._add_rotor_inertia,
             use_progress_bar=use_progress_bar,
         )
 
@@ -393,19 +402,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             low=-1, high=1, size=len(self._prog.decision_variables())
         )
         W_data = self._compute_W_data(random_var_values)
-
-        # NOTE: This might lead to running out of memory for large matrices. W_data
-        # is sparse and hence it might be possible to use a sparse SVD. However,
-        # this would make reconstruction difficult.
-        logging.info(
-            "Computing SVD for base parameter mapping. This might take a while for "
-            + "large data matrices."
-        )
-        svd_start = time.time()
-        _, S, VT = np.linalg.svd(W_data)
-        logging.info(f"SVD took {timedelta(seconds=time.time() - svd_start)}")
-        V = VT.T
-        base_param_mapping = V[:, np.abs(S) > 1e-6]
+        base_param_mapping = compute_base_param_mapping(W_data)
 
         assert (
             base_param_mapping.shape[1] > 0
@@ -568,6 +565,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         mu_multiplier: float,
         mu_max: float,
         num_workers: int,
+        add_rotor_inertia: bool,
         nevergrad_method: str = "NGOpt",
         spline_order: int = 4,
         traj_initial: Optional[BsplineTrajectory] = None,
@@ -599,6 +597,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 equality constraint is not satisfied.
             mu_max (float): The maximum value of the penalty weights.
             num_workers (int): The number of workers to use for parallel optimization.
+            add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -639,6 +638,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 mu_initial=mu_initial,
                 mu_multiplier=mu_multiplier,
                 mu_max=mu_max,
+                add_rotor_inertia=add_rotor_inertia,
                 nevergrad_method=nevergrad_method,
                 spline_order=spline_order,
                 traj_initial=traj_initial,

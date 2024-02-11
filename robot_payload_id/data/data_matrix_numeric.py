@@ -4,7 +4,9 @@ matrix.
 """
 
 import logging
+import time
 
+from datetime import timedelta
 from typing import Optional, Tuple, Union
 
 import numpy as np
@@ -170,6 +172,7 @@ def extract_numeric_data_matrix_through_symbolic_decomposition_with_dynamic_subs
 def extract_numeric_data_matrix_autodiff(
     arm_components: Union[ArmComponents, ArmPlantComponents],
     joint_data: JointData,
+    add_rotor_inertia: bool,
     use_progress_bar: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Extracts the numeric data matrix using autodiff. This scales to a large number of
@@ -181,6 +184,7 @@ def extract_numeric_data_matrix_autodiff(
         joint_data (JointData): The joint data. Only the joint positions, velocities,
             and accelerations are used for the data matrix computation. The joint
             torques are flattened and returned.
+        add_rotor_inertia (bool): Whether to add rotor inertia as a parameter.
         use_progress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
@@ -193,13 +197,20 @@ def extract_numeric_data_matrix_autodiff(
     ad_plant_components = (
         arm_components
         if isinstance(arm_components, ArmPlantComponents)
-        else create_autodiff_plant(arm_components=arm_components)
+        else create_autodiff_plant(
+            arm_components=arm_components, add_rotor_inertia=add_rotor_inertia
+        )
     )
 
     # Extract data matrix
     num_joints = joint_data.joint_positions.shape[1]
     num_timesteps = len(joint_data.sample_times_s)
-    num_lumped_params = num_joints * 10
+    num_lumped_params = sum(
+        [
+            len(params.get_lumped_param_list())
+            for params in ad_plant_components.parameters
+        ]
+    )
     W_data = np.zeros((num_timesteps * num_joints, num_lumped_params))
     tau_data = joint_data.joint_torques.flatten()
 
@@ -234,3 +245,33 @@ def extract_numeric_data_matrix_autodiff(
         W_data[i * num_joints : (i + 1) * num_joints, :] = sym_torques_derivative
 
     return W_data, tau_data
+
+
+def compute_base_param_mapping(W_data: np.ndarray, tol: float = 1e-6) -> np.ndarray:
+    """Computes the base parameter mapping matrix that maps the full parameters to the
+    identifiable base parameters. It corresponds to the part of V in the SVD that
+    corresponds to non-zero singular values.
+
+    Args:
+        W_data (np.ndarray): The data matrix of shape (num_joints * num_timesteps,
+            num_lumped_params). This should be a random numeric data matrix that
+            excites all the parameters. Parameters that are not excited will not be
+            included in the base parameters.
+        tol (float): The tolerance for considering singular values as non-zero.
+
+    Returns:
+        np.ndarray: The base parameter mapping matrix.
+    """
+    # NOTE: This might lead to running out of memory for large matrices. W_data
+    # is sparse and hence it might be possible to use a sparse SVD. However,
+    # this would make reconstruction difficutl.
+    logging.info(
+        "Computing SVD for base parameter mapping. This might take a while for "
+        + "large data matrices."
+    )
+    svd_start = time.time()
+    _, S, VT = np.linalg.svd(W_data)
+    logging.info(f"SVD took {timedelta(seconds=time.time() - svd_start)}")
+    V = VT.T
+    base_param_mapping = V[:, np.abs(S) > tol]
+    return base_param_mapping
