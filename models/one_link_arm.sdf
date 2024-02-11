@@ -50,7 +50,7 @@
             </geometry>
         </collision>
     </link>
-    <joint name="shoulder" type="revolute">
+    <joint name="joint1" type="revolute">
         <child>link1</child>
         <parent>base</parent>
         <axis>
@@ -68,6 +68,8 @@
             <spring_stiffness>0</spring_stiffness>
           </dynamics>
         </axis>
+        <drake:gear_ratio>2.0</drake:gear_ratio>
+        <drake:rotor_inertia>0.00007171875</drake:rotor_inertia>
     </joint>
     <joint name="base_weld" type="fixed">
       <child>base</child>

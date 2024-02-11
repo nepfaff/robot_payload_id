@@ -37,7 +37,7 @@
             <material name="red" />
         </visual>
     </link>
-    <joint name="shoulder" type="continuous">
+    <joint name="joint1" type="continuous">
         <parent link="base"/>
         <child link="link1" />
         <axis xyz="0 1 0" />
