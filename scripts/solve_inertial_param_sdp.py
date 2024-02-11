@@ -92,7 +92,9 @@ def main():
     time_horizon = args.time_horizon
     is_fourier_series = os.path.exists(traj_parameter_path / "a_value.npy")
     if is_fourier_series:
-        traj_attrs = FourierSeriesTrajectoryAttributes.load(traj_parameter_path)
+        traj_attrs = FourierSeriesTrajectoryAttributes.load(
+            traj_parameter_path, num_joints=num_joints
+        )
         joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
             plant=arm_components.plant,
             num_timesteps=num_data_points,
@@ -122,11 +124,13 @@ def main():
             joint_torques=np.zeros_like(q_numeric),
             sample_times_s=sample_times_s,
         )
-    base_param_mapping = (
-        np.load(traj_parameter_path / "base_param_mapping.npy")
-        if args.remove_unidentifiable_params
-        else None
-    )
+    if args.remove_unidentifiable_params:
+        base_param_mapping_path = traj_parameter_path / "base_param_mapping.npy"
+        if not os.path.exists(base_param_mapping_path):
+            base_param_mapping_path = traj_parameter_path / "../base_param_mapping.npy"
+        base_param_mapping = np.load(base_param_mapping_path)
+    else:
+        base_param_mapping = None
 
     # Generate data matrix
     W_data_raw, tau_data = extract_numeric_data_matrix_autodiff(
