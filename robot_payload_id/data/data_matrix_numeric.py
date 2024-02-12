@@ -247,7 +247,9 @@ def extract_numeric_data_matrix_autodiff(
     return W_data, tau_data
 
 
-def compute_base_param_mapping(W_data: np.ndarray, tol: float = 1e-6) -> np.ndarray:
+def compute_base_param_mapping(
+    W_data: np.ndarray, scale_by_singular_values: bool = False, tol: float = 1e-6
+) -> np.ndarray:
     """Computes the base parameter mapping matrix that maps the full parameters to the
     identifiable base parameters. It corresponds to the part of V in the SVD that
     corresponds to non-zero singular values.
@@ -257,6 +259,8 @@ def compute_base_param_mapping(W_data: np.ndarray, tol: float = 1e-6) -> np.ndar
             num_lumped_params). This should be a random numeric data matrix that
             excites all the parameters. Parameters that are not excited will not be
             included in the base parameters.
+        scale_by_singular_values (bool): Whether to scale the base parameter mapping by
+            the reciprocals of the singular values.
         tol (float): The tolerance for considering singular values as non-zero.
 
     Returns:
@@ -273,5 +277,8 @@ def compute_base_param_mapping(W_data: np.ndarray, tol: float = 1e-6) -> np.ndar
     _, S, VT = np.linalg.svd(W_data)
     logging.info(f"SVD took {timedelta(seconds=time.time() - svd_start)}")
     V = VT.T
-    base_param_mapping = V[:, np.abs(S) > tol]
+    mask = np.abs(S) > tol
+    base_param_mapping = V[:, mask]
+    if scale_by_singular_values:
+        base_param_mapping *= 1 / S[mask]
     return base_param_mapping
