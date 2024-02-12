@@ -166,9 +166,24 @@ def solve_inertial_param_sdp(
         prog.AddPositiveSemidefiniteConstraint(pseudo_inertia - 1e-6 * np.identity(4))
 
     # Reflected rotor inertia feasibility constraints
-    rotor_inertias = np.array([var.rotor_inertia for var in variables])
-    for rotor_inertia in rotor_inertias:
-        prog.AddConstraint(rotor_inertia >= 0)
+    if identify_rotor_inertia:
+        rotor_inertias = np.array([var.rotor_inertia for var in variables])
+        for rotor_inertia in rotor_inertias:
+            prog.AddConstraint(rotor_inertia >= 0)
+
+    # Viscous friction feasibility constraints
+    if identify_viscous_friction:
+        viscous_frictions = np.array([var.viscous_friction for var in variables])
+        for viscous_friction in viscous_frictions:
+            prog.AddConstraint(viscous_friction >= 0)
+
+    # Dynamic dry friction feasibility constraints
+    if identify_dynamic_dry_friction:
+        dynamic_dry_frictions = np.array(
+            [var.dynamic_dry_friction for var in variables]
+        )
+        for dynamic_dry_friction in dynamic_dry_frictions:
+            prog.AddConstraint(dynamic_dry_friction >= 0)
 
     options = None
     if solver_kPrintToConsole:
