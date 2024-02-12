@@ -901,6 +901,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         budget: int,
         model_path: str,
         add_rotor_inertia: bool,
+        add_viscous_friction: bool,
+        add_dynamic_dry_friction: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         use_optimization_progress_bar: bool = True,
@@ -922,6 +924,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             budget (int): The number of iterations to run the optimizer for.
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
             add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
+            add_viscous_friction (bool): Whether to consider viscous friction in the
+                dynamics.
+            add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
+                the dynamics.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -951,12 +957,17 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             logging_path=logging_path,
         )
         self._add_rotor_inertia = add_rotor_inertia
+        self._add_viscous_friction = add_viscous_friction
+        self._add_dynamic_dry_friction = add_dynamic_dry_friction
 
         self._arm_components = create_arm(
             arm_file_path=model_path, num_joints=num_joints, time_step=0.0
         )
         self._ad_plant_components = create_autodiff_plant(
-            arm_components=self._arm_components, add_rotor_inertia=add_rotor_inertia
+            arm_components=self._arm_components,
+            add_rotor_inertia=add_rotor_inertia,
+            add_viscous_friction=add_viscous_friction,
+            add_dynamic_dry_friction=add_dynamic_dry_friction,
         )
 
         self._base_param_mapping = self._compute_base_param_mapping()
@@ -987,6 +998,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             arm_components=self._ad_plant_components,
             joint_data=joint_data,
             add_rotor_inertia=self._add_rotor_inertia,
+            add_viscous_friction=self._add_viscous_friction,
+            add_dynamic_dry_friction=self._add_dynamic_dry_friction,
             use_progress_bar=use_progress_bar,
         )
 
@@ -1068,6 +1081,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         mu_max: float,
         model_path: str,
         add_rotor_inertia: bool,
+        add_viscous_friction: bool,
+        add_dynamic_dry_friction: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         logging_path: Optional[Path] = None,
@@ -1095,6 +1110,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             mu_max (float): The maximum value of the penalty weights.
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
             add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
+            add_viscous_friction (bool): Whether to consider viscous friction in the
+                dynamics.
+            add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
+                the dynamics.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -1117,6 +1136,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             budget=budget_per_iteration,
             model_path=model_path,
             add_rotor_inertia=add_rotor_inertia,
+            add_viscous_friction=add_viscous_friction,
+            add_dynamic_dry_friction=add_dynamic_dry_friction,
             nevergrad_method=nevergrad_method,
             traj_initial=traj_initial,
             use_optimization_progress_bar=False,
@@ -1335,6 +1356,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         robot_model_instance_name: str,
         num_workers: int,
         add_rotor_inertia: bool,
+        add_viscous_friction: bool,
+        add_dynamic_dry_friction: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         logging_path: Optional[Path] = None,
@@ -1364,6 +1387,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             robot_model_instance_name (str): The name of the robot model instance.
             num_workers (int): The number of workers to use for parallel optimization.
             add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
+            add_viscous_friction (bool): Whether to consider viscous friction in the
+                dynamics.
+            add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
+                the dynamics.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -1407,6 +1434,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 mu_max=mu_max,
                 model_path=model_path,
                 add_rotor_inertia=add_rotor_inertia,
+                add_viscous_friction=add_viscous_friction,
+                add_dynamic_dry_friction=add_dynamic_dry_friction,
                 nevergrad_method=nevergrad_method,
                 traj_initial=traj_initial,
                 logging_path=logging_path,

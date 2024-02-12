@@ -66,6 +66,21 @@ def main():
         help="Whether to print solver output.",
     )
     parser.add_argument(
+        "--not_identify_rotor_inertia",
+        action="store_true",
+        help="Do not identify rotor inertia.",
+    )
+    parser.add_argument(
+        "--not_identify_viscous_friction",
+        action="store_true",
+        help="Do not identify viscous friction.",
+    )
+    parser.add_argument(
+        "--not_identify_dynamic_dry_friction",
+        action="store_true",
+        help="Do not identify dynamic dry friction.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -74,6 +89,12 @@ def main():
     )
 
     args = parser.parse_args()
+    traj_parameter_path = args.traj_parameter_path
+    num_data_points = args.num_data_points
+    time_horizon = args.time_horizon
+    identify_rotor_inertia = not args.not_identify_rotor_inertia
+    identify_viscous_friction = not args.not_identify_viscous_friction
+    identify_dynamic_dry_friction = not args.not_identify_dynamic_dry_friction
 
     logging.basicConfig(level=args.log_level)
 
@@ -88,9 +109,6 @@ def main():
         arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
     )
 
-    traj_parameter_path = args.traj_parameter_path
-    num_data_points = args.num_data_points
-    time_horizon = args.time_horizon
     is_fourier_series = os.path.exists(traj_parameter_path / "a_value.npy")
     if is_fourier_series:
         traj_attrs = FourierSeriesTrajectoryAttributes.load(
@@ -130,7 +148,9 @@ def main():
     W_data_raw, tau_data = extract_numeric_data_matrix_autodiff(
         arm_components=arm_components,
         joint_data=joint_data,
-        add_rotor_inertia=True,
+        add_rotor_inertia=identify_rotor_inertia,
+        add_viscous_friction=identify_viscous_friction,
+        add_dynamic_dry_friction=identify_dynamic_dry_friction,
     )
 
     if args.remove_unidentifiable_params:
@@ -147,7 +167,31 @@ def main():
                 "Base parameter mapping has wrong shape! Recomputing the base "
                 + "parameter mapping..."
             )
-            base_param_mapping = compute_base_param_mapping(W_data_raw)
+            if num_data_points > 2000:
+                logging.warning(
+                    "Number of data points is large. Using 2000 random data points "
+                    + "to compute the base parameter mapping."
+                )
+                num_random_points = 2000
+                joint_data_random = JointData(
+                    joint_positions=np.random.rand(num_random_points, num_joints) - 0.5,
+                    joint_velocities=np.random.rand(num_random_points, num_joints)
+                    - 0.5,
+                    joint_accelerations=np.random.rand(num_random_points, num_joints)
+                    - 0.5,
+                    joint_torques=np.zeros((num_random_points, num_joints)),
+                    sample_times_s=np.zeros(num_random_points),
+                )
+                W_data_random, _ = extract_numeric_data_matrix_autodiff(
+                    arm_components=arm_components,
+                    joint_data=joint_data_random,
+                    add_rotor_inertia=identify_rotor_inertia,
+                    add_viscous_friction=identify_viscous_friction,
+                    add_dynamic_dry_friction=identify_dynamic_dry_friction,
+                )
+            else:
+                W_data_random = W_data_raw
+            base_param_mapping = compute_base_param_mapping(W_data_random)
 
         logging.info(
             f"{base_param_mapping.shape[1]} out of {base_param_mapping.shape[0]} "
@@ -173,6 +217,9 @@ def main():
         W_data=W_data,
         tau_data=tau_data,
         base_param_mapping=base_param_mapping,
+        identify_rotor_inertia=identify_rotor_inertia,
+        identify_viscous_friction=identify_viscous_friction,
+        identify_dynamic_dry_friction=identify_dynamic_dry_friction,
         solver_kPrintToConsole=args.kPrintToConsole,
     )
     if result.is_success():

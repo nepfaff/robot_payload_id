@@ -50,6 +50,9 @@ def solve_inertial_param_sdp(
     tau_data: np.ndarray,
     base_param_mapping: Optional[np.ndarray] = None,
     regularization_weight: float = 0.0,
+    identify_rotor_inertia: bool = True,
+    identify_viscous_friction: bool = True,
+    identify_dynamic_dry_friction: bool = True,
     solver_kPrintToConsole: bool = False,
 ) -> Tuple[MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray]:
     """Solves the inertial parameter SDP with a quadratic cost, a parameter
@@ -61,10 +64,15 @@ def solve_inertial_param_sdp(
         W_data (np.ndarray): The data matrix.
         tau_data (np.ndarray): The joint torque data.
         base_param_mapping (np.ndarray, optional): The base parameter mapping matrix
-        that maps the full parameters to the identifiable parameters. It corresponds to
-        the part of V in the SVD that corresponds to non-zero singular values. If None,
-        all parameters are assumed to be identifiable.
+            that maps the full parameters to the identifiable parameters. It corresponds
+            to the part of V in the SVD that corresponds to non-zero singular values. If
+            None, all parameters are assumed to be identifiable.
         regularization_weight (float, optional): The parameter regularization weight.
+        identify_rotor_inertia (bool, optional): Whether to identify the rotor inertia.
+        identify_viscous_friction (bool, optional): Whether to identify the viscous
+            friction.
+        identify_dynamic_dry_friction (bool, optional): Whether to identify the dynamic
+            dry friction.
         solver_kPrintToConsole (bool, optional): Whether to print solver output.
 
     Returns:
@@ -91,7 +99,19 @@ def solve_inertial_param_sdp(
                 Iyy=prog.NewContinuousVariables(1, f"Iyy{i}")[0],
                 Iyz=prog.NewContinuousVariables(1, f"Iyz{i}")[0],
                 Izz=prog.NewContinuousVariables(1, f"Izz{i}")[0],
-                rotor_inertia=prog.NewContinuousVariables(1, f"rotor_inertia{i}")[0],
+                rotor_inertia=prog.NewContinuousVariables(1, f"rotor_inertia{i}")[0]
+                if identify_rotor_inertia
+                else None,
+                viscous_friction=prog.NewContinuousVariables(1, f"viscous_friction{i}")[
+                    0
+                ]
+                if identify_viscous_friction
+                else None,
+                dynamic_dry_friction=prog.NewContinuousVariables(
+                    1, f"dynamic_dry_friction{i}"
+                )[0]
+                if identify_dynamic_dry_friction
+                else None,
             )
         )
 

@@ -173,6 +173,8 @@ def extract_numeric_data_matrix_autodiff(
     arm_components: Union[ArmComponents, ArmPlantComponents],
     joint_data: JointData,
     add_rotor_inertia: bool,
+    add_viscous_friction: bool,
+    add_dynamic_dry_friction: bool,
     use_progress_bar: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Extracts the numeric data matrix using autodiff. This scales to a large number of
@@ -185,6 +187,9 @@ def extract_numeric_data_matrix_autodiff(
             and accelerations are used for the data matrix computation. The joint
             torques are flattened and returned.
         add_rotor_inertia (bool): Whether to add rotor inertia as a parameter.
+        add_viscous_friction (bool): Whether to add viscous friction as a parameter.
+        add_dynamic_dry_friction (bool): Whether to add dynamic dry friction as a
+            parameter.
         use_progress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
@@ -198,9 +203,20 @@ def extract_numeric_data_matrix_autodiff(
         arm_components
         if isinstance(arm_components, ArmPlantComponents)
         else create_autodiff_plant(
-            arm_components=arm_components, add_rotor_inertia=add_rotor_inertia
+            arm_components=arm_components,
+            add_rotor_inertia=add_rotor_inertia,
+            add_viscous_friction=add_viscous_friction,
+            add_dynamic_dry_friction=add_dynamic_dry_friction,
         )
     )
+    if add_viscous_friction:
+        viscous_frictions_ad = np.array(
+            [params.viscous_friction for params in ad_plant_components.parameters]
+        )
+    if add_dynamic_dry_friction:
+        dynamic_dry_frictions_ad = np.array(
+            [params.dynamic_dry_friction for params in ad_plant_components.parameters]
+        )
 
     # Extract data matrix
     num_joints = joint_data.joint_positions.shape[1]
@@ -237,6 +253,13 @@ def extract_numeric_data_matrix_autodiff(
             joint_data.joint_accelerations[i],
             forces,
         )
+
+        if add_viscous_friction:
+            ad_torques += viscous_frictions_ad * joint_data.joint_velocities[i]
+        if add_dynamic_dry_friction:
+            ad_torques += dynamic_dry_frictions_ad * np.sign(
+                joint_data.joint_velocities[i]
+            )
 
         # Differentiate w.r.t. parameters
         ad_torques_derivative = np.vstack(

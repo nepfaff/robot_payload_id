@@ -184,6 +184,7 @@ def create_autodiff_plant(
     arm_components: ArmComponents,
     add_rotor_inertia: bool,
     add_viscous_friction: bool = False,
+    add_dynamic_dry_friction: bool = False,
 ) -> ArmPlantComponents:
     """Creates an autodiff plant for a robotic arm system.
 
@@ -192,8 +193,11 @@ def create_autodiff_plant(
         add_rotor_inertia (bool): Whether to add autodiff reflected rotor inertia
             parameters.
         add_viscous_friction (bool): Whether to add autodiff viscous friction
-            parameters.
-
+            parameters. NOTE: Drake does not yet support viscous friction as part of
+            the context. Hence, this parameter is created but not added to the plant.
+        add_dynamic_dry_friction (bool): Whether to add autodiff dynamic dry friction
+            parameters. NOTE: Drake does not yet support dynamic dry friction as part of
+            the context. Hence, this parameter is created but not added to the plant.
 
     Returns:
         ArmPlantComponents: The autodiff plant and associated autodiff components.
@@ -204,19 +208,21 @@ def create_autodiff_plant(
 
     # Create the autodiff parameters
     ad_parameters: List[JointParameters] = []
-    num_params_per_joint = 10 + add_rotor_inertia + add_viscous_friction
+    num_params_per_joint = (
+        10 + add_rotor_inertia + add_viscous_friction + add_dynamic_dry_friction
+    )
     num_params = arm_components.num_joints * num_params_per_joint
     for i in range(arm_components.num_joints):
         try:
             # There is no hope to identify link 0, so we skip it
             link: RigidBody = ad_plant.GetBodyByName(f"iiwa_link_{i+1}")
-            # joint: RevoluteJoint = ad_plant.GetJointByName(f"iiwa_joint_{i+1}")
+            joint: RevoluteJoint = ad_plant.GetJointByName(f"iiwa_joint_{i+1}")
             joint_actuator: JointActuator = ad_plant.GetJointActuatorByName(
                 f"iiwa_joint_{i+1}"
             )
         except:
             link: RigidBody = ad_plant.GetBodyByName(f"link{i + 1}")
-            # joint: RevoluteJoint = ad_plant.GetJointByName(f"joint{i+1}")
+            joint: RevoluteJoint = ad_plant.GetJointByName(f"joint{i+1}")
             joint_actuator: JointActuator = ad_plant.GetJointActuatorByName(
                 f"joint{i+1}"
             )
@@ -282,20 +288,23 @@ def create_autodiff_plant(
         Gzz_ad = Izz_ad / m_ad
         G_ad = UnitInertia_[AutoDiffXd](Gxx_ad, Gyy_ad, Gzz_ad, Gxy_ad, Gxz_ad, Gyz_ad)
 
+        offset = 10
         if add_rotor_inertia:
             rotor_inertia_vec = np.zeros(num_params)
-            rotor_inertia_vec[(i * num_params_per_joint) + 10] = 1
+            rotor_inertia_vec[(i * num_params_per_joint) + offset] = 1
             rotor_inertia_ad = AutoDiffXd(
                 joint_actuator.default_rotor_inertia(), rotor_inertia_vec
             )
-
+            offset += 1
         if add_viscous_friction:
-            raise NotImplementedError(
-                "Setting viscous friction is not yet implemented in Drake"
-            )
-            # viscous_friction_vec = np.zeros(num_params)
-            # viscous_friction_vec[(i * num_params_per_joint) + 10] = 1
-            # viscous_friction_ad = AutoDiffXd(joint.damping(), viscous_friction_vec)
+            viscous_friction_vec = np.zeros(num_params)
+            viscous_friction_vec[(i * num_params_per_joint) + offset] = 1
+            viscous_friction_ad = AutoDiffXd(joint.damping(), viscous_friction_vec)
+            offset += 1
+        if add_dynamic_dry_friction:
+            dynamic_dry_friction_vec = np.zeros(num_params)
+            dynamic_dry_friction_vec[(i * num_params_per_joint) + offset] = 1
+            dynamic_dry_friction_ad = AutoDiffXd(0.0, dynamic_dry_friction_vec)
 
         ad_parameters.append(
             JointParameters(
@@ -319,7 +328,10 @@ def create_autodiff_plant(
                 Iyz=Iyz_ad,
                 Izz=Izz_ad,
                 rotor_inertia=rotor_inertia_ad if add_rotor_inertia else None,
-                # viscous_friction=viscous_friction_ad if add_viscous_friction else None,
+                viscous_friction=viscous_friction_ad if add_viscous_friction else None,
+                dynamic_dry_friction=dynamic_dry_friction_ad
+                if add_dynamic_dry_friction
+                else None,
             )
         )
 
