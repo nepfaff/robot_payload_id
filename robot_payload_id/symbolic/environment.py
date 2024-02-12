@@ -10,6 +10,7 @@ from pydrake.all import (
     JointActuator,
     MathematicalProgram,
     MultibodyPlant,
+    RevoluteJoint,
     RigidBody,
     RotationalInertia_,
     SpatialInertia,
@@ -180,7 +181,9 @@ def create_symbolic_plant(
 
 
 def create_autodiff_plant(
-    arm_components: ArmComponents, add_rotor_inertia: bool
+    arm_components: ArmComponents,
+    add_rotor_inertia: bool,
+    add_viscous_friction: bool = False,
 ) -> ArmPlantComponents:
     """Creates an autodiff plant for a robotic arm system.
 
@@ -188,6 +191,9 @@ def create_autodiff_plant(
         arm_components (ArmComponents): The components of the robotic arm system.
         add_rotor_inertia (bool): Whether to add autodiff reflected rotor inertia
             parameters.
+        add_viscous_friction (bool): Whether to add autodiff viscous friction
+            parameters.
+
 
     Returns:
         ArmPlantComponents: The autodiff plant and associated autodiff components.
@@ -198,17 +204,19 @@ def create_autodiff_plant(
 
     # Create the autodiff parameters
     ad_parameters: List[JointParameters] = []
-    num_params_per_joint = 11 if add_rotor_inertia else 10
+    num_params_per_joint = 10 + add_rotor_inertia + add_viscous_friction
     num_params = arm_components.num_joints * num_params_per_joint
     for i in range(arm_components.num_joints):
         try:
             # There is no hope to identify link 0, so we skip it
             link: RigidBody = ad_plant.GetBodyByName(f"iiwa_link_{i+1}")
+            # joint: RevoluteJoint = ad_plant.GetJointByName(f"iiwa_joint_{i+1}")
             joint_actuator: JointActuator = ad_plant.GetJointActuatorByName(
                 f"iiwa_joint_{i+1}"
             )
         except:
             link: RigidBody = ad_plant.GetBodyByName(f"link{i + 1}")
+            # joint: RevoluteJoint = ad_plant.GetJointByName(f"joint{i+1}")
             joint_actuator: JointActuator = ad_plant.GetJointActuatorByName(
                 f"joint{i+1}"
             )
@@ -281,6 +289,14 @@ def create_autodiff_plant(
                 joint_actuator.default_rotor_inertia(), rotor_inertia_vec
             )
 
+        if add_viscous_friction:
+            raise NotImplementedError(
+                "Setting viscous friction is not yet implemented in Drake"
+            )
+            # viscous_friction_vec = np.zeros(num_params)
+            # viscous_friction_vec[(i * num_params_per_joint) + 10] = 1
+            # viscous_friction_ad = AutoDiffXd(joint.damping(), viscous_friction_vec)
+
         ad_parameters.append(
             JointParameters(
                 m=m_ad,
@@ -303,6 +319,7 @@ def create_autodiff_plant(
                 Iyz=Iyz_ad,
                 Izz=Izz_ad,
                 rotor_inertia=rotor_inertia_ad if add_rotor_inertia else None,
+                # viscous_friction=viscous_friction_ad if add_viscous_friction else None,
             )
         )
 
@@ -313,6 +330,10 @@ def create_autodiff_plant(
         link.SetSpatialInertiaInBodyFrame(ad_plant_context, spatial_inertia_ad)
         if add_rotor_inertia:
             joint_actuator.SetRotorInertia(ad_plant_context, rotor_inertia_ad)
+        # if add_viscous_friction:
+        # Not yet implemented in Drake (see
+        # https://github.com/RobotLocomotion/drake/issues/14405)
+        # joint.SetDamping(ad_plant_context, viscous_friction_ad)
 
     return ArmPlantComponents(
         plant=ad_plant,
