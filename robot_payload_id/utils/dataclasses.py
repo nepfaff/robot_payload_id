@@ -78,6 +78,8 @@ class JointParameters:
     Gyz: Union[sym.Variable, float, None] = None
     Gzz: Union[sym.Variable, float, None] = None
     rotor_inertia: Union[sym.Variable, float, None] = None
+    viscous_friction: Union[sym.Variable, float, None] = None
+    dynamic_dry_friction: Union[sym.Variable, float, None] = None
 
     # Lumped parameters that the dynamics are linear in (h=mc, I=mG)
     hx: Union[sym.Variable, float, None] = None
@@ -94,9 +96,10 @@ class JointParameters:
         """
         Returns a list of Drake's base inertial parameters for the joint.
         The output is of form [m, cx, cy, cz, Gxx, Gxy, Gxz, Gyy, Gyz, Gzz,
-        rotor_inertia], where m is the mass, cx, cy, and cz are the center of mass, and
-        Gxx, Gxy, Gxz, Gyy, Gyz, and Gzz are the rotational unit inertia matrix
-        elements. Note that elements that are None are not included in the output.
+        rotor_inertia, viscous_friction, dynamic_dry_friction], where m is the mass, cx,
+        cy, and cz are the center of mass, and Gxx, Gxy, Gxz, Gyy, Gyz, and Gzz are the
+        rotational unit inertia matrix elements. Note that elements that are None are
+        not included in the output.
         """
         param_list = [self.m]
         if self.cx is not None:
@@ -119,6 +122,10 @@ class JointParameters:
             param_list.append(self.Gzz)
         if self.rotor_inertia is not None:
             param_list.append(self.rotor_inertia)
+        if self.viscous_friction is not None:
+            param_list.append(self.viscous_friction)
+        if self.dynamic_dry_friction is not None:
+            param_list.append(self.dynamic_dry_friction)
         return param_list
 
     def get_lumped_param_list(self) -> List[sym.Variable]:
@@ -126,10 +133,10 @@ class JointParameters:
         Returns a list of the lumped parameters that the dynamics are linear in for the
         joint.
         The output is of form [m, hx, hy, hz, Ixx, Ixy, Ixz, Iyy, Iyz, Izz,
-        rotor_inertia], where m is the mass, hx, hy, and hz are the mass times the
-        center of mass, and Ixx, Ixy, Ixz, Iyy, Iyz, and Izz are the rotational inertia
-        matrix elements. Note that elements that are None are not included in the
-        output.
+        rotor_inertia, viscous_friction, dynamic_dry_friction], where m is the mass, hx,
+        hy, and hz are the mass times the center of mass, and Ixx, Ixy, Ixz, Iyy, Iyz,
+        and Izz are the rotational inertia matrix elements. Note that elements that are
+        None are not included in the output.
         """
         param_list = [self.m]
         if self.hx is not None:
@@ -152,6 +159,10 @@ class JointParameters:
             param_list.append(self.Izz)
         if self.rotor_inertia is not None:
             param_list.append(self.rotor_inertia)
+        if self.viscous_friction is not None:
+            param_list.append(self.viscous_friction)
+        if self.dynamic_dry_friction is not None:
+            param_list.append(self.dynamic_dry_friction)
         return param_list
 
     def get_inertia_matrix(self) -> np.ndarray:
