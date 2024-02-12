@@ -232,17 +232,17 @@ def extract_numeric_data_matrix_autodiff(
         ad_plant_components.plant.CalcForceElementsContribution(
             ad_plant_components.plant_context, forces
         )
-        sym_torques = ad_plant_components.plant.CalcInverseDynamics(
+        ad_torques = ad_plant_components.plant.CalcInverseDynamics(
             ad_plant_components.plant_context,
             joint_data.joint_accelerations[i],
             forces,
         )
 
         # Differentiate w.r.t. parameters
-        sym_torques_derivative = np.vstack(
-            [joint_torques.derivatives() for joint_torques in sym_torques]
+        ad_torques_derivative = np.vstack(
+            [joint_torques.derivatives() for joint_torques in ad_torques]
         )
-        W_data[i * num_joints : (i + 1) * num_joints, :] = sym_torques_derivative
+        W_data[i * num_joints : (i + 1) * num_joints, :] = ad_torques_derivative
 
     return W_data, tau_data
 
