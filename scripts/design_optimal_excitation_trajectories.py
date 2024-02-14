@@ -191,12 +191,12 @@ def main():
         help="Add dynamic dry friction to the optimization.",
     )
     parser.add_argument(
-        "--add_endpoint_constraints",
+        "--not_add_endpoint_constraints",
         action="store_true",
         help="Add zero velocity/acceleration endpoint constraints to the optimization. "
         + "Note that it might be possible to achieve better performance by not "
         + "including them and then solving two simple trajopt problems to reach the "
-        + "start and end points.",
+        + "start and end points. However, these might then turn out infeasible.",
     )
     parser.add_argument(
         "--wandb_mode",
@@ -270,7 +270,7 @@ def main():
     add_rotor_inertia = args.add_rotor_inertia
     add_viscous_friction = args.add_viscous_friction
     add_dynamic_dry_friction = args.add_dynamic_dry_friction
-    add_endpoint_constraints = args.add_endpoint_constraints
+    add_endpoint_constraints = not args.not_add_endpoint_constraints
 
     if args.use_bspline:
         assert (

@@ -1116,9 +1116,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
                 the dynamics.
             include_endpoint_constraints (bool): Whether to include start and end point
-                constraints. Note that it might be possible to achieve better
-                performance by not including them and then solving two simple trajopt
-                problems to reach the start and end points.
+                constraints.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -1401,9 +1399,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
                 the dynamics.
             include_endpoint_constraints (bool): Whether to include start and end point
-                constraints. Note that it might be possible to achieve better
-                performance by not including them and then solving two simple trajopt
-                problems to reach the start and end points.
+                constraints.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
