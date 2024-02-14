@@ -1083,6 +1083,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         add_rotor_inertia: bool,
         add_viscous_friction: bool,
         add_dynamic_dry_friction: bool,
+        include_endpoint_constraints: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         logging_path: Optional[Path] = None,
@@ -1114,6 +1115,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 dynamics.
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
                 the dynamics.
+            include_endpoint_constraints (bool): Whether to include start and end point
+                constraints. Note that it might be possible to achieve better
+                performance by not including them and then solving two simple trajopt
+                problems to reach the start and end points.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -1164,8 +1169,11 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
 
         # Add constraints
         self._add_bound_constraints()
-        self._add_start_and_end_point_constraints()
         self._add_collision_constraints()
+        if include_endpoint_constraints:
+            self._add_start_and_end_point_constraints()
+        else:
+            logging.warning("Not including start and end point constraints.")
 
         self._ng_al = NevergradAugmentedLagrangian(
             max_al_iterations=max_al_iterations,
@@ -1358,6 +1366,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         add_rotor_inertia: bool,
         add_viscous_friction: bool,
         add_dynamic_dry_friction: bool,
+        include_endpoint_constraints: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
         logging_path: Optional[Path] = None,
@@ -1391,6 +1400,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 dynamics.
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
                 the dynamics.
+            include_endpoint_constraints (bool): Whether to include start and end point
+                constraints. Note that it might be possible to achieve better
+                performance by not including them and then solving two simple trajopt
+                problems to reach the start and end points.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -1436,6 +1449,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 add_rotor_inertia=add_rotor_inertia,
                 add_viscous_friction=add_viscous_friction,
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
+                include_endpoint_constraints=include_endpoint_constraints,
                 nevergrad_method=nevergrad_method,
                 traj_initial=traj_initial,
                 logging_path=logging_path,

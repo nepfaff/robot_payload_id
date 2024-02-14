@@ -191,6 +191,14 @@ def main():
         help="Add dynamic dry friction to the optimization.",
     )
     parser.add_argument(
+        "--add_endpoint_constraints",
+        action="store_true",
+        help="Add zero velocity/acceleration endpoint constraints to the optimization. "
+        + "Note that it might be possible to achieve better performance by not "
+        + "including them and then solving two simple trajopt problems to reach the "
+        + "start and end points.",
+    )
+    parser.add_argument(
         "--wandb_mode",
         type=str,
         default="online",
@@ -262,6 +270,7 @@ def main():
     add_rotor_inertia = args.add_rotor_inertia
     add_viscous_friction = args.add_viscous_friction
     add_dynamic_dry_friction = args.add_dynamic_dry_friction
+    add_endpoint_constraints = args.add_endpoint_constraints
 
     if args.use_bspline:
         assert (
@@ -291,6 +300,7 @@ def main():
                 add_rotor_inertia=add_rotor_inertia,
                 add_viscous_friction=add_viscous_friction,
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
+                add_endpoint_constraints=add_endpoint_constraints,
                 nevergrad_method=nevergrad_method,
                 spline_order=4,
                 traj_initial=traj_initial,
@@ -315,6 +325,7 @@ def main():
                 add_rotor_inertia=add_rotor_inertia,
                 add_viscous_friction=add_viscous_friction,
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
+                add_endpoint_constraints=add_endpoint_constraints,
                 nevergrad_method=nevergrad_method,
                 spline_order=4,
                 traj_initial=traj_initial,
@@ -347,6 +358,7 @@ def main():
                             add_rotor_inertia=add_rotor_inertia,
                             add_viscous_friction=add_viscous_friction,
                             add_dynamic_dry_friction=add_dynamic_dry_friction,
+                            add_endpoint_constraints=add_endpoint_constraints,
                             nevergrad_method=nevergrad_method,
                             traj_initial=traj_initial,
                             logging_path=logging_path,
@@ -372,6 +384,7 @@ def main():
                         add_rotor_inertia=add_rotor_inertia,
                         add_viscous_friction=add_viscous_friction,
                         add_dynamic_dry_friction=add_dynamic_dry_friction,
+                        add_endpoint_constraints=add_endpoint_constraints,
                         nevergrad_method=nevergrad_method,
                         traj_initial=traj_initial,
                         logging_path=logging_path,
