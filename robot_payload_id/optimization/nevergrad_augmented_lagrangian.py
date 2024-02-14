@@ -64,7 +64,8 @@ class NevergradAugmentedLagrangian:
         mu_multiplier: float = 2.0,
         mu_max: float = 1e3,
         method: str = "NGOpt",
-        constraint_tol: float = 1e-5,
+        equality_constraint_tol: float = 1e-2,
+        inequality_constraint_tol: float = 1e-5,
     ):
         """
         Args:
@@ -78,16 +79,20 @@ class NevergradAugmentedLagrangian:
             method (str): The name of the Nevergrad optimizer to use. Refer to
                 https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
-            constraint_tol (float): If the equality constraint total violation is
-                larger than this number, we will increase the penalty on the
-                equality contraint violation.
+            equality_constraint_tol (float): If the equality constraint total violation
+                is larger than this number, we will increase the penalty on all
+                contraint violations (equality and inequality).
+            inequality_constraint_tol (float): If the inequality constraint total
+                violation is larger than this number, we will increase the penalty on
+                all contraint violations (equality and inequality).
         """
         self._max_al_iters = max_al_iterations
         self._budget_per_iteration = budget_per_iteration
         self._mu_multiplier = mu_multiplier
         self._mu_max = mu_max
         self._method = method
-        self._constraint_tol = constraint_tol
+        self._equality_constraint_tol = equality_constraint_tol
+        self._inequality_constraint_tol = inequality_constraint_tol
 
     def _solve_al(
         self,
@@ -244,17 +249,25 @@ class NevergradAugmentedLagrangian:
 
         # See Drake augmented_lagrangian.cc::EvalAugmentedLagrangian for context
         lag_idx = 0
-        for constraint, constraint_type in zip(constraints, constraint_types):
+        is_equality_mask = nonsmooth_al.is_equality()
+        for constraint, constraint_type, is_equality in zip(
+            constraints, constraint_types, is_equality_mask
+        ):
             if isinstance(constraint, BoundingBoxConstraint):
                 # No residuals exist for these bounds
                 continue
 
+            constraint_tol = (
+                self._equality_constraint_tol
+                if is_equality
+                else self._inequality_constraint_tol
+            )
             for i in range(constraint.num_constraints()):
                 lb = constraint.lower_bound()[i]
                 ub = constraint.upper_bound()[i]
                 if lb == ub:
                     # Constraint adds one Lagrange multiplier
-                    if constraint_residue[lag_idx] ** 2 > self._constraint_tol:
+                    if constraint_residue[lag_idx] ** 2 > constraint_tol:
                         constraint_type_violations_map[constraint_type] += 1
                     lag_idx += 1
                 else:
@@ -262,7 +275,7 @@ class NevergradAugmentedLagrangian:
                     if not np.isinf(lb):
                         if (
                             np.maximum(-constraint_residue[lag_idx], 0) ** 2
-                            > self._constraint_tol
+                            > constraint_tol
                         ):
                             constraint_type_violations_map[constraint_type] += 1
                         lag_idx += 1
@@ -270,7 +283,7 @@ class NevergradAugmentedLagrangian:
                     if not np.isinf(ub):
                         if (
                             np.maximum(-constraint_residue[lag_idx], 0) ** 2
-                            > self._constraint_tol
+                            > constraint_tol
                         ):
                             constraint_type_violations_map[constraint_type] += 1
                         lag_idx += 1
@@ -364,7 +377,7 @@ class NevergradAugmentedLagrangian:
             lagrangian_size = nonsmooth_al.lagrangian_size()
         assert lambda_val.shape[0] == lagrangian_size, "Invalid lambda_val size!"
 
-        is_equality = nonsmooth_al.is_equality()
+        is_equality_mask = nonsmooth_al.is_equality()
         x_val = x_init
         try:
             pool = (
@@ -398,7 +411,7 @@ class NevergradAugmentedLagrangian:
                 equality_constraint_error = 0.0
                 inequality_constraint_error = 0.0
                 for j in range(lagrangian_size):
-                    if is_equality[j]:
+                    if is_equality_mask[j]:
                         lambda_val[j] -= constraint_residue[j] * mu
                         equality_constraint_error += constraint_residue[j] ** 2
                     else:
@@ -414,17 +427,18 @@ class NevergradAugmentedLagrangian:
                 # the current mu is doing a good job of maintaining near-feasibility.
                 # TODO: Consider decreasing mu by a fraction of mu_multiplier if the
                 # constraint error is small.
-                constraint_error = (
-                    equality_constraint_error + inequality_constraint_error
-                )
-                if constraint_error > self._constraint_tol:
+                if (
+                    equality_constraint_error > self._equality_constraint_tol
+                    or inequality_constraint_error > self._inequality_constraint_tol
+                ):
                     mu = np.minimum(mu * self._mu_multiplier, self._mu_max)
 
                 # Log results
                 wandb.log(
                     {
                         "AL Iteration": i + 1,
-                        "constraint_error": constraint_error,
+                        "total_constraint_error": equality_constraint_error
+                        + inequality_constraint_error,
                         "equality_constraint_error": equality_constraint_error,
                         "inequality_constraint_error": inequality_constraint_error,
                     }
