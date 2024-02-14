@@ -99,7 +99,7 @@ def main():
         q_dot_numeric = np.empty((num_timesteps, num_joints))
         q_ddot_numeric = np.empty((num_timesteps, num_joints))
         sample_times_s = np.linspace(
-            traj.start_time(), traj.end_time(), num=num_timesteps
+            traj.start_time(), traj.end_time(), num=num_timesteps, endpoint=True
         )
         for i, t in enumerate(sample_times_s):
             q_numeric[i] = traj.value(t).flatten()
@@ -115,6 +115,16 @@ def main():
         )
 
     # Log some joint data stats
+    print("Start velocity: ", joint_data.joint_velocities[0])
+    print(
+        f"End velocity (time={joint_data.sample_times_s[-1]}s): ",
+        joint_data.joint_velocities[-1],
+    )
+    print("Start acceleration: ", joint_data.joint_accelerations[0])
+    print(
+        f"End acceleration (time={joint_data.sample_times_s[-1]}s): ",
+        joint_data.joint_accelerations[-1],
+    )
     print(
         "Max abs joint velocities: ",
         np.max(np.abs(joint_data.joint_velocities), axis=0),

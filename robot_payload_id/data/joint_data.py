@@ -157,7 +157,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params(
     q_dot = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
     q_ddot = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
     num_terms = a.shape[1]
-    times = np.linspace(0, time_horizon, num_timesteps)
+    times = np.linspace(0, time_horizon, num_timesteps, endpoint=True)
     for t in tqdm(
         range(num_timesteps),
         total=num_timesteps,
@@ -255,7 +255,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
     q = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
     q_dot = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
     q_ddot = np.zeros((num_timesteps, num_joints), dtype=AutoDiffXd)
-    times = np.linspace(0, time_horizon, num_timesteps)
+    times = np.linspace(0, time_horizon, num_timesteps, endpoint=True)
     for t in tqdm(
         range(num_timesteps),
         total=num_timesteps,
