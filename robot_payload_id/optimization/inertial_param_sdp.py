@@ -54,7 +54,9 @@ def solve_inertial_param_sdp(
     identify_viscous_friction: bool = True,
     identify_dynamic_dry_friction: bool = True,
     solver_kPrintToConsole: bool = False,
-) -> Tuple[MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray]:
+) -> Tuple[
+    MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray, np.ndarray
+]:
     """Solves the inertial parameter SDP with a quadratic cost, a parameter
     regularization term, and inertial parameter feasibility constraints (pseudo inertias
     being positive definite).
@@ -76,11 +78,13 @@ def solve_inertial_param_sdp(
         solver_kPrintToConsole (bool, optional): Whether to print solver output.
 
     Returns:
-        Tuple[MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray]: A
-            tuple containing the MathematicalProgram, MathematicalProgramResult, an
-            array of the variable names, and an array of the MathematicalProgram
-            variables. The variable names and variables contain all the parameters
-            rather than the identifiable base parameters.
+        Tuple[MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray
+            np.ndarray]: A tuple containing the MathematicalProgram,
+            MathematicalProgramResult, an array of the variable names, an array of the
+            MathematicalProgram variables, and an array of the MathematicalProgram base
+            variables. The variable names and variables contain all the parameters, even
+            the non-identifiable ones, while the base variables contain only the
+            identifiable parameters (can be linear combinations of other parameters).
     """
     prog = MathematicalProgram()
 
@@ -115,23 +119,23 @@ def solve_inertial_param_sdp(
             )
         )
 
-    variable_list = np.concatenate([var.get_lumped_param_list() for var in variables])
-    variable_names = np.array([var.get_name() for var in variable_list])
+    variable_vec = np.concatenate([var.get_lumped_param_list() for var in variables])
+    variable_names = np.array([var.get_name() for var in variable_vec])
 
     # Optionally remove unidentifiable parameters
     if base_param_mapping is not None:
-        base_variable_list = variable_list.T @ base_param_mapping
+        base_variable_vec = variable_vec.T @ base_param_mapping
 
         logging.info(
             "Condition number after removing unidentifiable params: "
             + f"{np.linalg.cond(W_data)}"
         )
     else:
-        base_variable_list = variable_list
+        base_variable_vec = variable_vec
 
     # Create decision variables z = x.T @ base_param_mapping to preserve good
     # conditioning
-    z = prog.NewContinuousVariables(base_variable_list.shape[0], "z")
+    z = prog.NewContinuousVariables(base_variable_vec.shape[0], "z")
     # Normalize cost to achieve similar scaling between the cost and linear
     # equality constraints (improves numerics and is required for solvability)
     num_datapoints = len(W_data) / num_links
@@ -144,8 +148,7 @@ def solve_inertial_param_sdp(
     )
 
     # Add constraint that z = x.T @ base_param_mapping
-    A, _, x = DecomposeAffineExpressions(base_variable_list)  # z = Ax
-    A[np.abs(A) < 1e-6] = 0.0
+    A, _, x = DecomposeAffineExpressions(base_variable_vec)  # z = Ax
     num_base_params = len(z)
     prog.AddLinearEqualityConstraint(
         np.hstack([np.eye(num_base_params), -A]),
@@ -156,7 +159,7 @@ def solve_inertial_param_sdp(
     # Regularization
     # TODO: Replace this with geometric regularization
     prog.AddQuadraticCost(
-        regularization_weight * base_variable_list.T @ base_variable_list,
+        regularization_weight * base_variable_vec.T @ base_variable_vec,
         is_convex=True,
     )
 
@@ -192,4 +195,4 @@ def solve_inertial_param_sdp(
 
     logging.info("Starting to solve SDP...")
     result = Solve(prog=prog, solver_options=options)
-    return prog, result, variable_names, variable_list
+    return prog, result, variable_names, variable_vec, base_variable_vec

@@ -3,8 +3,18 @@ import logging
 import os
 
 from pathlib import Path
+from typing import Dict
 
 import numpy as np
+import sympy
+
+from pydrake.all import (
+    DecomposeAffineExpressions,
+    MathematicalProgramResult,
+    from_sympy,
+    to_sympy,
+)
+from scipy.linalg import lu
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
@@ -19,10 +29,177 @@ from robot_payload_id.eric_id.drake_torch_dynamics import (
 )
 from robot_payload_id.optimization import solve_inertial_param_sdp
 from robot_payload_id.utils import (
+    ArmComponents,
     BsplineTrajectoryAttributes,
     FourierSeriesTrajectoryAttributes,
     JointData,
+    get_plant_joint_params,
 )
+
+
+def compute_entropic_divergence_to_gt_params(
+    num_joints: int, arm_components: ArmComponents, var_sol_dict: Dict[str, float]
+) -> None:
+    """
+    Compute and logs the inertial entropic divergence from the estimated parameters in
+    `var_sol_dict` to the ground truth parameters in `arm_components.plant`.
+
+    Zero entropic divergence means the estimated parameters are the same as the ground
+    truth parameters. This is not possible as not all parameters are identifiable.
+    """
+    masses_estimated = np.array([var_sol_dict[f"m{i}(0)"] for i in range(num_joints)])
+    coms_estimated = np.array(
+        [
+            [
+                var_sol_dict[f"hx{i}(0)"],
+                var_sol_dict[f"hy{i}(0)"],
+                var_sol_dict[f"hz{i}(0)"],
+            ]
+            / var_sol_dict[f"m{i}(0)"]
+            for i in range(num_joints)
+        ]
+    )
+    rot_inertias_estimated = np.array(
+        [
+            [
+                [
+                    var_sol_dict[f"Ixx{i}(0)"],
+                    var_sol_dict[f"Ixy{i}(0)"],
+                    var_sol_dict[f"Ixz{i}(0)"],
+                ],
+                [
+                    var_sol_dict[f"Ixy{i}(0)"],
+                    var_sol_dict[f"Iyy{i}(0)"],
+                    var_sol_dict[f"Iyz{i}(0)"],
+                ],
+                [
+                    var_sol_dict[f"Ixz{i}(0)"],
+                    var_sol_dict[f"Iyz{i}(0)"],
+                    var_sol_dict[f"Izz{i}(0)"],
+                ],
+            ]
+            for i in range(num_joints)
+        ]
+    )
+    bodies = get_candidate_sys_id_bodies(arm_components.plant)
+    masses_gt, coms_gt, rot_inertias_gt = get_plant_inertial_params(
+        arm_components.plant, arm_components.plant.CreateDefaultContext(), bodies
+    )
+    inertia_entropic_divergence = calc_inertia_entropic_divergence(
+        masses_estimated,
+        coms_estimated,
+        rot_inertias_estimated,
+        masses_gt,
+        coms_gt,
+        rot_inertias_gt,
+    )
+    logging.info(
+        "Inertia entropic divergence from ground truth: "
+        + f"{inertia_entropic_divergence}"
+    )
+    last_link_inertia_entropic_divergence = calc_inertia_entropic_divergence(
+        masses_estimated[-1:],
+        coms_estimated[-1:],
+        rot_inertias_estimated[-1:],
+        masses_gt[-1:],
+        coms_gt[-1:],
+        rot_inertias_gt[-1:],
+    )
+    logging.info(
+        "Inertia entropic divergence from ground truth for last link: "
+        + f"{last_link_inertia_entropic_divergence}"
+    )
+
+
+def compute_base_parameter_errors(
+    arm_components: ArmComponents,
+    result: MathematicalProgramResult,
+    identify_rotor_inertia: bool,
+    identify_viscous_friction: bool,
+    identify_dynamic_dry_friction: bool,
+    base_param_mapping: np.ndarray,
+    variable_vec: np.ndarray,
+    base_variable_vec: np.ndarray,
+    var_sol_dict: Dict[str, float],
+    remove_term_threshold: float = 1e-6,
+) -> None:
+    # Get GT params
+    inertial_params_gt = get_plant_joint_params(
+        arm_components.plant,
+        arm_components.plant.CreateDefaultContext(),
+        add_rotor_inertia=identify_rotor_inertia,
+        add_viscous_friction=identify_viscous_friction,
+        add_dynamic_dry_friction=identify_dynamic_dry_friction,
+    )
+    params_vec_gt = np.concatenate(
+        [params.get_lumped_param_list() for params in inertial_params_gt]
+    )
+    # Assume that GT params are in the same order as variable_vec
+    variable_names = [var.get_name() for var in variable_vec]
+    var_gt_dict = dict(zip(variable_names, params_vec_gt))
+
+    # Compute absolute base param errors
+    if base_param_mapping is not None:
+        base_params_vec_gt = params_vec_gt.T @ base_param_mapping
+        base_variable_vec_numeric = np.array(
+            [
+                expression[0].Evaluate()
+                for expression in result.GetSolution(base_variable_vec)
+            ]
+        )
+    else:
+        base_params_vec_gt = params_vec_gt
+        base_variable_vec_numeric = result.GetSolution(variable_vec)
+    base_param_abs_error = np.abs(base_params_vec_gt - base_variable_vec_numeric)
+    logging.info(f"Total absolute base parameter error: {np.sum(base_param_abs_error)}")
+
+    # Compute the identifiable parameters (approximate)
+    # Remove terms with absolute value less than remove_term_threshold
+    base_variable_vec_simplified = []
+    for i, param in enumerate(base_variable_vec):
+        memo = {}
+        param_sympy = to_sympy(param, memo=memo)
+        param_sympy_poly = sympy.Poly(param_sympy)
+        to_remove = [
+            abs(i) for i in param_sympy_poly.coeffs() if abs(i) < remove_term_threshold
+        ]
+        for i in to_remove:
+            param_sympy_poly = param_sympy_poly.subs(i, 0)
+        param_simplified = (
+            from_sympy(param_sympy_poly, memo=memo)
+            if not isinstance(param_sympy_poly, sympy.Poly)
+            else param
+        )
+        base_variable_vec_simplified.append(param_simplified)
+    A_matrix, _, x_vars = DecomposeAffineExpressions(base_variable_vec_simplified)
+    U_matrix = lu(A_matrix)[2]
+    # The basis columns correspond to the identifiable parameters
+    basis_columns = {
+        np.flatnonzero(U_matrix[i, :])[0] for i in range(U_matrix.shape[0])
+    }
+    identifiable_vars = [x_vars[i] for i in basis_columns]
+    identifiable_vars_sorted = sorted(
+        identifiable_vars, key=lambda x: int(x.get_name()[-4])
+    )
+
+    # Print GT and estimated values of identifiable parameters
+    identifiable_vars_gt_values = [
+        var_gt_dict[var.get_name()] for var in identifiable_vars_sorted
+    ]
+    identifiable_vars_estimated_values = [
+        var_sol_dict[var.get_name()] for var in identifiable_vars_sorted
+    ]
+    logging.info("Identifiable parameters:")
+    for var, gt_value, estimated_value in zip(
+        identifiable_vars_sorted,
+        identifiable_vars_gt_values,
+        identifiable_vars_estimated_values,
+    ):
+        logging.info(
+            f"{var.get_name():>20}: GT value: {gt_value:>12.6}, Estimated value: "
+            + f"{estimated_value:>12.6}, Abs error: {abs(gt_value - estimated_value):>12.6} "
+            + f", Rel error: {abs(gt_value - estimated_value) / abs(gt_value+1e-12):>12.6}"
+        )
 
 
 def main():
@@ -212,7 +389,13 @@ def main():
                 @ base_param_mapping
             )
 
-    _, result, variable_names, variable_list = solve_inertial_param_sdp(
+    (
+        _,
+        result,
+        variable_names,
+        variable_vec,
+        base_variable_vec,
+    ) = solve_inertial_param_sdp(
         num_links=num_joints,
         W_data=W_data,
         tau_data=tau_data,
@@ -223,77 +406,24 @@ def main():
         solver_kPrintToConsole=args.kPrintToConsole,
     )
     if result.is_success():
-        var_sol_dict = dict(zip(variable_names, result.GetSolution(variable_list)))
+        var_sol_dict = dict(zip(variable_names, result.GetSolution(variable_vec)))
         logging.info(f"SDP result:\n{var_sol_dict}")
 
-        # Compute entropic divergence to GT parameters
-        masses_estiamted = np.array(
-            [var_sol_dict[f"m{i}(0)"] for i in range(num_joints)]
+        compute_entropic_divergence_to_gt_params(
+            num_joints, arm_components, var_sol_dict
         )
-        coms_estimated = np.array(
-            [
-                [
-                    var_sol_dict[f"hx{i}(0)"],
-                    var_sol_dict[f"hy{i}(0)"],
-                    var_sol_dict[f"hz{i}(0)"],
-                ]
-                / var_sol_dict[f"m{i}(0)"]
-                for i in range(num_joints)
-            ]
+        compute_base_parameter_errors(
+            arm_components=arm_components,
+            result=result,
+            identify_rotor_inertia=identify_rotor_inertia,
+            identify_viscous_friction=identify_viscous_friction,
+            identify_dynamic_dry_friction=identify_dynamic_dry_friction,
+            base_param_mapping=base_param_mapping,
+            variable_vec=variable_vec,
+            base_variable_vec=base_variable_vec,
+            var_sol_dict=var_sol_dict,
         )
-        rot_inertias_estimated = np.array(
-            [
-                [
-                    [
-                        var_sol_dict[f"Ixx{i}(0)"],
-                        var_sol_dict[f"Ixy{i}(0)"],
-                        var_sol_dict[f"Ixz{i}(0)"],
-                    ],
-                    [
-                        var_sol_dict[f"Ixy{i}(0)"],
-                        var_sol_dict[f"Iyy{i}(0)"],
-                        var_sol_dict[f"Iyz{i}(0)"],
-                    ],
-                    [
-                        var_sol_dict[f"Ixz{i}(0)"],
-                        var_sol_dict[f"Iyz{i}(0)"],
-                        var_sol_dict[f"Izz{i}(0)"],
-                    ],
-                ]
-                for i in range(num_joints)
-            ]
-        )
-        bodies = get_candidate_sys_id_bodies(arm_components.plant)
-        masses_gt, coms_gt, rot_inertias_gt = get_plant_inertial_params(
-            arm_components.plant, arm_components.plant.CreateDefaultContext(), bodies
-        )
-        inertia_entropic_divergence = calc_inertia_entropic_divergence(
-            masses_estiamted,
-            coms_estimated,
-            rot_inertias_estimated,
-            masses_gt,
-            coms_gt,
-            rot_inertias_gt,
-        )
-        # Zero entropic divergence means the estimated parameters are the same as the
-        # ground truth parameters. This is not possible as not all parameters are
-        # identifiable.
-        logging.info(
-            "Inertia entropic divergence from ground truth: "
-            + f"{inertia_entropic_divergence}"
-        )
-        last_link_inertia_entropic_divergence = calc_inertia_entropic_divergence(
-            masses_estiamted[-1:],
-            coms_estimated[-1:],
-            rot_inertias_estimated[-1:],
-            masses_gt[-1:],
-            coms_gt[-1:],
-            rot_inertias_gt[-1:],
-        )
-        logging.info(
-            "Inertia entropic divergence from ground truth for last link: "
-            + f"{last_link_inertia_entropic_divergence}"
-        )
+
     else:
         logging.warning("Failed to solve inertial parameter SDP!")
         logging.info(f"Solution result:\n{result.get_solution_result()}")
