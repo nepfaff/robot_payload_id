@@ -16,32 +16,39 @@ from pydrake.all import (
 from robot_payload_id.utils import JointParameters
 
 
-def construct_psuedo_inertias(variables: List[JointParameters]) -> List[np.ndarray]:
-    pseudo_inertias = []
-    for i in range(len(variables)):
-        mass = np.array([[variables[i].m]])
-        inertia = variables[i].get_inertia_matrix()
-        density_weighted_2nd_moment_matrix = (
-            0.5 * np.trace(inertia) * np.eye(3) - inertia
+def add_entropic_divergence_regularization(
+    prog: MathematicalProgram,
+    pseudo_inertias: List[np.ndarray],
+    pseudo_inertias_guess: List[np.ndarray],
+    regularization_weight: float,
+) -> None:
+    """Adds entropic divergence regularization to the inertial parameter SDP.
+    Entropic divergence is from Eq. (19) of "Geometric Robot Dynamic Identification:
+    A Convex Programming Approach" (https://ieeexplore.ieee.org/document/8922724):
+    d_M(ϕ, ϕ₀)² = d_F(P || P₀) = -log(|P|) + tr(P₀⁻¹ P), where ℙ(4) represents
+    pseudo-inertias.
+    See https://github.com/alex07143/Geometric-Robot-DynID/blob/592e64c5a9/Functions/Identification/ID_Entropic.m#L67
+    for the original MATLAB implementation.
+
+    Args:
+        prog (MathematicalProgram): The MathematicalProgram to add the cost to.
+        pseudo_inertias (List[np.ndarray]): The pseudo-inertias to regularize.
+        pseudo_inertias_guess (List[np.ndarray]): The pseudo-inertias initial guess.
+        regularization_weight (float): The regularization weight.
+    """
+    for pseudo_inertia, pseudo_inertia_guess in zip(
+        pseudo_inertias, pseudo_inertias_guess
+    ):
+        # The AddMaximizeLogDeterminantCost cost is -∑ᵢt(i)
+        # We remove the cost and add it back with scalling
+        cost, t, _ = prog.AddMaximizeLogDeterminantCost(pseudo_inertia)
+        prog.RemoveCost(cost)
+        prog.AddLinearCost(-regularization_weight * np.sum(t))
+
+        prog.AddCost(
+            regularization_weight
+            * np.trace(np.linalg.inv(pseudo_inertia_guess) @ pseudo_inertia)
         )
-        density_weighted_1st_moment = np.array(
-            [variables[i].hx, variables[i].hy, variables[i].hz]
-        ).reshape((3, 1))
-        pseudo_inertias.append(
-            np.block(
-                [
-                    [
-                        density_weighted_2nd_moment_matrix,
-                        density_weighted_1st_moment,
-                    ],
-                    [
-                        density_weighted_1st_moment.T,
-                        mass,
-                    ],
-                ]
-            )
-        )
-    return pseudo_inertias
 
 
 def solve_inertial_param_sdp(
@@ -50,6 +57,8 @@ def solve_inertial_param_sdp(
     tau_data: np.ndarray,
     base_param_mapping: Optional[np.ndarray] = None,
     regularization_weight: float = 0.0,
+    params_guess: Optional[List[JointParameters]] = None,
+    use_euclidean_regularization: bool = False,
     identify_rotor_inertia: bool = True,
     identify_viscous_friction: bool = True,
     identify_dynamic_dry_friction: bool = True,
@@ -70,6 +79,11 @@ def solve_inertial_param_sdp(
             to the part of V in the SVD that corresponds to non-zero singular values. If
             None, all parameters are assumed to be identifiable.
         regularization_weight (float, optional): The parameter regularization weight.
+        params_guess (List[JointParameters], optional): A guess of the inertial
+            parameters to use for regularization. Required if `regularization_weight` is
+            non-zero.
+        use_euclidean_regularization (bool, optional): Whether to use euclidean
+            regularization instead of entropic divergence regularization.
         identify_rotor_inertia (bool, optional): Whether to identify the rotor inertia.
         identify_viscous_friction (bool, optional): Whether to identify the viscous
             friction.
@@ -86,6 +100,11 @@ def solve_inertial_param_sdp(
             the non-identifiable ones, while the base variables contain only the
             identifiable parameters (can be linear combinations of other parameters).
     """
+    assert regularization_weight == 0.0 or params_guess is not None, (
+        "Ground truth inertial parameters are required if the regularization weight is "
+        "non-zero."
+    )
+
     prog = MathematicalProgram()
 
     # Create decision variables
@@ -156,15 +175,30 @@ def solve_inertial_param_sdp(
         np.concatenate([z, x]),
     )
 
-    # Regularization
-    # TODO: Replace this with geometric regularization
-    prog.AddQuadraticCost(
-        regularization_weight * base_variable_vec.T @ base_variable_vec,
-        is_convex=True,
-    )
+    # Regularization towards initial parameter guess
+    pseudo_inertias = [var.get_pseudo_inertia_matrix() for var in variables]
+    if use_euclidean_regularization:
+        variables_guess = np.concatenate(
+            [var.get_lumped_param_list() for var in params_guess]
+        )
+        prog.AddQuadraticCost(
+            regularization_weight
+            * (variables_guess - variable_vec).T
+            @ (variables_guess - variable_vec),
+            is_convex=True,
+        )
+    else:
+        pseudo_inertias_guess = [
+            var.get_pseudo_inertia_matrix() for var in params_guess
+        ]
+        add_entropic_divergence_regularization(
+            prog=prog,
+            pseudo_inertias=pseudo_inertias,
+            pseudo_inertias_guess=pseudo_inertias_guess,
+            regularization_weight=regularization_weight,
+        )
 
     # Inertial parameter feasibility constraints
-    pseudo_inertias = construct_psuedo_inertias(variables)
     for pseudo_inertia in pseudo_inertias:
         prog.AddPositiveSemidefiniteConstraint(pseudo_inertia - 1e-6 * np.identity(4))
 

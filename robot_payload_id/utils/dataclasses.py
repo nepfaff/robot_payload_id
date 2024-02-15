@@ -204,6 +204,43 @@ class JointParameters:
             + "unit inertia."
         )
 
+    def get_pseudo_inertia_matrix(self) -> np.ndarray:
+        """
+        Returns the pseudo-inertia matrix of the joint.
+
+        Pseudo-inertia ℙ(4):
+            P(m, c, Iₘ) = [ Σ  h ]
+                          [ hᵀ m ]
+        where
+            Iₘ is I_BBo_B (about link origin)/ rotational inertia
+            c is p_BBcm (center of mass)
+            Σ = 1/2 tr(Iₘ) eye(3) - Iₘ is the covariance/ density weighted 2nd moment
+            h = m c the density weighted 1st moment
+        """
+        rotational_inertia = self.get_inertia_matrix()
+        density_weighted_2nd_moment_matrix = (
+            0.5 * np.trace(rotational_inertia) * np.eye(3) - rotational_inertia
+        )
+        if self.hx is not None and self.hy is not None and self.hz is not None:
+            density_weighted_1st_moment = np.array([self.hx, self.hy, self.hz]).reshape(
+                (3, 1)
+            )
+        elif self.cx is not None and self.cy is not None and self.cz is not None:
+            density_weighted_1st_moment = self.m * np.array(
+                [self.cx, self.cy, self.cz]
+            ).reshape((3, 1))
+        else:
+            raise NotImplementedError(
+                "Currently only supporting all center of mass or all mass times center "
+                + "of mass."
+            )
+        return np.block(
+            [
+                [density_weighted_2nd_moment_matrix, density_weighted_1st_moment],
+                [density_weighted_1st_moment.T, self.m],
+            ]
+        )
+
 
 @dataclass
 class ArmComponents:

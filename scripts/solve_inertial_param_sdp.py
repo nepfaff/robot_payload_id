@@ -195,10 +195,13 @@ def compute_base_parameter_errors(
         identifiable_vars_gt_values,
         identifiable_vars_estimated_values,
     ):
+        rel_abs_error = (
+            abs(gt_value - estimated_value) / abs(gt_value) if gt_value != 0 else np.nan
+        )
         logging.info(
-            f"{var.get_name():>20}: GT value: {gt_value:>12.6}, Estimated value: "
+            f"{var.get_name():>25}: GT value: {gt_value:>12.6}, Estimated value: "
             + f"{estimated_value:>12.6}, Abs error: {abs(gt_value - estimated_value):>12.6} "
-            + f", Rel error: {abs(gt_value - estimated_value) / abs(gt_value+1e-12):>12.6}"
+            + f", Rel abs error: {rel_abs_error:>12.6}"
         )
 
 
@@ -258,6 +261,17 @@ def main():
         help="Do not identify dynamic dry friction.",
     )
     parser.add_argument(
+        "--use_euclidean_regularization",
+        action="store_true",
+        help="Use euclidean regularization instead of entropic divergence regularization.",
+    )
+    parser.add_argument(
+        "--regularization_weight",
+        type=float,
+        default=1e-2,
+        help="The regularization weight.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -272,6 +286,8 @@ def main():
     identify_rotor_inertia = not args.not_identify_rotor_inertia
     identify_viscous_friction = not args.not_identify_viscous_friction
     identify_dynamic_dry_friction = not args.not_identify_dynamic_dry_friction
+    use_euclidean_regularization = args.use_euclidean_regularization
+    regularization_weight = args.regularization_weight
 
     logging.basicConfig(level=args.log_level)
 
@@ -389,6 +405,17 @@ def main():
                 @ base_param_mapping
             )
 
+    # Construct initial parameter guess
+    # TODO: Perturb the GT parameters to get a more realistic initial guess for
+    # simulation-based evaluation
+    params_guess = get_plant_joint_params(
+        arm_components.plant,
+        arm_components.plant.CreateDefaultContext(),
+        add_rotor_inertia=identify_rotor_inertia,
+        add_viscous_friction=identify_viscous_friction,
+        add_dynamic_dry_friction=identify_dynamic_dry_friction,
+    )
+
     (
         _,
         result,
@@ -400,12 +427,16 @@ def main():
         W_data=W_data,
         tau_data=tau_data,
         base_param_mapping=base_param_mapping,
+        regularization_weight=regularization_weight,
+        params_guess=params_guess,
+        use_euclidean_regularization=use_euclidean_regularization,
         identify_rotor_inertia=identify_rotor_inertia,
         identify_viscous_friction=identify_viscous_friction,
         identify_dynamic_dry_friction=identify_dynamic_dry_friction,
         solver_kPrintToConsole=args.kPrintToConsole,
     )
     if result.is_success():
+        logging.info(f"Final cost: {result.get_optimal_cost()}")
         var_sol_dict = dict(zip(variable_names, result.GetSolution(variable_vec)))
         logging.info(f"SDP result:\n{var_sol_dict}")
 
