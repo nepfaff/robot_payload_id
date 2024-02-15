@@ -189,6 +189,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         add_viscous_friction: bool,
         add_dynamic_dry_friction: bool,
         include_endpoint_constraints: bool,
+        constraint_acceleration_endpoints: bool = False,
         nevergrad_method: str = "NGOpt",
         spline_order: int = 4,
         traj_initial: Optional[Union[BsplineTrajectory, Path]] = None,
@@ -225,6 +226,8 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 the dynamics.
             include_endpoint_constraints (bool): Whether to include start and end point
                 constraints.
+            constraint_acceleration_endpoints (bool): Whether to add acceleration
+                constraints at the start and end of the trajectory.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -256,6 +259,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         self._add_rotor_inertia = add_rotor_inertia
         self._add_viscous_friction = add_viscous_friction
         self._add_dynamic_dry_friction = add_dynamic_dry_friction
+        self._constraint_acceleration_endpoints = constraint_acceleration_endpoints
         self._nevergrad_method = nevergrad_method
 
         # Select cost function
@@ -497,15 +501,16 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         name_unnamed_constraints(self._prog, "endVelocity")
 
         # Acceleration endpoint constraints
-        # Note that path and joint acceleration constraints are equivalent for s=0,1
-        self._trajopt.AddPathAccelerationConstraint(
-            lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
-        )
-        name_unnamed_constraints(self._prog, "startAcceleration")
-        self._trajopt.AddPathAccelerationConstraint(
-            lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
-        )
-        name_unnamed_constraints(self._prog, "endAcceleration")
+        if self._constraint_acceleration_endpoints:
+            # Note that path and joint acceleration constraints are equivalent for s=0,1
+            self._trajopt.AddPathAccelerationConstraint(
+                lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
+            )
+            name_unnamed_constraints(self._prog, "startAcceleration")
+            self._trajopt.AddPathAccelerationConstraint(
+                lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
+            )
+            name_unnamed_constraints(self._prog, "endAcceleration")
 
     def _add_collision_constraints(self, min_distance: float = 0.01) -> None:
         """Add collision avoidance constraints."""
