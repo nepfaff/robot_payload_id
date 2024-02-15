@@ -25,7 +25,7 @@
             <ixz>0</ixz>
             <iyy>0.05</iyy>
             <iyz>0</iyz>
-            <izz>0</izz>
+            <izz>0.01</izz>
           </inertia>
         </inertial>
         <visual name="link_1_visual">
@@ -68,7 +68,7 @@
             <spring_stiffness>0</spring_stiffness>
           </dynamics>
         </axis>
-        <drake:gear_ratio>2.0</drake:gear_ratio>
+        <drake:gear_ratio>160.0</drake:gear_ratio>
         <drake:rotor_inertia>0.00007171875</drake:rotor_inertia>
     </joint>
     <joint name="base_weld" type="fixed">
