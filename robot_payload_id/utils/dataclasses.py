@@ -78,6 +78,7 @@ class JointParameters:
     Gyz: Union[sym.Variable, float, None] = None
     Gzz: Union[sym.Variable, float, None] = None
     rotor_inertia: Union[sym.Variable, float, None] = None
+    reflected_inertia: Union[sym.Variable, float, None] = None
     viscous_friction: Union[sym.Variable, float, None] = None
     dynamic_dry_friction: Union[sym.Variable, float, None] = None
 
@@ -101,6 +102,10 @@ class JointParameters:
         rotational unit inertia matrix elements. Note that elements that are None are
         not included in the output.
         """
+        assert not (
+            self.rotor_inertia is not None and self.reflected_inertia is not None
+        ), "Only one of rotor_inertia and reflected_inertia can be specified."
+
         param_list = [self.m]
         if self.cx is not None:
             param_list.append(self.cx)
@@ -122,6 +127,8 @@ class JointParameters:
             param_list.append(self.Gzz)
         if self.rotor_inertia is not None:
             param_list.append(self.rotor_inertia)
+        if self.reflected_inertia is not None:
+            param_list.append(self.reflected_inertia)
         if self.viscous_friction is not None:
             param_list.append(self.viscous_friction)
         if self.dynamic_dry_friction is not None:
@@ -138,6 +145,10 @@ class JointParameters:
         and Izz are the rotational inertia matrix elements. Note that elements that are
         None are not included in the output.
         """
+        assert not (
+            self.rotor_inertia is not None and self.reflected_inertia is not None
+        ), "Only one of rotor_inertia and reflected_inertia can be specified."
+
         param_list = [self.m]
         if self.hx is not None:
             param_list.append(self.hx)
@@ -159,6 +170,8 @@ class JointParameters:
             param_list.append(self.Izz)
         if self.rotor_inertia is not None:
             param_list.append(self.rotor_inertia)
+        if self.reflected_inertia is not None:
+            param_list.append(self.reflected_inertia)
         if self.viscous_friction is not None:
             param_list.append(self.viscous_friction)
         if self.dynamic_dry_friction is not None:

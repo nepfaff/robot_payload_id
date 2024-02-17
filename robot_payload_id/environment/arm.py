@@ -38,7 +38,10 @@ def create_arm(
 
     # Add arm
     parser.AddModels(arm_file_path)
-    arm = plant.GetModelInstanceByName("arm")
+    try:
+        arm = plant.GetModelInstanceByName("iiwa")
+    except:
+        arm = plant.GetModelInstanceByName("arm")
     plant.Finalize()
 
     placeholder_trajectory = PiecewisePolynomial(np.zeros((num_joints, 1)))

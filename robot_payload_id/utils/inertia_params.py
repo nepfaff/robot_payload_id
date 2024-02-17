@@ -136,6 +136,7 @@ def get_plant_joint_params(
     plant: MultibodyPlant,
     context: Context,
     add_rotor_inertia: bool,
+    add_reflected_inertia: bool,
     add_viscous_friction: bool,
     add_dynamic_dry_friction: bool,
 ) -> List[JointParameters]:
@@ -146,6 +147,8 @@ def get_plant_joint_params(
         plant (MultibodyPlant): The plant to extract inertial parameters from.
         context (Context): The context to extract inertial parameters from.
         add_rotor_inertia (bool): Whether to add rotor inertia to the joint parameters.
+        add_reflected_inertia (bool): Whether to add reflected inertia to the joint
+            parameters. NOTE: This is mutually exclusive with `add_rotor_inertia`.
         add_viscous_friction (bool): Whether to add viscous friction to the joint
             parameters.
         add_dynamic_dry_friction (bool): Whether to add dynamic dry friction to the
@@ -155,6 +158,10 @@ def get_plant_joint_params(
         List[JointParameters]: A list of inertial parameters for each joint in the
             plant.
     """
+    assert not (
+        add_rotor_inertia and add_reflected_inertia
+    ), "Cannot add rotor inertia and reflected inertia at the same time."
+
     bodies = get_candidate_sys_id_bodies(plant)
     joints = get_revolute_joints(plant)
     joint_actuators = get_joint_actuators(plant)
@@ -179,6 +186,10 @@ def get_plant_joint_params(
                 Iyz=rot_inertia[1, 2],
                 rotor_inertia=joint_actuator.rotor_inertia(context)
                 if add_rotor_inertia
+                else None,
+                reflected_inertia=joint_actuator.rotor_inertia(context)
+                * joint_actuator.gear_ratio(context) ** 2
+                if add_reflected_inertia
                 else None,
                 viscous_friction=joint.damping() if add_viscous_friction else None,
                 dynamic_dry_friction=0.0

@@ -115,6 +115,7 @@ def compute_base_parameter_errors(
     arm_components: ArmComponents,
     result: MathematicalProgramResult,
     identify_rotor_inertia: bool,
+    identify_reflected_inertia: bool,
     identify_viscous_friction: bool,
     identify_dynamic_dry_friction: bool,
     base_param_mapping: np.ndarray,
@@ -128,6 +129,7 @@ def compute_base_parameter_errors(
         arm_components.plant,
         arm_components.plant.CreateDefaultContext(),
         add_rotor_inertia=identify_rotor_inertia,
+        add_reflected_inertia=identify_reflected_inertia,
         add_viscous_friction=identify_viscous_friction,
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
     )
@@ -213,9 +215,9 @@ def main():
         help="Use one link arm instead of 7-DOF arm.",
     )
     parser.add_argument(
-        "--remove_unidentifiable_params",
+        "--keep_unidentifiable_params",
         action="store_true",
-        help="Remove unidentifiable parameters instead of identifying all parameters.",
+        help="Keep and identify unidentifiable parameters instead of removing them.",
     )
     parser.add_argument(
         "--num_data_points",
@@ -246,9 +248,15 @@ def main():
         help="Whether to print solver output.",
     )
     parser.add_argument(
-        "--not_identify_rotor_inertia",
+        "--identify_rotor_inertia",
         action="store_true",
-        help="Do not identify rotor inertia.",
+        help="Identify rotor inertia. NOTE: It is recommended to identify reflected "
+        + "inertia instead.",
+    )
+    parser.add_argument(
+        "--not_identify_reflected_inertia",
+        action="store_true",
+        help="Do not identify reflected inertia.",
     )
     parser.add_argument(
         "--not_identify_viscous_friction",
@@ -283,7 +291,8 @@ def main():
     traj_parameter_path = args.traj_parameter_path
     num_data_points = args.num_data_points
     time_horizon = args.time_horizon
-    identify_rotor_inertia = not args.not_identify_rotor_inertia
+    identify_rotor_inertia = args.identify_rotor_inertia
+    identify_reflected_inertia = not args.not_identify_reflected_inertia
     identify_viscous_friction = not args.not_identify_viscous_friction
     identify_dynamic_dry_friction = not args.not_identify_dynamic_dry_friction
     use_euclidean_regularization = args.use_euclidean_regularization
@@ -342,11 +351,12 @@ def main():
         arm_components=arm_components,
         joint_data=joint_data,
         add_rotor_inertia=identify_rotor_inertia,
+        add_reflected_inertia=identify_reflected_inertia,
         add_viscous_friction=identify_viscous_friction,
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
     )
 
-    if args.remove_unidentifiable_params:
+    if not args.keep_unidentifiable_params:
         # Load base parameter mapping
         base_param_mapping_path = traj_parameter_path / "base_param_mapping.npy"
         if not os.path.exists(base_param_mapping_path):
@@ -379,6 +389,7 @@ def main():
                     arm_components=arm_components,
                     joint_data=joint_data_random,
                     add_rotor_inertia=identify_rotor_inertia,
+                    add_reflected_inertia=identify_reflected_inertia,
                     add_viscous_friction=identify_viscous_friction,
                     add_dynamic_dry_friction=identify_dynamic_dry_friction,
                 )
@@ -412,6 +423,7 @@ def main():
         arm_components.plant,
         arm_components.plant.CreateDefaultContext(),
         add_rotor_inertia=identify_rotor_inertia,
+        add_reflected_inertia=identify_reflected_inertia,
         add_viscous_friction=identify_viscous_friction,
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
     )
@@ -431,6 +443,7 @@ def main():
         params_guess=params_guess,
         use_euclidean_regularization=use_euclidean_regularization,
         identify_rotor_inertia=identify_rotor_inertia,
+        identify_reflected_inertia=identify_reflected_inertia,
         identify_viscous_friction=identify_viscous_friction,
         identify_dynamic_dry_friction=identify_dynamic_dry_friction,
         solver_kPrintToConsole=args.kPrintToConsole,
@@ -447,6 +460,7 @@ def main():
             arm_components=arm_components,
             result=result,
             identify_rotor_inertia=identify_rotor_inertia,
+            identify_reflected_inertia=identify_reflected_inertia,
             identify_viscous_friction=identify_viscous_friction,
             identify_dynamic_dry_friction=identify_dynamic_dry_friction,
             base_param_mapping=base_param_mapping,

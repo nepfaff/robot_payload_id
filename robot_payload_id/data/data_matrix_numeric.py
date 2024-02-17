@@ -173,6 +173,7 @@ def extract_numeric_data_matrix_autodiff(
     arm_components: Union[ArmComponents, ArmPlantComponents],
     joint_data: JointData,
     add_rotor_inertia: bool,
+    add_reflected_inertia: bool,
     add_viscous_friction: bool,
     add_dynamic_dry_friction: bool,
     use_progress_bar: bool = True,
@@ -187,6 +188,8 @@ def extract_numeric_data_matrix_autodiff(
             and accelerations are used for the data matrix computation. The joint
             torques are flattened and returned.
         add_rotor_inertia (bool): Whether to add rotor inertia as a parameter.
+        add_reflected_inertia (bool): Whether to add reflected inertia as a parameter.
+            NOTE: This is mutually exclusive with add_rotor_inertia.
         add_viscous_friction (bool): Whether to add viscous friction as a parameter.
         add_dynamic_dry_friction (bool): Whether to add dynamic dry friction as a
             parameter.
@@ -198,6 +201,11 @@ def extract_numeric_data_matrix_autodiff(
             num_timesteps, num_lumped_params) and the numeric torque data has shape
             (num_joints * num_timesteps,).
     """
+    assert not (add_rotor_inertia and add_reflected_inertia), (
+        "Cannot add both rotor inertia and reflected inertia as they represent the "
+        + "same parameter."
+    )
+
     # Create autodiff arm
     ad_plant_components = (
         arm_components
@@ -205,10 +213,15 @@ def extract_numeric_data_matrix_autodiff(
         else create_autodiff_plant(
             arm_components=arm_components,
             add_rotor_inertia=add_rotor_inertia,
+            add_reflected_inertia=add_reflected_inertia,
             add_viscous_friction=add_viscous_friction,
             add_dynamic_dry_friction=add_dynamic_dry_friction,
         )
     )
+    if add_reflected_inertia:
+        reflected_inertia_ad = np.array(
+            [params.reflected_inertia for params in ad_plant_components.parameters]
+        )
     if add_viscous_friction:
         viscous_frictions_ad = np.array(
             [params.viscous_friction for params in ad_plant_components.parameters]
@@ -254,6 +267,8 @@ def extract_numeric_data_matrix_autodiff(
             forces,
         )
 
+        if add_reflected_inertia:
+            ad_torques += reflected_inertia_ad * joint_data.joint_accelerations[i]
         if add_viscous_friction:
             ad_torques += viscous_frictions_ad * joint_data.joint_velocities[i]
         if add_dynamic_dry_friction:

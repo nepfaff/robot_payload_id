@@ -183,6 +183,7 @@ def create_symbolic_plant(
 def create_autodiff_plant(
     arm_components: ArmComponents,
     add_rotor_inertia: bool,
+    add_reflected_inertia: bool,
     add_viscous_friction: bool = False,
     add_dynamic_dry_friction: bool = False,
 ) -> ArmPlantComponents:
@@ -192,6 +193,8 @@ def create_autodiff_plant(
         arm_components (ArmComponents): The components of the robotic arm system.
         add_rotor_inertia (bool): Whether to add autodiff reflected rotor inertia
             parameters.
+        add_reflected_inertia (bool): Whether to add autodiff reflected inertia
+            parameters. NOTE: This option is mutually exclusive with `add_rotor_inertia`.
         add_viscous_friction (bool): Whether to add autodiff viscous friction
             parameters. NOTE: Drake does not yet support viscous friction as part of
             the context. Hence, this parameter is created but not added to the plant.
@@ -202,6 +205,11 @@ def create_autodiff_plant(
     Returns:
         ArmPlantComponents: The autodiff plant and associated autodiff components.
     """
+    assert not (add_rotor_inertia and add_reflected_inertia), (
+        "The options `add_rotor_inertia` and `add_reflected_inertia` are mutually "
+        "exclusive."
+    )
+
     # Create an autodiff plant
     ad_plant: MultibodyPlant = arm_components.plant.ToAutoDiffXd()
     ad_plant_context = ad_plant.CreateDefaultContext()
@@ -209,7 +217,11 @@ def create_autodiff_plant(
     # Create the autodiff parameters
     ad_parameters: List[JointParameters] = []
     num_params_per_joint = (
-        10 + add_rotor_inertia + add_viscous_friction + add_dynamic_dry_friction
+        10
+        + add_rotor_inertia
+        + add_reflected_inertia
+        + add_viscous_friction
+        + add_dynamic_dry_friction
     )
     num_params = arm_components.num_joints * num_params_per_joint
     for i in range(arm_components.num_joints):
@@ -296,6 +308,11 @@ def create_autodiff_plant(
                 joint_actuator.default_rotor_inertia(), rotor_inertia_vec
             )
             offset += 1
+        if add_reflected_inertia:
+            reflected_inertia_vec = np.zeros(num_params)
+            reflected_inertia_vec[(i * num_params_per_joint) + offset] = 1
+            reflected_inertia_ad = AutoDiffXd(0.0, reflected_inertia_vec)
+            offset += 1
         if add_viscous_friction:
             viscous_friction_vec = np.zeros(num_params)
             viscous_friction_vec[(i * num_params_per_joint) + offset] = 1
@@ -328,6 +345,9 @@ def create_autodiff_plant(
                 Iyz=Iyz_ad,
                 Izz=Izz_ad,
                 rotor_inertia=rotor_inertia_ad if add_rotor_inertia else None,
+                reflected_inertia=reflected_inertia_ad
+                if add_reflected_inertia
+                else None,
                 viscous_friction=viscous_friction_ad if add_viscous_friction else None,
                 dynamic_dry_friction=dynamic_dry_friction_ad
                 if add_dynamic_dry_friction

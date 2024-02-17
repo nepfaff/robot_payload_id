@@ -178,7 +178,15 @@ def main():
     parser.add_argument(
         "--add_rotor_inertia",
         action="store_true",
-        help="Add reflected rotor inertia to the optimization.",
+        help="Add reflected rotor inertia to the optimization. NOTE: This will lead "
+        + "to horrible conditioning and it is recommended to use "
+        + "`add_reflected_inertia` instead.",
+    )
+    parser.add_argument(
+        "--add_reflected_inertia",
+        action="store_true",
+        help="Add reflected inertia to the optimization. NOTE: This is mutually "
+        + "exclusive with `add_rotor_inertia`.",
     )
     parser.add_argument(
         "--add_viscous_friction",
@@ -268,6 +276,7 @@ def main():
     num_control_points = args.num_control_points
     traj_initial = args.traj_initial
     add_rotor_inertia = args.add_rotor_inertia
+    add_reflected_inertia = args.add_reflected_inertia
     add_viscous_friction = args.add_viscous_friction
     add_dynamic_dry_friction = args.add_dynamic_dry_friction
     add_endpoint_constraints = not args.not_add_endpoint_constraints
@@ -298,6 +307,7 @@ def main():
                 mu_multiplier=mu_multiplier,
                 mu_max=mu_max,
                 add_rotor_inertia=add_rotor_inertia,
+                add_reflected_inertia=add_reflected_inertia,
                 add_viscous_friction=add_viscous_friction,
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
                 include_endpoint_constraints=add_endpoint_constraints,
@@ -323,6 +333,7 @@ def main():
                 mu_multiplier=mu_multiplier,
                 mu_max=mu_max,
                 add_rotor_inertia=add_rotor_inertia,
+                add_reflected_inertia=add_reflected_inertia,
                 add_viscous_friction=add_viscous_friction,
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
                 include_endpoint_constraints=add_endpoint_constraints,
@@ -356,6 +367,7 @@ def main():
                             mu_max=mu_max,
                             model_path=model_path,
                             add_rotor_inertia=add_rotor_inertia,
+                            add_reflected_inertia=add_reflected_inertia,
                             add_viscous_friction=add_viscous_friction,
                             add_dynamic_dry_friction=add_dynamic_dry_friction,
                             include_endpoint_constraints=add_endpoint_constraints,
@@ -382,6 +394,7 @@ def main():
                         robot_model_instance_name="arm",
                         num_workers=num_workers,
                         add_rotor_inertia=add_rotor_inertia,
+                        add_reflected_inertia=add_reflected_inertia,
                         add_viscous_friction=add_viscous_friction,
                         add_dynamic_dry_friction=add_dynamic_dry_friction,
                         include_endpoint_constraints=add_endpoint_constraints,
@@ -447,6 +460,7 @@ def main():
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
                         add_rotor_inertia=add_rotor_inertia,
+                        add_reflected_inertia=add_reflected_inertia,
                         add_viscous_friction=add_viscous_friction,
                         add_dynamic_dry_friction=add_dynamic_dry_friction,
                         nevergrad_method=nevergrad_method,

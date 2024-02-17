@@ -59,7 +59,8 @@ def solve_inertial_param_sdp(
     regularization_weight: float = 0.0,
     params_guess: Optional[List[JointParameters]] = None,
     use_euclidean_regularization: bool = False,
-    identify_rotor_inertia: bool = True,
+    identify_rotor_inertia: bool = False,
+    identify_reflected_inertia: bool = True,
     identify_viscous_friction: bool = True,
     identify_dynamic_dry_friction: bool = True,
     solver_kPrintToConsole: bool = False,
@@ -85,6 +86,10 @@ def solve_inertial_param_sdp(
         use_euclidean_regularization (bool, optional): Whether to use euclidean
             regularization instead of entropic divergence regularization.
         identify_rotor_inertia (bool, optional): Whether to identify the rotor inertia.
+        identify_reflected_inertia (bool, optional): Whether to identify the reflected
+            inertia. NOTE: It is not possible to identify both the rotor inertia and the
+            reflected inertia at the same time as they are the same parameter in
+            different forms (reflected inertia = rotor inertia * gear ratio^2).
         identify_viscous_friction (bool, optional): Whether to identify the viscous
             friction.
         identify_dynamic_dry_friction (bool, optional): Whether to identify the dynamic
@@ -104,6 +109,9 @@ def solve_inertial_param_sdp(
         "Ground truth inertial parameters are required if the regularization weight is "
         "non-zero."
     )
+    assert not (
+        identify_rotor_inertia and identify_reflected_inertia
+    ), "Cannot identify both rotor inertia and reflected inertia."
 
     prog = MathematicalProgram()
 
@@ -124,6 +132,11 @@ def solve_inertial_param_sdp(
                 Izz=prog.NewContinuousVariables(1, f"Izz{i}")[0],
                 rotor_inertia=prog.NewContinuousVariables(1, f"rotor_inertia{i}")[0]
                 if identify_rotor_inertia
+                else None,
+                reflected_inertia=prog.NewContinuousVariables(
+                    1, f"reflected_inertia{i}"
+                )[0]
+                if identify_reflected_inertia
                 else None,
                 viscous_friction=prog.NewContinuousVariables(1, f"viscous_friction{i}")[
                     0
@@ -207,6 +220,12 @@ def solve_inertial_param_sdp(
         rotor_inertias = np.array([var.rotor_inertia for var in variables])
         for rotor_inertia in rotor_inertias:
             prog.AddConstraint(rotor_inertia >= 0)
+
+    # Reflected inertia feasibility constraints
+    if identify_reflected_inertia:
+        reflected_inertias = np.array([var.reflected_inertia for var in variables])
+        for reflected_inertia in reflected_inertias:
+            prog.AddConstraint(reflected_inertia >= 0)
 
     # Viscous friction feasibility constraints
     if identify_viscous_friction:

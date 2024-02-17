@@ -186,6 +186,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         mu_multiplier: float,
         mu_max: float,
         add_rotor_inertia: bool,
+        add_reflected_inertia: bool,
         add_viscous_friction: bool,
         add_dynamic_dry_friction: bool,
         include_endpoint_constraints: bool,
@@ -220,6 +221,8 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 equality constraint is not satisfied.
             mu_max (float): The maximum value of the penalty weights.
             add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
+            add_reflected_inertia (bool): Whether to consider reflected inertia in the
+                dynamics. NOTE: This is mutually exclusive with `add_rotor_inertia`.
             add_viscous_friction (bool): Whether to consider viscous friction in the
                 dynamics.
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
@@ -241,6 +244,10 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             logging_path (Path): The path to write the optimization logs to. If None,
                 then no logs are written.
         """
+        assert not (
+            add_rotor_inertia and add_reflected_inertia
+        ), "`add_rotor_inertia` and `add_reflected_inertia` are mutually exclusive."
+
         super().__init__(
             num_joints=num_joints,
             cost_function=cost_function,
@@ -257,6 +264,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         self._plant_context = plant_context
         self._mu_initial = mu_initial
         self._add_rotor_inertia = add_rotor_inertia
+        self._add_reflected_inertia = add_reflected_inertia
         self._add_viscous_friction = add_viscous_friction
         self._add_dynamic_dry_friction = add_dynamic_dry_friction
         self._constraint_acceleration_endpoints = constraint_acceleration_endpoints
@@ -277,6 +285,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         self._ad_plant_components = create_autodiff_plant(
             arm_components=arm_components,
             add_rotor_inertia=add_rotor_inertia,
+            add_reflected_inertia=add_reflected_inertia,
             add_viscous_friction=add_viscous_friction,
             add_dynamic_dry_friction=add_dynamic_dry_friction,
         )
@@ -387,6 +396,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             arm_components=self._ad_plant_components,
             joint_data=joint_data,
             add_rotor_inertia=self._add_rotor_inertia,
+            add_reflected_inertia=self._add_reflected_inertia,
             add_viscous_friction=self._add_viscous_friction,
             add_dynamic_dry_friction=self._add_dynamic_dry_friction,
             use_progress_bar=use_progress_bar,
@@ -588,6 +598,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         mu_max: float,
         num_workers: int,
         add_rotor_inertia: bool,
+        add_reflected_inertia: bool,
         add_viscous_friction: bool,
         add_dynamic_dry_friction: bool,
         include_endpoint_constraints: bool,
@@ -623,6 +634,8 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             mu_max (float): The maximum value of the penalty weights.
             num_workers (int): The number of workers to use for parallel optimization.
             add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
+            add_reflected_inertia (bool): Whether to consider reflected inertia in the
+                dynamics. NOTE: This is mutually exclusive with `add_rotor_inertia`.
             add_viscous_friction (bool): Whether to consider viscous friction in the
                 dynamics.
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
@@ -670,6 +683,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 mu_multiplier=mu_multiplier,
                 mu_max=mu_max,
                 add_rotor_inertia=add_rotor_inertia,
+                add_reflected_inertia=add_reflected_inertia,
                 add_viscous_friction=add_viscous_friction,
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
                 include_endpoint_constraints=include_endpoint_constraints,

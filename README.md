@@ -49,6 +49,10 @@ python scripts/design_optimal_excitation_trajectories.py  \
 *Hint:* Run on multiple cores using `--num_workers`. When using multiple workers,
 using `--log_level ERROR` is needed for nice progress bars.
 
+*Note:* It is recommended to design trajectories without considering reflected inertia
+and joint friction as this seems to lead to better results, even when identifying these
+parameters later on.
+
 ### Use a Fourier series trajectory as an initial guess for BSpline trajectory optimization
 
 First, convert the optimized Fourier series trajectory into a BSpline trajectory:
@@ -94,8 +98,8 @@ This requires trajectories that have been designed using optimal excitation traj
 design as otherwise the numerics won't be good enough for the optimization to succeed.
 
 ```bash
-python scripts/solve_inertial_param_sdp.py --use_one_link_arm \
---remove_unidentifiable_params --traj_parameter_path logs/traj
+python scripts/solve_inertial_param_sdp.py --traj_parameter_path logs/traj \
+--num_data_points 5000 --use_one_link_arm
 ```
 
 NOTE that one would want to obtain data using optimal experiment design to ensure that

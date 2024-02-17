@@ -901,6 +901,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         budget: int,
         model_path: str,
         add_rotor_inertia: bool,
+        add_reflected_inertia: bool,
         add_viscous_friction: bool,
         add_dynamic_dry_friction: bool,
         nevergrad_method: str = "NGOpt",
@@ -924,6 +925,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             budget (int): The number of iterations to run the optimizer for.
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
             add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
+            add_reflected_inertia (bool): Whether to consider reflected inertia in the
+                dynamics. NOTE: This is mutually exclusive with `add_rotor_inertia`.
             add_viscous_friction (bool): Whether to consider viscous friction in the
                 dynamics.
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
@@ -941,6 +944,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
                 then no logs are written. Recording logs is a callback and hence will
                 slow down the optimization.
         """
+        assert not (
+            add_rotor_inertia and add_reflected_inertia
+        ), "add_rotor_inertia and add_reflected_inertia are mutually exclusive!"
+
         super().__init__(
             num_joints=num_joints,
             cost_function=cost_function,
@@ -957,6 +964,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             logging_path=logging_path,
         )
         self._add_rotor_inertia = add_rotor_inertia
+        self._add_reflected_inertia = add_reflected_inertia
         self._add_viscous_friction = add_viscous_friction
         self._add_dynamic_dry_friction = add_dynamic_dry_friction
 
@@ -966,6 +974,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         self._ad_plant_components = create_autodiff_plant(
             arm_components=self._arm_components,
             add_rotor_inertia=add_rotor_inertia,
+            add_reflected_inertia=add_reflected_inertia,
             add_viscous_friction=add_viscous_friction,
             add_dynamic_dry_friction=add_dynamic_dry_friction,
         )
@@ -998,6 +1007,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             arm_components=self._ad_plant_components,
             joint_data=joint_data,
             add_rotor_inertia=self._add_rotor_inertia,
+            add_reflected_inertia=self._add_reflected_inertia,
             add_viscous_friction=self._add_viscous_friction,
             add_dynamic_dry_friction=self._add_dynamic_dry_friction,
             use_progress_bar=use_progress_bar,
@@ -1081,6 +1091,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         mu_max: float,
         model_path: str,
         add_rotor_inertia: bool,
+        add_reflected_inertia: bool,
         add_viscous_friction: bool,
         add_dynamic_dry_friction: bool,
         include_endpoint_constraints: bool,
@@ -1111,6 +1122,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             mu_max (float): The maximum value of the penalty weights.
             model_path (str): The path to the model file (e.g. SDFormat, URDF).
             add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
+            add_reflected_inertia (bool): Whether to consider reflected inertia in the
+                dynamics. NOTE: This is mutually exclusive with `add_rotor_inertia`.
             add_viscous_friction (bool): Whether to consider viscous friction in the
                 dynamics.
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
@@ -1139,6 +1152,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             budget=budget_per_iteration,
             model_path=model_path,
             add_rotor_inertia=add_rotor_inertia,
+            add_reflected_inertia=add_reflected_inertia,
             add_viscous_friction=add_viscous_friction,
             add_dynamic_dry_friction=add_dynamic_dry_friction,
             nevergrad_method=nevergrad_method,
@@ -1362,6 +1376,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         robot_model_instance_name: str,
         num_workers: int,
         add_rotor_inertia: bool,
+        add_reflected_inertia: bool,
         add_viscous_friction: bool,
         add_dynamic_dry_friction: bool,
         include_endpoint_constraints: bool,
@@ -1394,6 +1409,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             robot_model_instance_name (str): The name of the robot model instance.
             num_workers (int): The number of workers to use for parallel optimization.
             add_rotor_inertia (bool): Whether to consider rotor inertia in the dynamics.
+            add_reflected_inertia (bool): Whether to consider reflected inertia in the
+                dynamics. NOTE: This is mutually exclusive with `add_rotor_inertia`.
             add_viscous_friction (bool): Whether to consider viscous friction in the
                 dynamics.
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
@@ -1443,6 +1460,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 mu_max=mu_max,
                 model_path=model_path,
                 add_rotor_inertia=add_rotor_inertia,
+                add_reflected_inertia=add_reflected_inertia,
                 add_viscous_friction=add_viscous_friction,
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
                 include_endpoint_constraints=include_endpoint_constraints,
