@@ -51,3 +51,13 @@ directives:
     child: arm::iiwa_link_0
     X_PC:
         translation: [0.0, 0.0, 0.0127]
+
+# Box to represent the gripper/ payload
+- add_model:
+    name: gripper_payload_box
+    file: package://robot_payload_id/gripper_payload_box.sdf
+- add_weld:
+    parent: arm::iiwa_link_7
+    child: gripper_payload_box::gripper_payload_box_link
+    X_PC:
+        translation: [0.0, 0.0, 0.14] # box_heigh / 2 + 0.05
