@@ -234,7 +234,10 @@ def main():
     logging_path = args.logging_path
     if logging_path is not None:
         logging_path.mkdir(parents=True)
-        yaml.dump(vars(args), open(logging_path / "args.yaml", "w"))
+        args_dict = vars(args)
+        if wandb.run is not None:
+            args_dict["wandb_url"] = wandb.run.get_url()
+        yaml.dump(args_dict, open(logging_path / "args.yaml", "w"))
 
     use_one_link_arm = args.use_one_link_arm
     num_joints = 1 if use_one_link_arm else 7
