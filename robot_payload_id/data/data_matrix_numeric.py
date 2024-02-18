@@ -241,7 +241,7 @@ def extract_numeric_data_matrix_autodiff(
         ]
     )
     W_data = np.zeros((num_timesteps * num_joints, num_lumped_params))
-    tau_data = joint_data.joint_torques.flatten()
+    tau_data = np.zeros(num_timesteps * num_joints)
 
     for i in tqdm(
         range(num_timesteps),
@@ -281,6 +281,10 @@ def extract_numeric_data_matrix_autodiff(
             [joint_torques.derivatives() for joint_torques in ad_torques]
         )
         W_data[i * num_joints : (i + 1) * num_joints, :] = ad_torques_derivative
+
+        tau_data[i * num_joints : (i + 1) * num_joints] = np.array(
+            [torque.value() for torque in ad_torques]
+        )
 
     return W_data, tau_data
 

@@ -311,7 +311,9 @@ def create_autodiff_plant(
         if add_reflected_inertia:
             reflected_inertia_vec = np.zeros(num_params)
             reflected_inertia_vec[(i * num_params_per_joint) + offset] = 1
-            reflected_inertia_ad = AutoDiffXd(0.0, reflected_inertia_vec)
+            reflected_inertia_ad = AutoDiffXd(
+                joint_actuator.default_reflected_inertia(), reflected_inertia_vec
+            )
             offset += 1
         if add_viscous_friction:
             viscous_friction_vec = np.zeros(num_params)
@@ -362,6 +364,9 @@ def create_autodiff_plant(
         link.SetSpatialInertiaInBodyFrame(ad_plant_context, spatial_inertia_ad)
         if add_rotor_inertia:
             joint_actuator.SetRotorInertia(ad_plant_context, rotor_inertia_ad)
+        if add_reflected_inertia:
+            # We only want to count reflected inertia once
+            joint_actuator.SetRotorInertia(ad_plant_context, 0.0)
         # if add_viscous_friction:
         # Not yet implemented in Drake (see
         # https://github.com/RobotLocomotion/drake/issues/14405)

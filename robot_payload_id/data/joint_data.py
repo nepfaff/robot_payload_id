@@ -223,6 +223,9 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
     time_horizon: float,
     traj_attrs: FourierSeriesTrajectoryAttributes,
     plant: Optional[MultibodyPlant] = None,
+    reflected_inertias: Optional[np.ndarray] = None,
+    viscous_frictions: Optional[np.ndarray] = None,
+    dynamic_dry_frictions: Optional[np.ndarray] = None,
     use_progress_bar: bool = True,
 ) -> JointData:
     """Generates autodiff joint data from the following Fourier series trajectory
@@ -240,6 +243,12 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
             parameters. A recommended value for omega is 0.3 * np.pi.
         plant (MultibodyPlant, optional): The plant to generate data for. If None, then
             the torques will be set to zero.
+        reflected_inertias (np.ndarray, optional): The reflected inertias of the joints.
+            If None, then reflected inertias are not added to the torques.
+        viscous_frictions (np.ndarray, optional): The viscous frictions of the joints.
+            If None, then viscous frictions are not added to the torques.
+        dynamic_dry_frictions (np.ndarray, optional): The dynamic dry frictions of the
+            joints. If None, then dynamic dry frictions are not added to the torques.
         use_progress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
@@ -304,6 +313,15 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
             forces = MultibodyForces_(plant)
             plant.CalcForceElementsContribution(context, forces)
             tau_gt[i] = plant.CalcInverseDynamics(context, v_dot_curr, forces)
+
+            if reflected_inertias is not None:
+                tau_gt[i] += reflected_inertias[i] * joint_data.joint_accelerations[i]
+            if viscous_frictions is not None:
+                tau_gt[i] += viscous_frictions[i] * joint_data.joint_velocities[i]
+            if dynamic_dry_frictions:
+                tau_gt[i] += dynamic_dry_frictions[i] * np.sign(
+                    joint_data.joint_velocities[i]
+                )
 
     sample_delta = time_horizon / num_timesteps
     joint_data = JointData(
