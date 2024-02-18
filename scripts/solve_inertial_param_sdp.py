@@ -317,7 +317,6 @@ def main():
             traj_parameter_path, num_joints=num_joints
         )
         joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
-            plant=arm_components.plant,
             num_timesteps=num_data_points,
             time_horizon=time_horizon,
             traj_attrs=traj_attrs,
