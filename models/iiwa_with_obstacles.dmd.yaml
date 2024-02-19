@@ -60,4 +60,4 @@ directives:
     parent: arm::iiwa_link_7
     child: gripper_payload_box::gripper_payload_box_link
     X_PC:
-        translation: [0.0, 0.0, 0.14] # box_heigh / 2 + 0.05
+        translation: [0.0, 0.0, 0.18] # box_heigh / 2 + 0.05
