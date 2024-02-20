@@ -271,7 +271,9 @@ def main():
     parser.add_argument(
         "--use_euclidean_regularization",
         action="store_true",
-        help="Use euclidean regularization instead of entropic divergence regularization.",
+        help="Use euclidean regularization instead of entropic divergence "
+        + "regularization. Note that euclidian regularization is always used for the "
+        + "non-inertial parameters.",
     )
     parser.add_argument(
         "--regularization_weight",

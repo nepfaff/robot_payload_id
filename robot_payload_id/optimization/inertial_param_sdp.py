@@ -211,6 +211,33 @@ def solve_inertial_param_sdp(
             regularization_weight=regularization_weight,
         )
 
+        # Use euclidean regularization for the non-inertia parameters
+        non_inertia_params = []
+        non_inertia_params_guess = []
+        if identify_rotor_inertia:
+            non_inertia_params += [var.rotor_inertia for var in variables]
+            non_inertia_params_guess += [var.rotor_inertia for var in params_guess]
+        if identify_reflected_inertia:
+            non_inertia_params += [var.reflected_inertia for var in variables]
+            non_inertia_params_guess += [var.reflected_inertia for var in params_guess]
+        if identify_viscous_friction:
+            non_inertia_params += [var.viscous_friction for var in variables]
+            non_inertia_params_guess += [var.viscous_friction for var in params_guess]
+        if identify_dynamic_dry_friction:
+            non_inertia_params += [var.dynamic_dry_friction for var in variables]
+            non_inertia_params_guess += [
+                var.dynamic_dry_friction for var in params_guess
+            ]
+        if len(non_inertia_params) > 0:
+            non_inertia_params = np.asarray(non_inertia_params)
+            non_inertia_params_guess = np.asarray(non_inertia_params_guess)
+            prog.AddQuadraticCost(
+                regularization_weight
+                * (non_inertia_params_guess - non_inertia_params).T
+                @ (non_inertia_params_guess - non_inertia_params),
+                is_convex=True,
+            )
+
     # Inertial parameter feasibility constraints
     for pseudo_inertia in pseudo_inertias:
         prog.AddPositiveSemidefiniteConstraint(pseudo_inertia - 1e-6 * np.identity(4))
