@@ -36,6 +36,16 @@ directives:
       translation: [0.0, 0.5, 0.75]
 
 - add_model:
+    name: back_wall
+    file: package://robot_payload_id/wall.sdf
+- add_weld:
+    parent: world
+    child: back_wall::wall_link
+    X_PC:
+      translation: [-1.0, 0.0, 0.75]
+      rotation: !Rpy { deg: [0.0, 0.0, 90.0]}
+
+- add_model:
     name: arm
     file: package://drake/manipulation/models/iiwa_description/iiwa7/iiwa7_with_box_collision.sdf
     default_joint_positions:
