@@ -278,7 +278,7 @@ def main():
     parser.add_argument(
         "--regularization_weight",
         type=float,
-        default=1e-2,
+        default=1e-6,
         help="The regularization weight.",
     )
     parser.add_argument(
