@@ -282,6 +282,13 @@ def main():
         help="The regularization weight.",
     )
     parser.add_argument(
+        "--perturb_scale",
+        type=float,
+        default=0.0,
+        help="The scale of perturbation to apply to the ground truth parameters to get "
+        + "a more realistic initial guess for simulation-based evaluation.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -299,6 +306,7 @@ def main():
     identify_dynamic_dry_friction = not args.not_identify_dynamic_dry_friction
     use_euclidean_regularization = args.use_euclidean_regularization
     regularization_weight = args.regularization_weight
+    perturb_scale = args.perturb_scale
 
     logging.basicConfig(level=args.log_level)
 
@@ -428,6 +436,9 @@ def main():
         add_viscous_friction=identify_viscous_friction,
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
     )
+    if perturb_scale > 0.0:
+        for params in params_guess:
+            params.perturb(perturb_scale)
 
     (
         _,

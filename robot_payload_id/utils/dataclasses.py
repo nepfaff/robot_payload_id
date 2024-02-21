@@ -21,6 +21,8 @@ from pydrake.all import (
 
 import wandb
 
+from .inertia import change_inertia_reference_points_with_parallel_axis_theorem
+
 
 @dataclass
 class JointData:
@@ -253,6 +255,63 @@ class JointParameters:
                 [density_weighted_1st_moment.T, self.m],
             ]
         )
+
+    def perturb(self, perturb_scale: float) -> None:
+        """
+        Perturbs the inertial parameters of the joint by a random scale factor.
+
+        Args:
+            perturb_scale: The maximum scale factor to perturb the parameters by.
+        """
+        # Get center of mass
+        if self.cx is not None and self.cy is not None and self.cz is not None:
+            com = np.array([self.cx, self.cy, self.cz])
+            is_base_params = True
+        elif self.hx is not None and self.hy is not None and self.hz is not None:
+            com = np.array([self.hx, self.hy, self.hz]) / self.m
+            is_base_params = False
+        else:
+            raise NotImplementedError(
+                "Currently only supporting all center of mass or all mass times center "
+                + "of mass."
+            )
+
+        # Express inertia with respect to center of mass
+        rot_inertias_cm = change_inertia_reference_points_with_parallel_axis_theorem(
+            I_BBa_B=self.get_inertia_matrix(),
+            m_B=np.array([self.m]),
+            p_BaBb_B=com,
+            Ba_is_Bcm=False,
+        )
+
+        # Perturb inertial parameters
+        # NOTE: Could also rotate inertias and add random point-mass noise
+        mass_scale = 1.0 + perturb_scale * np.random.uniform()
+        self.m *= mass_scale
+        rot_inertias_cm *= mass_scale
+
+        # Re-express inertia with respect to link origin
+        rot_inertias = change_inertia_reference_points_with_parallel_axis_theorem(
+            I_BBa_B=rot_inertias_cm,
+            m_B=np.array([self.m]),
+            p_BaBb_B=com,
+            Ba_is_Bcm=True,
+        )
+        if is_base_params:
+            self.Ixx, self.Iyy, self.Izz = rot_inertias.diagonal()
+            self.Ixy, self.Ixz, self.Iyz = (
+                rot_inertias[0, 1],
+                rot_inertias[0, 2],
+                rot_inertias[1, 2],
+            )
+        else:
+            self.hx, self.hy, self.hz = self.m * com
+            self.Gxx, self.Gyy, self.Gzz = rot_inertias.diagonal()
+            self.Gxy, self.Gxz, self.Gyz = (
+                rot_inertias[0, 1],
+                rot_inertias[0, 2],
+                rot_inertias[1, 2],
+            ) / self.m
 
 
 @dataclass
