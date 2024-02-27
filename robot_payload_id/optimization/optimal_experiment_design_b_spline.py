@@ -270,6 +270,10 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         self._constraint_acceleration_endpoints = constraint_acceleration_endpoints
         self._nevergrad_method = nevergrad_method
 
+        # The percentage of the q, q_dot, q_ddot limits that we want to consider as the
+        # save limit
+        self._save_limit_fraction = 0.95
+
         # Select cost function
         cost_function_to_cost = {
             CostFunction.CONDITION_NUMBER: self._condition_number_cost,
@@ -472,18 +476,18 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
     def _add_bound_constraints(self) -> None:
         """Add position, velocity, and acceleration bound constraints."""
         self._trajopt.AddPositionBounds(
-            lb=self._plant.GetPositionLowerLimits(),
-            ub=self._plant.GetPositionUpperLimits(),
+            lb=self._plant.GetPositionLowerLimits() * self._save_limit_fraction,
+            ub=self._plant.GetPositionUpperLimits() * self._save_limit_fraction,
         )
         name_unnamed_constraints(self._prog, "positionBounds")
         self._trajopt.AddVelocityBounds(
-            lb=self._plant.GetVelocityLowerLimits(),
-            ub=self._plant.GetVelocityUpperLimits(),
+            lb=self._plant.GetVelocityLowerLimits() * self._save_limit_fraction,
+            ub=self._plant.GetVelocityUpperLimits() * self._save_limit_fraction,
         )
         name_unnamed_constraints(self._prog, "velocityBounds")
         self._trajopt.AddAccelerationBounds(
-            lb=self._plant.GetAccelerationLowerLimits(),
-            ub=self._plant.GetAccelerationUpperLimits(),
+            lb=self._plant.GetAccelerationLowerLimits() * self._save_limit_fraction,
+            ub=self._plant.GetAccelerationUpperLimits() * self._save_limit_fraction,
         )
         name_unnamed_constraints(self._prog, "accelerationBounds")
 

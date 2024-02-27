@@ -1164,6 +1164,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         self._mu_initial = mu_initial
         self._optimizer = None
 
+        # The percentage of the q, q_dot, q_ddot limits that we want to consider as the
+        # save limit
+        self._save_limit_fraction = 0.95
+
         self._prog = MathematicalProgram()
 
         # Create decision variables
@@ -1218,12 +1222,24 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
 
         joint_data = self._compute_joint_data(self._symbolic_vars)
 
-        position_lower_limits = self._plant.GetPositionLowerLimits()
-        position_upper_limits = self._plant.GetPositionUpperLimits()
-        velocity_lower_limits = self._plant.GetVelocityLowerLimits()
-        velocity_upper_limits = self._plant.GetVelocityUpperLimits()
-        acceleration_lower_limits = self._plant.GetAccelerationLowerLimits()
-        acceleration_upper_limits = self._plant.GetAccelerationUpperLimits()
+        position_lower_limits = (
+            self._plant.GetPositionLowerLimits() * self._save_limit_fraction
+        )
+        position_upper_limits = (
+            self._plant.GetPositionUpperLimits() * self._save_limit_fraction
+        )
+        velocity_lower_limits = (
+            self._plant.GetVelocityLowerLimits() * self._save_limit_fraction
+        )
+        velocity_upper_limits = (
+            self._plant.GetVelocityUpperLimits() * self._save_limit_fraction
+        )
+        acceleration_lower_limits = (
+            self._plant.GetAccelerationLowerLimits() * self._save_limit_fraction
+        )
+        acceleration_upper_limits = (
+            self._plant.GetAccelerationUpperLimits() * self._save_limit_fraction
+        )
         for i in range(self._num_timesteps):
             for j in range(self._num_joints):
                 # Position bounds
