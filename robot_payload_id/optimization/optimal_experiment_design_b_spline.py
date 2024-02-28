@@ -490,6 +490,13 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             ub=self._plant.GetAccelerationUpperLimits() * self._save_limit_fraction,
         )
         name_unnamed_constraints(self._prog, "accelerationBounds")
+        # The jerk limits are rather arbitrary and are mainly there to prevent
+        # acceleration discontinuities that lead to commanded torque discontinuities
+        # when using inverse dynamics control
+        self._trajopt.AddJerkBounds(
+            lb=-np.full(self._num_joints, 100), ub=np.full(self._num_joints, 100)
+        )
+        name_unnamed_constraints(self._prog, "jerkBounds")
 
     def _add_start_and_end_point_constraints(self) -> None:
         """Add constraints to start and end with zero velocities/ accelerations."""
