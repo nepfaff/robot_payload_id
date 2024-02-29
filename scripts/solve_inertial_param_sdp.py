@@ -191,6 +191,10 @@ def compute_base_parameter_errors(
     identifiable_vars_estimated_values = [
         var_sol_dict[var.get_name()] for var in identifiable_vars_sorted
     ]
+    logging.info(
+        "Note that Drake changes the inertia frame when parsing SDFormat files. Hence, "
+        + "the GT inertia values won't necessarily match the SDFormat file."
+    )
     logging.info("Identifiable parameters:")
     for var, gt_value, estimated_value in zip(
         identifiable_vars_sorted,
@@ -364,7 +368,8 @@ def main():
         )
 
     # Generate data matrix
-    W_data_raw, tau_data = extract_numeric_data_matrix_autodiff(
+    # TODO: Stop using the model-predicted torques
+    W_data_raw, w0_data, tau_data = extract_numeric_data_matrix_autodiff(
         arm_components=arm_components,
         joint_data=joint_data,
         add_rotor_inertia=identify_rotor_inertia,
@@ -373,6 +378,8 @@ def main():
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
         payload_only=payload_only,
     )
+    # Transform from affine `tau = W * params + w0` into linear `(tau - w0) = W * params`
+    tau_data -= w0_data
 
     if not args.keep_unidentifiable_params:
         # Load base parameter mapping
@@ -403,7 +410,7 @@ def main():
                     joint_torques=np.zeros((num_random_points, num_joints)),
                     sample_times_s=np.zeros(num_random_points),
                 )
-                W_data_random, _ = extract_numeric_data_matrix_autodiff(
+                W_data_random, _, _ = extract_numeric_data_matrix_autodiff(
                     arm_components=arm_components,
                     joint_data=joint_data_random,
                     add_rotor_inertia=identify_rotor_inertia,
@@ -491,7 +498,6 @@ def main():
                 num_joints=num_joints,
                 arm_components=arm_components,
                 var_sol_dict=var_sol_dict,
-                payload_only=payload_only,
             )
             compute_base_parameter_errors(
                 arm_components=arm_components,

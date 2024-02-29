@@ -178,9 +178,10 @@ def extract_numeric_data_matrix_autodiff(
     add_dynamic_dry_friction: bool,
     payload_only: bool = False,
     use_progress_bar: bool = True,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Extracts the numeric data matrix using autodiff. This scales to a large number of
     links.
+    In particular, for tau = W * alpha + w0, this method computes W and w0.
 
     Args:
         arm_components (Union[ArmComponents, ArmPlantComponents]): The arm components
@@ -200,10 +201,12 @@ def extract_numeric_data_matrix_autodiff(
         use_progress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: A tuple containing the numeric data matrix and
-            the numeric torque data. The numeric data matrix has shape (num_joints *
-            num_timesteps, num_lumped_params) and the numeric torque data has shape
-            (num_joints * num_timesteps,).
+        Tuple[np.ndarray, np.ndarray, np.ndarray]: A tuple of:
+            - W_data: The numeric data matrix of shape
+                (num_joints * num_timesteps, num_lumped_params).
+            - w0: The numeric offset of shape (num_joints * num_timesteps,).
+            - tau_data: The model-predicted torque data using the parameters in
+                `arm_components.plant` of shape (num_joints * num_timesteps,).
     """
     assert not (add_rotor_inertia and add_reflected_inertia), (
         "Cannot add both rotor inertia and reflected inertia as they represent the "
@@ -245,8 +248,13 @@ def extract_numeric_data_matrix_autodiff(
             for params in ad_plant_components.parameters
         ]
     )
+    ad_params = np.concatenate(
+        [params.get_lumped_param_list() for params in ad_plant_components.parameters]
+    )
+    param_values = np.array([param.value() for param in ad_params])
     W_data = np.zeros((num_timesteps * num_joints, num_lumped_params))
     tau_data = np.zeros(num_timesteps * num_joints)
+    w0 = np.zeros(num_timesteps * num_joints)
 
     for i in tqdm(
         range(num_timesteps),
@@ -292,7 +300,15 @@ def extract_numeric_data_matrix_autodiff(
             [torque.value() for torque in ad_torques]
         )
 
-    return W_data, tau_data
+        # Another way to compute this is by setting the parameter values to zero in the
+        # plant, resulting in tau_data = w0. This would be more efficient as we would
+        # be saving a step.
+        w0[i * num_joints : (i + 1) * num_joints] = (
+            tau_data[i * num_joints : (i + 1) * num_joints]
+            - W_data[i * num_joints : (i + 1) * num_joints, :] @ param_values
+        )
+
+    return W_data, w0, tau_data
 
 
 def compute_base_param_mapping(

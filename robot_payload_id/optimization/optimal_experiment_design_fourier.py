@@ -1003,7 +1003,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         )
 
         # Evaluate and stack symbolic data matrix
-        W_data_raw, _ = extract_numeric_data_matrix_autodiff(
+        W_data_raw, _, _ = extract_numeric_data_matrix_autodiff(
             arm_components=self._ad_plant_components,
             joint_data=joint_data,
             add_rotor_inertia=self._add_rotor_inertia,
