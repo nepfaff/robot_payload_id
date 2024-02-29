@@ -240,11 +240,19 @@ def main():
     parser.add_argument(
         "--traj_parameter_path",
         type=Path,
-        required=True,
         help="Path to the trajectory parameter folder. The folder must contain "
         + "'a_value.npy', 'b_value.npy', and 'q0_value.npy' or 'control_points.npy', "
         + "'knots.npy', and 'spline_order.npy'. If --remove_unidentifiable_params is "
-        + "set, the folder must also contain 'base_param_mapping.npy'.",
+        + "set, the folder must also contain 'base_param_mapping.npy'. NOTE: Only one "
+        + "of `--traj_parameter_path` or `--joint_data_path` should be set.",
+    )
+    parser.add_argument(
+        "--joint_data_path",
+        type=Path,
+        help="Path to the joint data folder. The folder must contain "
+        + "`joint_positions.npy`, `joint_velocities.npy`, `joint_accelerations.npy`, "
+        + "`joint_torques.npy`, and `sample_times_s.npy`. NOTE: Only one of "
+        + "`--traj_parameter_path` or `--joint_data_path` should be set.",
     )
     parser.add_argument(
         "--kPrintToConsole",
@@ -309,6 +317,7 @@ def main():
 
     args = parser.parse_args()
     traj_parameter_path = args.traj_parameter_path
+    joint_data_path = args.joint_data_path
     num_data_points = args.num_data_points
     time_horizon = args.time_horizon
     identify_rotor_inertia = args.identify_rotor_inertia
@@ -319,6 +328,11 @@ def main():
     regularization_weight = args.regularization_weight
     perturb_scale = args.perturb_scale
     payload_only = args.payload_only
+
+    assert (traj_parameter_path is not None) != (joint_data_path is not None), (
+        "One but not both of `--traj_parameter_path` and `--joint_data_path` should be "
+        + "set."
+    )
 
     logging.basicConfig(level=args.log_level)
 
@@ -333,43 +347,49 @@ def main():
         arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
     )
 
-    is_fourier_series = os.path.exists(traj_parameter_path / "a_value.npy")
-    if is_fourier_series:
-        traj_attrs = FourierSeriesTrajectoryAttributes.load(
-            traj_parameter_path, num_joints=num_joints
-        )
-        joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
-            num_timesteps=num_data_points,
-            time_horizon=time_horizon,
-            traj_attrs=traj_attrs,
-        )
+    if traj_parameter_path is not None:
+        is_fourier_series = os.path.exists(traj_parameter_path / "a_value.npy")
+        if is_fourier_series:
+            traj_attrs = FourierSeriesTrajectoryAttributes.load(
+                traj_parameter_path, num_joints=num_joints
+            )
+            joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
+                num_timesteps=num_data_points,
+                time_horizon=time_horizon,
+                traj_attrs=traj_attrs,
+            )
+        else:
+            traj_attrs = BsplineTrajectoryAttributes.load(traj_parameter_path)
+            traj = traj_attrs.to_bspline_trajectory()
+
+            # Sample the trajectory
+            q_numeric = np.empty((num_data_points, num_joints))
+            q_dot_numeric = np.empty((num_data_points, num_joints))
+            q_ddot_numeric = np.empty((num_data_points, num_joints))
+            sample_times_s = np.linspace(
+                traj.start_time(), traj.end_time(), num=num_data_points
+            )
+            for i, t in enumerate(sample_times_s):
+                q_numeric[i] = traj.value(t).flatten()
+                q_dot_numeric[i] = traj.EvalDerivative(t, derivative_order=1).flatten()
+                q_ddot_numeric[i] = traj.EvalDerivative(t, derivative_order=2).flatten()
+
+            joint_data = JointData(
+                joint_positions=q_numeric,
+                joint_velocities=q_dot_numeric,
+                joint_accelerations=q_ddot_numeric,
+                joint_torques=np.zeros_like(q_numeric),
+                sample_times_s=sample_times_s,
+            )
     else:
-        traj_attrs = BsplineTrajectoryAttributes.load(traj_parameter_path)
-        traj = traj_attrs.to_bspline_trajectory()
-
-        # Sample the trajectory
-        q_numeric = np.empty((num_data_points, num_joints))
-        q_dot_numeric = np.empty((num_data_points, num_joints))
-        q_ddot_numeric = np.empty((num_data_points, num_joints))
-        sample_times_s = np.linspace(
-            traj.start_time(), traj.end_time(), num=num_data_points
-        )
-        for i, t in enumerate(sample_times_s):
-            q_numeric[i] = traj.value(t).flatten()
-            q_dot_numeric[i] = traj.EvalDerivative(t, derivative_order=1).flatten()
-            q_ddot_numeric[i] = traj.EvalDerivative(t, derivative_order=2).flatten()
-
-        joint_data = JointData(
-            joint_positions=q_numeric,
-            joint_velocities=q_dot_numeric,
-            joint_accelerations=q_ddot_numeric,
-            joint_torques=np.zeros_like(q_numeric),
-            sample_times_s=sample_times_s,
-        )
+        joint_data = JointData.load_from_disk(joint_data_path)
 
     # Generate data matrix
-    # TODO: Stop using the model-predicted torques
-    W_data_raw, w0_data, tau_data = extract_numeric_data_matrix_autodiff(
+    (
+        W_data_raw,
+        w0_data,
+        tau_data_model_predicted,
+    ) = extract_numeric_data_matrix_autodiff(
         arm_components=arm_components,
         joint_data=joint_data,
         add_rotor_inertia=identify_rotor_inertia,
@@ -378,22 +398,36 @@ def main():
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
         payload_only=payload_only,
     )
+    if traj_parameter_path is not None:
+        # Use the model-predicted torques
+        tau_data = tau_data_model_predicted
+    else:
+        # Use the measured torques
+        tau_data = joint_data.joint_torques.flatten()
     # Transform from affine `tau = W * params + w0` into linear `(tau - w0) = W * params`
     tau_data -= w0_data
 
     if not args.keep_unidentifiable_params:
         # Load base parameter mapping
-        base_param_mapping_path = traj_parameter_path / "base_param_mapping.npy"
-        if not os.path.exists(base_param_mapping_path):
-            base_param_mapping_path = traj_parameter_path / "../base_param_mapping.npy"
-        logging.info(f"Loading base parameter mapping from {base_param_mapping_path}")
-        base_param_mapping = np.load(base_param_mapping_path)
+        if traj_parameter_path is not None:
+            base_param_mapping_path = traj_parameter_path / "base_param_mapping.npy"
+            if not os.path.exists(base_param_mapping_path):
+                base_param_mapping_path = (
+                    traj_parameter_path / "../base_param_mapping.npy"
+                )
+            logging.info(
+                f"Loading base parameter mapping from {base_param_mapping_path}"
+            )
+            base_param_mapping = np.load(base_param_mapping_path)
 
-        # Recompute base parameter mapping if it has wrong shape
-        if W_data_raw.shape[1] != base_param_mapping.shape[0]:
+        # Recompute base parameter mapping if it has wrong shape or is not provided
+        if (
+            traj_parameter_path is None
+            or W_data_raw.shape[1] != base_param_mapping.shape[0]
+        ):
             logging.warning(
-                "Base parameter mapping has wrong shape! Recomputing the base "
-                + "parameter mapping..."
+                "Base parameter mapping not provided or has wrong shape! Recomputing "
+                + "the base parameter mapping..."
             )
             if num_data_points > 2000:
                 logging.warning(
@@ -511,7 +545,6 @@ def main():
                 base_variable_vec=base_variable_vec,
                 var_sol_dict=var_sol_dict,
             )
-
     else:
         logging.warning("Failed to solve inertial parameter SDP!")
         logging.info(f"Solution result:\n{result.get_solution_result()}")

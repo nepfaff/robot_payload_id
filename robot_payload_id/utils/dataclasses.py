@@ -42,6 +42,37 @@ class JointData:
     sample_times_s: np.ndarray
     """The sample times in seconds of shape (T,)."""
 
+    def save_to_disk(self, path: Path) -> None:
+        """Saves the joint data to disk.
+
+        Args:
+            path: The path to save the joint data to.
+        """
+        path.mkdir(parents=True, exist_ok=True)
+        np.save(path / "joint_positions.npy", self.joint_positions)
+        np.save(path / "joint_velocities.npy", self.joint_velocities)
+        np.save(path / "joint_accelerations.npy", self.joint_accelerations)
+        np.save(path / "joint_torques.npy", self.joint_torques)
+        np.save(path / "sample_times_s.npy", self.sample_times_s)
+
+    @classmethod
+    def load_from_disk(cls, path: Path) -> "JointData":
+        """Loads the joint data from disk.
+
+        Args:
+            path: The path to load the joint data from.
+
+        Returns:
+            The joint data.
+        """
+        return cls(
+            joint_positions=np.load(path / "joint_positions.npy"),
+            joint_velocities=np.load(path / "joint_velocities.npy"),
+            joint_accelerations=np.load(path / "joint_accelerations.npy"),
+            joint_torques=np.load(path / "joint_torques.npy"),
+            sample_times_s=np.load(path / "sample_times_s.npy"),
+        )
+
 
 @dataclass
 class SymJointStateVariables:
