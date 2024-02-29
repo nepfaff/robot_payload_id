@@ -176,6 +176,7 @@ def extract_numeric_data_matrix_autodiff(
     add_reflected_inertia: bool,
     add_viscous_friction: bool,
     add_dynamic_dry_friction: bool,
+    payload_only: bool = False,
     use_progress_bar: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Extracts the numeric data matrix using autodiff. This scales to a large number of
@@ -193,6 +194,9 @@ def extract_numeric_data_matrix_autodiff(
         add_viscous_friction (bool): Whether to add viscous friction as a parameter.
         add_dynamic_dry_friction (bool): Whether to add dynamic dry friction as a
             parameter.
+        payload_only (bool, optional): Whether to only include the 10 inertial
+            parameters of the last link. These are the parameters that we care about
+            for payload identification.
         use_progress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
@@ -216,17 +220,18 @@ def extract_numeric_data_matrix_autodiff(
             add_reflected_inertia=add_reflected_inertia,
             add_viscous_friction=add_viscous_friction,
             add_dynamic_dry_friction=add_dynamic_dry_friction,
+            payload_only=payload_only,
         )
     )
-    if add_reflected_inertia:
+    if add_reflected_inertia and not payload_only:
         reflected_inertia_ad = np.array(
             [params.reflected_inertia for params in ad_plant_components.parameters]
         )
-    if add_viscous_friction:
+    if add_viscous_friction and not payload_only:
         viscous_frictions_ad = np.array(
             [params.viscous_friction for params in ad_plant_components.parameters]
         )
-    if add_dynamic_dry_friction:
+    if add_dynamic_dry_friction and not payload_only:
         dynamic_dry_frictions_ad = np.array(
             [params.dynamic_dry_friction for params in ad_plant_components.parameters]
         )
@@ -267,18 +272,19 @@ def extract_numeric_data_matrix_autodiff(
             forces,
         )
 
-        if add_reflected_inertia:
-            ad_torques += reflected_inertia_ad * joint_data.joint_accelerations[i]
-        if add_viscous_friction:
-            ad_torques += viscous_frictions_ad * joint_data.joint_velocities[i]
-        if add_dynamic_dry_friction:
-            ad_torques += dynamic_dry_frictions_ad * np.sign(
-                joint_data.joint_velocities[i]
-            )
+        if not payload_only:
+            if add_reflected_inertia:
+                ad_torques += reflected_inertia_ad * joint_data.joint_accelerations[i]
+            if add_viscous_friction:
+                ad_torques += viscous_frictions_ad * joint_data.joint_velocities[i]
+            if add_dynamic_dry_friction:
+                ad_torques += dynamic_dry_frictions_ad * np.sign(
+                    joint_data.joint_velocities[i]
+                )
 
         # Differentiate w.r.t. parameters
         ad_torques_derivative = np.vstack(
-            [joint_torques.derivatives() for joint_torques in ad_torques]
+            [torque.derivatives() for torque in ad_torques]
         )
         W_data[i * num_joints : (i + 1) * num_joints, :] = ad_torques_derivative
 
@@ -323,4 +329,5 @@ def compute_base_param_mapping(
     base_param_mapping = V[:, mask]
     if scale_by_singular_values:
         base_param_mapping *= 1 / S[mask]
+    return base_param_mapping
     return base_param_mapping

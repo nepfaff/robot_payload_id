@@ -289,6 +289,13 @@ def main():
         + "a more realistic initial guess for simulation-based evaluation.",
     )
     parser.add_argument(
+        "--payload_only",
+        action="store_true",
+        help="Only identify the 10 inertial parameters of the last link. All other "
+        + "parameters are frozen. These are the parameters that we want to estimate "
+        + "for payload identification.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -307,6 +314,7 @@ def main():
     use_euclidean_regularization = args.use_euclidean_regularization
     regularization_weight = args.regularization_weight
     perturb_scale = args.perturb_scale
+    payload_only = args.payload_only
 
     logging.basicConfig(level=args.log_level)
 
@@ -363,6 +371,7 @@ def main():
         add_reflected_inertia=identify_reflected_inertia,
         add_viscous_friction=identify_viscous_friction,
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
+        payload_only=payload_only,
     )
 
     if not args.keep_unidentifiable_params:
@@ -401,6 +410,7 @@ def main():
                     add_reflected_inertia=identify_reflected_inertia,
                     add_viscous_friction=identify_viscous_friction,
                     add_dynamic_dry_friction=identify_dynamic_dry_friction,
+                    payload_only=payload_only,
                 )
             else:
                 W_data_random = W_data_raw
@@ -410,6 +420,12 @@ def main():
             f"{base_param_mapping.shape[1]} out of {base_param_mapping.shape[0]} "
             + "parameters are identifiable."
         )
+
+        if base_param_mapping.shape[0] == base_param_mapping.shape[1]:
+            logging.warning(
+                "All parameters are identifiable. Not applying SVD projection."
+            )
+            base_param_mapping = None
     else:
         base_param_mapping = None
 
@@ -436,6 +452,8 @@ def main():
         add_viscous_friction=identify_viscous_friction,
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
     )
+    if payload_only:
+        params_guess = params_guess[-1:]
     if perturb_scale > 0.0:
         for params in params_guess:
             params.perturb(perturb_scale)
@@ -458,6 +476,7 @@ def main():
         identify_reflected_inertia=identify_reflected_inertia,
         identify_viscous_friction=identify_viscous_friction,
         identify_dynamic_dry_friction=identify_dynamic_dry_friction,
+        payload_only=payload_only,
         solver_kPrintToConsole=args.kPrintToConsole,
     )
     if result.is_success():
@@ -465,21 +484,27 @@ def main():
         var_sol_dict = dict(zip(variable_names, result.GetSolution(variable_vec)))
         logging.info(f"SDP result:\n{var_sol_dict}")
 
-        compute_entropic_divergence_to_gt_params(
-            num_joints, arm_components, var_sol_dict
-        )
-        compute_base_parameter_errors(
-            arm_components=arm_components,
-            result=result,
-            identify_rotor_inertia=identify_rotor_inertia,
-            identify_reflected_inertia=identify_reflected_inertia,
-            identify_viscous_friction=identify_viscous_friction,
-            identify_dynamic_dry_friction=identify_dynamic_dry_friction,
-            base_param_mapping=base_param_mapping,
-            variable_vec=variable_vec,
-            base_variable_vec=base_variable_vec,
-            var_sol_dict=var_sol_dict,
-        )
+        if not payload_only:
+            # The GT parameters are currently incorrect when a payload is attached
+            # (payload is ignored in GT parameters).
+            compute_entropic_divergence_to_gt_params(
+                num_joints=num_joints,
+                arm_components=arm_components,
+                var_sol_dict=var_sol_dict,
+                payload_only=payload_only,
+            )
+            compute_base_parameter_errors(
+                arm_components=arm_components,
+                result=result,
+                identify_rotor_inertia=identify_rotor_inertia,
+                identify_reflected_inertia=identify_reflected_inertia,
+                identify_viscous_friction=identify_viscous_friction,
+                identify_dynamic_dry_friction=identify_dynamic_dry_friction,
+                base_param_mapping=base_param_mapping,
+                variable_vec=variable_vec,
+                base_variable_vec=base_variable_vec,
+                var_sol_dict=var_sol_dict,
+            )
 
     else:
         logging.warning("Failed to solve inertial parameter SDP!")

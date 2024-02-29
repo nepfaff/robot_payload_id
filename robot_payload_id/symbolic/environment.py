@@ -186,6 +186,7 @@ def create_autodiff_plant(
     add_reflected_inertia: bool,
     add_viscous_friction: bool = False,
     add_dynamic_dry_friction: bool = False,
+    payload_only: bool = False,
 ) -> ArmPlantComponents:
     """Creates an autodiff plant for a robotic arm system.
 
@@ -201,6 +202,9 @@ def create_autodiff_plant(
         add_dynamic_dry_friction (bool): Whether to add autodiff dynamic dry friction
             parameters. NOTE: Drake does not yet support dynamic dry friction as part of
             the context. Hence, this parameter is created but not added to the plant.
+        payload_only (bool): Whether to only include the 10 inertial parameters of the
+            last link. These are the parameters that we care about for payload
+            identification.
 
     Returns:
         ArmPlantComponents: The autodiff plant and associated autodiff components.
@@ -216,15 +220,22 @@ def create_autodiff_plant(
 
     # Create the autodiff parameters
     ad_parameters: List[JointParameters] = []
-    num_params_per_joint = (
-        10
-        + add_rotor_inertia
-        + add_reflected_inertia
-        + add_viscous_friction
-        + add_dynamic_dry_friction
-    )
-    num_params = arm_components.num_joints * num_params_per_joint
+    if payload_only:
+        num_params = num_params_per_joint = 10
+    else:
+        num_params_per_joint = (
+            10
+            + add_rotor_inertia
+            + add_reflected_inertia
+            + add_viscous_friction
+            + add_dynamic_dry_friction
+        )
+        num_params = arm_components.num_joints * num_params_per_joint
     for i in range(arm_components.num_joints):
+        if payload_only and i < arm_components.num_joints - 1:
+            # Skip all but the last link
+            continue
+
         try:
             # There is no hope to identify link 0, so we skip it
             link: RigidBody = ad_plant.GetBodyByName(f"iiwa_link_{i+1}")
@@ -256,6 +267,9 @@ def create_autodiff_plant(
         Izz_val = ExtractValue(spatial_inertia.CopyToFullMatrix6()[:3, :3])[2, 2]
 
         # Create autodiff variables for the inertial parameters
+        if payload_only:
+            i = 0
+
         m_vec = np.zeros(num_params)
         m_vec[(i * num_params_per_joint)] = 1
         m_ad = AutoDiffXd(m_val, m_vec)
@@ -298,29 +312,28 @@ def create_autodiff_plant(
         Izz_vec[(i * num_params_per_joint) + 9] = 1
         Izz_ad = AutoDiffXd(Izz_val, Izz_vec)
         Gzz_ad = Izz_ad / m_ad
-        G_ad = UnitInertia_[AutoDiffXd](Gxx_ad, Gyy_ad, Gzz_ad, Gxy_ad, Gxz_ad, Gyz_ad)
 
         offset = 10
-        if add_rotor_inertia:
+        if add_rotor_inertia and not payload_only:
             rotor_inertia_vec = np.zeros(num_params)
             rotor_inertia_vec[(i * num_params_per_joint) + offset] = 1
             rotor_inertia_ad = AutoDiffXd(
                 joint_actuator.default_rotor_inertia(), rotor_inertia_vec
             )
             offset += 1
-        if add_reflected_inertia:
+        if add_reflected_inertia and not payload_only:
             reflected_inertia_vec = np.zeros(num_params)
             reflected_inertia_vec[(i * num_params_per_joint) + offset] = 1
             reflected_inertia_ad = AutoDiffXd(
                 joint_actuator.default_reflected_inertia(), reflected_inertia_vec
             )
             offset += 1
-        if add_viscous_friction:
+        if add_viscous_friction and not payload_only:
             viscous_friction_vec = np.zeros(num_params)
             viscous_friction_vec[(i * num_params_per_joint) + offset] = 1
             viscous_friction_ad = AutoDiffXd(joint.damping(), viscous_friction_vec)
             offset += 1
-        if add_dynamic_dry_friction:
+        if add_dynamic_dry_friction and not payload_only:
             dynamic_dry_friction_vec = np.zeros(num_params)
             dynamic_dry_friction_vec[(i * num_params_per_joint) + offset] = 1
             dynamic_dry_friction_ad = AutoDiffXd(0.0, dynamic_dry_friction_vec)
@@ -346,25 +359,30 @@ def create_autodiff_plant(
                 Iyy=Iyy_ad,
                 Iyz=Iyz_ad,
                 Izz=Izz_ad,
-                rotor_inertia=rotor_inertia_ad if add_rotor_inertia else None,
-                reflected_inertia=reflected_inertia_ad
-                if add_reflected_inertia
+                rotor_inertia=rotor_inertia_ad
+                if add_rotor_inertia and not payload_only
                 else None,
-                viscous_friction=viscous_friction_ad if add_viscous_friction else None,
+                reflected_inertia=reflected_inertia_ad
+                if add_reflected_inertia and not payload_only
+                else None,
+                viscous_friction=viscous_friction_ad
+                if add_viscous_friction and not payload_only
+                else None,
                 dynamic_dry_friction=dynamic_dry_friction_ad
-                if add_dynamic_dry_friction
+                if add_dynamic_dry_friction and not payload_only
                 else None,
             )
         )
 
         # Add the autodiff parameters to the plant
+        G_ad = UnitInertia_[AutoDiffXd](Gxx_ad, Gyy_ad, Gzz_ad, Gxy_ad, Gxz_ad, Gyz_ad)
         spatial_inertia_ad = SpatialInertia_[AutoDiffXd](
             m_ad, com_ad, G_ad, skip_validity_check=True
         )
         link.SetSpatialInertiaInBodyFrame(ad_plant_context, spatial_inertia_ad)
-        if add_rotor_inertia:
+        if add_rotor_inertia and not payload_only:
             joint_actuator.SetRotorInertia(ad_plant_context, rotor_inertia_ad)
-        if add_reflected_inertia:
+        if add_reflected_inertia and not payload_only:
             # We only want to count reflected inertia once
             joint_actuator.SetRotorInertia(ad_plant_context, 0.0)
         # if add_viscous_friction:

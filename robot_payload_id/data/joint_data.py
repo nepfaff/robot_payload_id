@@ -318,7 +318,7 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
                 tau_gt[i] += reflected_inertias[i] * joint_data.joint_accelerations[i]
             if viscous_frictions is not None:
                 tau_gt[i] += viscous_frictions[i] * joint_data.joint_velocities[i]
-            if dynamic_dry_frictions:
+            if dynamic_dry_frictions is not None:
                 tau_gt[i] += dynamic_dry_frictions[i] * np.sign(
                     joint_data.joint_velocities[i]
                 )

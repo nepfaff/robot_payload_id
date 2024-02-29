@@ -63,6 +63,7 @@ def solve_inertial_param_sdp(
     identify_reflected_inertia: bool = True,
     identify_viscous_friction: bool = True,
     identify_dynamic_dry_friction: bool = True,
+    payload_only=False,
     solver_kPrintToConsole: bool = False,
 ) -> Tuple[
     MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray, np.ndarray
@@ -94,6 +95,9 @@ def solve_inertial_param_sdp(
             friction.
         identify_dynamic_dry_friction (bool, optional): Whether to identify the dynamic
             dry friction.
+        payload_only (bool, optional): Whether to only include the 10 inertial
+            parameters of the last link. These are the parameters that we care about
+            for payload identification.
         solver_kPrintToConsole (bool, optional): Whether to print solver output.
 
     Returns:
@@ -118,6 +122,10 @@ def solve_inertial_param_sdp(
     # Create decision variables
     variables: List[JointParameters] = []
     for i in range(num_links):
+        if payload_only and i < num_links - 1:
+            # Skip all but the last link
+            continue
+
         variables.append(
             JointParameters(
                 m=prog.NewContinuousVariables(1, f"m{i}")[0],
@@ -131,22 +139,22 @@ def solve_inertial_param_sdp(
                 Iyz=prog.NewContinuousVariables(1, f"Iyz{i}")[0],
                 Izz=prog.NewContinuousVariables(1, f"Izz{i}")[0],
                 rotor_inertia=prog.NewContinuousVariables(1, f"rotor_inertia{i}")[0]
-                if identify_rotor_inertia
+                if identify_rotor_inertia and not payload_only
                 else None,
                 reflected_inertia=prog.NewContinuousVariables(
                     1, f"reflected_inertia{i}"
                 )[0]
-                if identify_reflected_inertia
+                if identify_reflected_inertia and not payload_only
                 else None,
                 viscous_friction=prog.NewContinuousVariables(1, f"viscous_friction{i}")[
                     0
                 ]
-                if identify_viscous_friction
+                if identify_viscous_friction and not payload_only
                 else None,
                 dynamic_dry_friction=prog.NewContinuousVariables(
                     1, f"dynamic_dry_friction{i}"
                 )[0]
-                if identify_dynamic_dry_friction
+                if identify_dynamic_dry_friction and not payload_only
                 else None,
             )
         )
@@ -214,54 +222,59 @@ def solve_inertial_param_sdp(
         # Use euclidean regularization for the non-inertia parameters
         non_inertia_params = []
         non_inertia_params_guess = []
-        if identify_rotor_inertia:
-            non_inertia_params += [var.rotor_inertia for var in variables]
-            non_inertia_params_guess += [var.rotor_inertia for var in params_guess]
-        if identify_reflected_inertia:
-            non_inertia_params += [var.reflected_inertia for var in variables]
-            non_inertia_params_guess += [var.reflected_inertia for var in params_guess]
-        if identify_viscous_friction:
-            non_inertia_params += [var.viscous_friction for var in variables]
-            non_inertia_params_guess += [var.viscous_friction for var in params_guess]
-        if identify_dynamic_dry_friction:
-            non_inertia_params += [var.dynamic_dry_friction for var in variables]
-            non_inertia_params_guess += [
-                var.dynamic_dry_friction for var in params_guess
-            ]
-        if len(non_inertia_params) > 0:
-            non_inertia_params = np.asarray(non_inertia_params)
-            non_inertia_params_guess = np.asarray(non_inertia_params_guess)
-            prog.AddQuadraticCost(
-                regularization_weight
-                * (non_inertia_params_guess - non_inertia_params).T
-                @ (non_inertia_params_guess - non_inertia_params),
-                is_convex=True,
-            )
+        if not payload_only:
+            if identify_rotor_inertia:
+                non_inertia_params += [var.rotor_inertia for var in variables]
+                non_inertia_params_guess += [var.rotor_inertia for var in params_guess]
+            if identify_reflected_inertia:
+                non_inertia_params += [var.reflected_inertia for var in variables]
+                non_inertia_params_guess += [
+                    var.reflected_inertia for var in params_guess
+                ]
+            if identify_viscous_friction:
+                non_inertia_params += [var.viscous_friction for var in variables]
+                non_inertia_params_guess += [
+                    var.viscous_friction for var in params_guess
+                ]
+            if identify_dynamic_dry_friction:
+                non_inertia_params += [var.dynamic_dry_friction for var in variables]
+                non_inertia_params_guess += [
+                    var.dynamic_dry_friction for var in params_guess
+                ]
+            if len(non_inertia_params) > 0:
+                non_inertia_params = np.asarray(non_inertia_params)
+                non_inertia_params_guess = np.asarray(non_inertia_params_guess)
+                prog.AddQuadraticCost(
+                    regularization_weight
+                    * (non_inertia_params_guess - non_inertia_params).T
+                    @ (non_inertia_params_guess - non_inertia_params),
+                    is_convex=True,
+                )
 
     # Inertial parameter feasibility constraints
     for pseudo_inertia in pseudo_inertias:
         prog.AddPositiveSemidefiniteConstraint(pseudo_inertia - 1e-6 * np.identity(4))
 
     # Reflected rotor inertia feasibility constraints
-    if identify_rotor_inertia:
+    if identify_rotor_inertia and not payload_only:
         rotor_inertias = np.array([var.rotor_inertia for var in variables])
         for rotor_inertia in rotor_inertias:
             prog.AddConstraint(rotor_inertia >= 0)
 
     # Reflected inertia feasibility constraints
-    if identify_reflected_inertia:
+    if identify_reflected_inertia and not payload_only:
         reflected_inertias = np.array([var.reflected_inertia for var in variables])
         for reflected_inertia in reflected_inertias:
             prog.AddConstraint(reflected_inertia >= 0)
 
     # Viscous friction feasibility constraints
-    if identify_viscous_friction:
+    if identify_viscous_friction and not payload_only:
         viscous_frictions = np.array([var.viscous_friction for var in variables])
         for viscous_friction in viscous_frictions:
             prog.AddConstraint(viscous_friction >= 0)
 
     # Dynamic dry friction feasibility constraints
-    if identify_dynamic_dry_friction:
+    if identify_dynamic_dry_friction and not payload_only:
         dynamic_dry_frictions = np.array(
             [var.dynamic_dry_friction for var in variables]
         )
