@@ -250,21 +250,21 @@ def create_autodiff_plant(
                 f"joint{i+1}"
             )
 
-        m_val = link.get_mass(ad_plant_context).value()
-
         # Extract the current values from the plant
+        m_val = link.get_mass(ad_plant_context).value()
         cx_val, cy_val, cz_val = ExtractValue(
             link.CalcCenterOfMassInBodyFrame(ad_plant_context)
         )
-        spatial_inertia: SpatialInertia = link.CalcSpatialInertiaInBodyFrame(
+        inertia_matrix = link.CalcSpatialInertiaInBodyFrame(
             ad_plant_context
-        )
-        Ixx_val = ExtractValue(spatial_inertia.CopyToFullMatrix6()[:3, :3])[0, 0]
-        Ixy_val = ExtractValue(spatial_inertia.CopyToFullMatrix6()[:3, :3])[0, 1]
-        Ixz_val = ExtractValue(spatial_inertia.CopyToFullMatrix6()[:3, :3])[0, 2]
-        Iyy_val = ExtractValue(spatial_inertia.CopyToFullMatrix6()[:3, :3])[1, 1]
-        Iyz_val = ExtractValue(spatial_inertia.CopyToFullMatrix6()[:3, :3])[1, 2]
-        Izz_val = ExtractValue(spatial_inertia.CopyToFullMatrix6()[:3, :3])[2, 2]
+        ).CopyToFullMatrix6()[:3, :3]
+        inertia_matrix_val = ExtractValue(inertia_matrix)
+        Ixx_val = inertia_matrix_val[0, 0]
+        Ixy_val = inertia_matrix_val[0, 1]
+        Ixz_val = inertia_matrix_val[0, 2]
+        Iyy_val = inertia_matrix_val[1, 1]
+        Iyz_val = inertia_matrix_val[1, 2]
+        Izz_val = inertia_matrix_val[2, 2]
 
         # Create autodiff variables for the inertial parameters
         if payload_only:
