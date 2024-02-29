@@ -6,9 +6,10 @@ authors = ["Nicholas Pfaff <nepfaff@mit.edu>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.12"
+python = ">=3.10,<3.11"
 numpy = "^1.25.2"
-manipulation = {git = "https://github.com/RussTedrake/manipulation.git"}
+manipulation = {git = "https://github.com/RussTedrake/manipulation.git", rev = "d87bd43609003f487155da6dff5840bcd3f9b64a"}
+iiwa_setup = {git = "https://github.com/nepfaff/iiwa_setup.git"}
 tqdm = "^4.66.1"
 hydra-core = "^1.3.2"
 omegaconf = "^2.3.0"
@@ -20,7 +21,7 @@ scipy = "^1.11.4"
 wandb = "^0.16.0"
 plotly = "^5.18.0"
 sympy = "^1.12"
-drake = "^1.23.0"
+drake = "^1.26.0"
 nevergrad = "^1.0.1"
 matplotlib = "^3.8.2"
 nlopt = "^2.7.1"
