@@ -243,6 +243,9 @@ def main():
         )
 
     # Add data loggers
+    commanded_position_logger: VectorLogSink = builder.AddNamedSystem(
+        "commanded_position_logger", VectorLogSink(num_positions)
+    )
     measured_position_logger: VectorLogSink = builder.AddNamedSystem(
         "measured_position_logger", VectorLogSink(num_positions)
     )
@@ -251,6 +254,10 @@ def main():
     )
     measured_torque_logger: VectorLogSink = builder.AddNamedSystem(
         "measured_torque_logger", VectorLogSink(num_positions)
+    )
+    builder.Connect(
+        station.GetOutputPort("iiwa.position_commanded"),
+        commanded_position_logger.get_input_port(),
     )
     builder.Connect(
         station.GetOutputPort("iiwa.position_measured"),
@@ -287,6 +294,9 @@ def main():
         with open(html_path, "w") as f:
             f.write(html)
 
+    commanded_position_data = (
+        commanded_position_logger.FindLog(simulator.get_context()).data().T
+    )
     measured_position_data = (
         measured_position_logger.FindLog(simulator.get_context()).data().T
     )
@@ -301,7 +311,7 @@ def main():
     ).sample_times()
 
     # Estimate accelerations using finite differences
-    sample_period = sample_times_s[1] - sample_times_s[0]
+    sample_period = scenario.plant_config.time_step
     joint_accelerations = np.gradient(measured_velocity_data, sample_period, axis=0)
     fs_hz = 1.0 / sample_period
     filtered_joint_accelerations = filter_time_series_data(
@@ -328,6 +338,16 @@ def main():
         sample_times_s=sample_times_s,
     )
     joint_data.save_to_disk(save_data_path)
+
+    # Print tracking statistics
+    print(
+        "Mean absolute position tracking error per joint:",
+        np.mean(np.abs(commanded_position_data - measured_position_data), axis=0),
+    )
+    print(
+        "Max absolute position tracking error per joint:",
+        np.max(np.abs(commanded_position_data - measured_position_data), axis=0),
+    )
 
 
 if __name__ == "__main__":
