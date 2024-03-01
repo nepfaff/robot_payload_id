@@ -494,7 +494,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         # acceleration discontinuities that lead to commanded torque discontinuities
         # when using inverse dynamics control
         self._trajopt.AddJerkBounds(
-            lb=-np.full(self._num_joints, 100), ub=np.full(self._num_joints, 100)
+            lb=-np.full(self._num_joints, 25), ub=np.full(self._num_joints, 25)
         )
         name_unnamed_constraints(self._prog, "jerkBounds")
 
