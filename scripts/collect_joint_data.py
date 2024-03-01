@@ -97,11 +97,12 @@ def main():
 
     builder = DiagramBuilder()
     scenario = LoadScenario(filename=scenario_path)
+    has_wsg = "wsg" in scenario.model_drivers.keys()
     station: IiwaHardwareStationDiagram = builder.AddNamedSystem(
         "iiwa_hardware_station",
         IiwaHardwareStationDiagram(
             scenario=scenario,
-            has_wsg=True,  # TODO: This script should work with and without gripper, based on the scenario file.
+            has_wsg=has_wsg,
             use_hardware=use_hardware,
             control_mode=scenario.model_drivers["iiwa"].control_mode,
             package_xmls=[os.path.abspath("models/package.xml")],
@@ -233,12 +234,13 @@ def main():
 
     # TODO: Decide what to do there. Do we want to open for 5s and then grip tightly?
     # If yes, then force control would be better than position control.
-    wsg_const_pos_source: ConstantVectorSource = builder.AddNamedSystem(
-        "wsg_position_source", ConstantVectorSource(source_value=0.05 * np.ones(1))
-    )
-    builder.Connect(
-        wsg_const_pos_source.get_output_port(), station.GetInputPort("wsg.position")
-    )
+    if has_wsg:
+        wsg_const_pos_source: ConstantVectorSource = builder.AddNamedSystem(
+            "wsg_position_source", ConstantVectorSource(source_value=0.05 * np.ones(1))
+        )
+        builder.Connect(
+            wsg_const_pos_source.get_output_port(), station.GetInputPort("wsg.position")
+        )
 
     # Add data loggers
     measured_position_logger: VectorLogSink = builder.AddNamedSystem(
