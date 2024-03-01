@@ -6,3 +6,4 @@ logs
 *.csv
 /data/
 wandb/
+joint_data

@@ -6,21 +6,19 @@ from pathlib import Path
 
 import numpy as np
 
+from iiwa_setup.controllers import (
+    InverseDynamicsControllerWithGravityCompensationCancellation,
+)
 from iiwa_setup.iiwa import IiwaHardwareStationDiagram
 from manipulation.station import LoadScenario
 from pydrake.all import (
-    Adder,
     ApplySimulatorConfig,
     BsplineBasis,
     BsplineTrajectory,
     ConstantVectorSource,
     Demultiplexer,
     DiagramBuilder,
-    Gain,
-    InverseDynamics,
-    InverseDynamicsController,
     MeshcatVisualizer,
-    MultibodyPlant,
     PiecewisePolynomial,
     Simulator,
     TrajectorySource,
@@ -36,7 +34,6 @@ from robot_payload_id.utils import (
     FourierSeriesTrajectoryAttributes,
     JointData,
     filter_time_series_data,
-    get_parser,
 )
 
 
@@ -59,7 +56,6 @@ def main():
     parser.add_argument(
         "--save_data_path",
         type=Path,
-        required=True,
         help="Path to save the data to.",
     )
     parser.add_argument(
@@ -149,25 +145,21 @@ def main():
         traj_source_initializer.GetInputPort("iiwa.position_measured"),
     )
 
-    # Add the iiwa controller
-    # TODO: Add this entire controller system to `iiwa_setup` (inverse dynamics control
-    # with gravity compensation cancellation).
+    # Add controller
     controler_plant = station.get_iiwa_controller_plant()
     num_positions = controler_plant.num_positions()
-    torque_adder: Adder = builder.AddNamedSystem(
-        "torque_adder", Adder(2, num_positions)
-    )
-    kp = np.full(num_positions, 600)
-    damping_ratio = 0.2
-    inverse_dynamics_controller: InverseDynamicsController = builder.AddNamedSystem(
-        "inverse_dynamics_controller",
-        InverseDynamicsController(
-            controler_plant,
-            kp=kp,
-            ki=[1] * num_positions,
-            kd=2 * damping_ratio * np.sqrt(kp),
-            has_reference_acceleration=True,
+    controller = builder.AddNamedSystem(
+        "controller",
+        InverseDynamicsControllerWithGravityCompensationCancellation(
+            station=station,
+            scenario=scenario,
+            kp_gains=np.full(7, 600),
+            damping_ratios=np.full(7, 0.2),
         ),
+    )
+    builder.Connect(
+        station.GetOutputPort("iiwa.state_estimated"),
+        controller.GetInputPort("iiwa.state_estimated"),
     )
     state_acceleration_demux: Demultiplexer = builder.AddNamedSystem(
         "state_acceleration_demux",
@@ -178,59 +170,13 @@ def main():
     )
     builder.Connect(
         state_acceleration_demux.get_output_port(0),
-        inverse_dynamics_controller.get_input_port_desired_state(),
-    )
-    builder.Connect(
-        station.GetOutputPort("iiwa.state_estimated"),
-        inverse_dynamics_controller.get_input_port_estimated_state(),
+        controller.GetInputPort("iiwa.desired_state"),
     )
     builder.Connect(
         state_acceleration_demux.get_output_port(1),
-        inverse_dynamics_controller.get_input_port_desired_acceleration(),
+        controller.GetInputPort("iiwa.desired_accelerations"),
     )
-    builder.Connect(
-        inverse_dynamics_controller.get_output_port_control(),
-        torque_adder.get_input_port(0),
-    )
-
-    # Cancel out the iiwa control box's internal gravity compensation.
-    # This assumes that the iiwa control box does not know about the gripper and thus
-    # only considers the arm in its gravity compensation.
-    iiwa_only_controller_plant = MultibodyPlant(
-        time_step=scenario.plant_config.time_step
-    )
-    # TODO: Shouldn't be loading a fixed model here!
-    iiwa_only_controller_plant_parser = get_parser(iiwa_only_controller_plant)
-    iiwa_only_controller_plant_parser.AddModelsFromUrl(
-        "package://drake/manipulation/models/iiwa_description/iiwa7/iiwa7_no_collision.sdf"
-    )
-    iiwa_only_controller_plant.WeldFrames(
-        iiwa_only_controller_plant.world_frame(),
-        iiwa_only_controller_plant.GetFrameByName("iiwa_link_0"),
-    )
-    iiwa_only_controller_plant.Finalize()
-    gravity_compensation: InverseDynamics = builder.AddNamedSystem(
-        "gravity_compensation",
-        InverseDynamics(
-            plant=iiwa_only_controller_plant,
-            mode=InverseDynamics.InverseDynamicsMode.kGravityCompensation,
-        ),
-    )
-    builder.Connect(
-        station.GetOutputPort("iiwa.state_estimated"),
-        gravity_compensation.get_input_port_estimated_state(),
-    )
-    negater: Gain = builder.AddNamedSystem("negater", Gain(k=-1, size=num_positions))
-    builder.Connect(
-        gravity_compensation.get_output_port(),
-        negater.get_input_port(),
-    )
-    builder.Connect(
-        negater.get_output_port(),
-        torque_adder.get_input_port(1),
-    )
-
-    builder.Connect(torque_adder.get_output_port(), station.GetInputPort("iiwa.torque"))
+    builder.Connect(controller.get_output_port(), station.GetInputPort("iiwa.torque"))
 
     # TODO: Decide what to do there. Do we want to open for 5s and then grip tightly?
     # If yes, then force control would be better than position control.
@@ -330,14 +276,15 @@ def main():
     )
 
     # Save data
-    joint_data = JointData(
-        joint_positions=measured_position_data,
-        joint_velocities=measured_velocity_data,
-        joint_accelerations=filtered_joint_accelerations,
-        joint_torques=filtered_tau_measured,
-        sample_times_s=sample_times_s,
-    )
-    joint_data.save_to_disk(save_data_path)
+    if save_data_path is not None:
+        joint_data = JointData(
+            joint_positions=measured_position_data,
+            joint_velocities=measured_velocity_data,
+            joint_accelerations=filtered_joint_accelerations,
+            joint_torques=filtered_tau_measured,
+            sample_times_s=sample_times_s,
+        )
+        joint_data.save_to_disk(save_data_path)
 
     # Print tracking statistics
     print(

@@ -1,5 +1,7 @@
 import os
 
+from typing import List
+
 from manipulation.utils import ConfigureParser
 from pydrake.all import MathematicalProgram, MultibodyPlant, Parser
 
@@ -10,6 +12,13 @@ def get_parser(plant: MultibodyPlant) -> Parser:
     ConfigureParser(parser)
     parser.package_map().AddPackageXml(filename=os.path.abspath("models/package.xml"))
     return parser
+
+
+def get_package_xmls() -> List[str]:
+    """Returns a list of package.xml files."""
+    return [
+        os.path.abspath("models/package.xml"),
+    ]
 
 
 def name_constraint(constraint_binding: "BindingTConstraintU", name: str) -> None:
