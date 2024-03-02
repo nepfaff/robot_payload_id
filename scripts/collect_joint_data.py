@@ -161,19 +161,19 @@ def main():
         station.GetOutputPort("iiwa.state_estimated"),
         controller.GetInputPort("iiwa.state_estimated"),
     )
-    state_acceleration_demux: Demultiplexer = builder.AddNamedSystem(
-        "state_acceleration_demux",
+    desired_state_acceleration_demux: Demultiplexer = builder.AddNamedSystem(
+        "desired_state_acceleration_demux",
         Demultiplexer(output_ports_sizes=[num_positions * 2, num_positions]),
     )
     builder.Connect(
-        traj_source.get_output_port(), state_acceleration_demux.get_input_port()
+        traj_source.get_output_port(), desired_state_acceleration_demux.get_input_port()
     )
     builder.Connect(
-        state_acceleration_demux.get_output_port(0),
+        desired_state_acceleration_demux.get_output_port(0),
         controller.GetInputPort("iiwa.desired_state"),
     )
     builder.Connect(
-        state_acceleration_demux.get_output_port(1),
+        desired_state_acceleration_demux.get_output_port(1),
         controller.GetInputPort("iiwa.desired_accelerations"),
     )
     builder.Connect(controller.get_output_port(), station.GetInputPort("iiwa.torque"))
@@ -189,6 +189,13 @@ def main():
         )
 
     # Add data loggers
+    desired_state_demux = builder.AddNamedSystem(
+        "desired_state_demux", Demultiplexer(output_ports_sizes=[7, 7])
+    )
+    builder.Connect(
+        desired_state_acceleration_demux.get_output_port(0),
+        desired_state_demux.get_input_port(),
+    )
     commanded_position_logger: VectorLogSink = builder.AddNamedSystem(
         "commanded_position_logger", VectorLogSink(num_positions)
     )
@@ -202,7 +209,7 @@ def main():
         "measured_torque_logger", VectorLogSink(num_positions)
     )
     builder.Connect(
-        station.GetOutputPort("iiwa.position_commanded"),
+        desired_state_demux.get_output_port(0),
         commanded_position_logger.get_input_port(),
     )
     builder.Connect(
