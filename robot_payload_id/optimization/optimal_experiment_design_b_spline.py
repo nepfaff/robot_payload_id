@@ -189,6 +189,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         add_reflected_inertia: bool,
         add_viscous_friction: bool,
         add_dynamic_dry_friction: bool,
+        payload_only: bool,
         include_endpoint_constraints: bool,
         constraint_acceleration_endpoints: bool = False,
         nevergrad_method: str = "NGOpt",
@@ -227,6 +228,8 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 dynamics.
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
                 the dynamics.
+            payload_only (bool): Whether to only consider the 10 inertial parameters of
+                the last link. This takes precedence over other arguments.
             include_endpoint_constraints (bool): Whether to include start and end point
                 constraints.
             constraint_acceleration_endpoints (bool): Whether to add acceleration
@@ -267,6 +270,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         self._add_reflected_inertia = add_reflected_inertia
         self._add_viscous_friction = add_viscous_friction
         self._add_dynamic_dry_friction = add_dynamic_dry_friction
+        self._payload_only = payload_only
         self._constraint_acceleration_endpoints = constraint_acceleration_endpoints
         self._nevergrad_method = nevergrad_method
 
@@ -292,6 +296,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             add_reflected_inertia=add_reflected_inertia,
             add_viscous_friction=add_viscous_friction,
             add_dynamic_dry_friction=add_dynamic_dry_friction,
+            payload_only=payload_only,
         )
 
         # Compute base parameter mapping
@@ -302,7 +307,13 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
         wandb.run.summary["num_params"] = self._base_param_mapping.shape[0]
         wandb.run.summary["num_identifiable_params"] = self._base_param_mapping.shape[1]
-        self._log_base_params_mapping(self._base_param_mapping)
+        if self._base_param_mapping.shape[0] == self._base_param_mapping.shape[1]:
+            logging.info(
+                "All parameters are identifiable. Not applying SVD projection."
+            )
+            self._base_param_mapping = None
+        else:
+            self._log_base_params_mapping(self._base_param_mapping)
 
         # Add cost
         self._prog.AddCost(
@@ -403,6 +414,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             add_reflected_inertia=self._add_reflected_inertia,
             add_viscous_friction=self._add_viscous_friction,
             add_dynamic_dry_friction=self._add_dynamic_dry_friction,
+            payload_only=self._payload_only,
             use_progress_bar=use_progress_bar,
         )
 
@@ -612,6 +624,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         add_reflected_inertia: bool,
         add_viscous_friction: bool,
         add_dynamic_dry_friction: bool,
+        payload_only: bool,
         include_endpoint_constraints: bool,
         nevergrad_method: str = "NGOpt",
         spline_order: int = 4,
@@ -651,6 +664,8 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 dynamics.
             add_dynamic_dry_friction (bool): Whether to consider dynamic dry friction in
                 the dynamics.
+            payload_only (bool): Whether to only consider the 10 inertial parameters of
+                the last link. This takes precedence over other arguments.
             include_endpoint_constraints (bool): Whether to include start and end point
                 constraints.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
@@ -697,6 +712,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 add_reflected_inertia=add_reflected_inertia,
                 add_viscous_friction=add_viscous_friction,
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
+                payload_only=payload_only,
                 include_endpoint_constraints=include_endpoint_constraints,
                 nevergrad_method=nevergrad_method,
                 spline_order=spline_order,
