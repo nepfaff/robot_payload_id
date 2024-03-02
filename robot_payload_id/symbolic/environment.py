@@ -204,7 +204,7 @@ def create_autodiff_plant(
             the context. Hence, this parameter is created but not added to the plant.
         payload_only (bool): Whether to only include the 10 inertial parameters of the
             last link. These are the parameters that we care about for payload
-            identification.
+            identification. This takes precedence over other arguments.
 
     Returns:
         ArmPlantComponents: The autodiff plant and associated autodiff components.

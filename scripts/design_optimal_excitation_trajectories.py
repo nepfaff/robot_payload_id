@@ -207,6 +207,12 @@ def main():
         + "start and end points. However, these might then turn out infeasible.",
     )
     parser.add_argument(
+        "--payload_only",
+        action="store_true",
+        help="Only consider the 10 inertial parameters of the last link. These are the "
+        + "parameters that we want to estimate for payload identification.",
+    )
+    parser.add_argument(
         "--wandb_mode",
         type=str,
         default="online",
@@ -283,6 +289,7 @@ def main():
     add_viscous_friction = args.add_viscous_friction
     add_dynamic_dry_friction = args.add_dynamic_dry_friction
     add_endpoint_constraints = not args.not_add_endpoint_constraints
+    payload_only = args.payload_only
 
     if args.use_bspline:
         assert (
@@ -373,6 +380,7 @@ def main():
                             add_reflected_inertia=add_reflected_inertia,
                             add_viscous_friction=add_viscous_friction,
                             add_dynamic_dry_friction=add_dynamic_dry_friction,
+                            payload_only=payload_only,
                             include_endpoint_constraints=add_endpoint_constraints,
                             nevergrad_method=nevergrad_method,
                             traj_initial=traj_initial,
@@ -400,6 +408,7 @@ def main():
                         add_reflected_inertia=add_reflected_inertia,
                         add_viscous_friction=add_viscous_friction,
                         add_dynamic_dry_friction=add_dynamic_dry_friction,
+                        payload_only=payload_only,
                         include_endpoint_constraints=add_endpoint_constraints,
                         nevergrad_method=nevergrad_method,
                         traj_initial=traj_initial,

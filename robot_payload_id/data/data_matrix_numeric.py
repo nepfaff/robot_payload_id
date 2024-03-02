@@ -197,7 +197,7 @@ def extract_numeric_data_matrix_autodiff(
             parameter.
         payload_only (bool, optional): Whether to only include the 10 inertial
             parameters of the last link. These are the parameters that we care about
-            for payload identification.
+            for payload identification. This takes precedence over the other arguments.
         use_progress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
