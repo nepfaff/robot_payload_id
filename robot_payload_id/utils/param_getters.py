@@ -15,6 +15,7 @@ from pydrake.all import (
     MultibodyPlant,
     RevoluteJoint,
     RigidBody,
+    RigidTransform,
     SpatialInertia,
 )
 
@@ -112,6 +113,25 @@ def get_candidate_sys_id_bodies(plant) -> List[RigidBody]:
     return bodies
 
 
+def get_candidate_sys_id_welded_subgraphs(plant) -> List[List[RigidBody]]:
+    subgraphs = get_welded_subgraphs(plant)
+    candidate_subgraphs: List[List[RigidBody]] = []
+    for subgraph in subgraphs:
+        first_body = subgraph[0]
+        # Ignore world subgraph
+        if are_frames_welded(plant, first_body.body_frame(), plant.world_frame()):
+            continue
+
+        # Ignore subgraphs with no mass
+        masses = [body.default_mass() for body in subgraph]
+        if sum(masses) == 0.0:
+            continue
+
+        # Return subgraph
+        candidate_subgraphs.append(subgraph)
+    return candidate_subgraphs
+
+
 def extract_inertial_param(
     spatial_inertia: SpatialInertia,
 ) -> Tuple[float, np.ndarray, np.ndarray]:
@@ -139,6 +159,7 @@ def get_plant_joint_params(
     add_reflected_inertia: bool,
     add_viscous_friction: bool,
     add_dynamic_dry_friction: bool,
+    payload_only: bool,
 ) -> List[JointParameters]:
     """Returns the parameters for all joints and their associated welded subgraph in the
     plant.
@@ -153,6 +174,8 @@ def get_plant_joint_params(
             parameters.
         add_dynamic_dry_friction (bool): Whether to add dynamic dry friction to the
             joint parameters.
+        payload_only (bool): Whether to include only the 10 inertial parameters of the
+            last link.
 
     Returns:
         List[JointParameters]: A list of inertial parameters for each joint in the
@@ -162,38 +185,82 @@ def get_plant_joint_params(
         add_rotor_inertia and add_reflected_inertia
     ), "Cannot add rotor inertia and reflected inertia at the same time."
 
-    bodies = get_candidate_sys_id_bodies(plant)
+    # bodies = get_candidate_sys_id_bodies(plant)
+    subgraphs = get_candidate_sys_id_welded_subgraphs(plant)
     joints = get_revolute_joints(plant)
     joint_actuators = get_joint_actuators(plant)
 
+    if payload_only:
+        subgraphs = subgraphs[-1:]
+        joints = joints[-1:]
+        joint_actuators = joint_actuators[-1:]
+
     joint_params: List[JointParameters] = []
-    for body, joint, joint_actuator in zip(bodies, joints, joint_actuators):
-        mass, com, rot_inertia = get_body_inertial_param(body, context)
+    for subgraph, joint, joint_actuator in zip(subgraphs, joints, joint_actuators):
+        # Combine inertial parameters of all bodies in subgraph
+        if len(subgraph) == 1:
+            combined_mass, combined_com, combined_rot_inertia = get_body_inertial_param(
+                subgraph[0], context
+            )
+        else:
+            # Express parameters in the frame of the first body
+            combined_mass, combined_com, combined_rot_inertia = (
+                0.0,
+                np.zeros(3),
+                np.zeros((3, 3)),
+            )
+            X_WBody1 = subgraph[0].body_frame().CalcPoseInWorld(context)
+            for body in subgraph:
+                X_WBody = body.body_frame().CalcPoseInWorld(context)
+                X_BodyW = X_WBody.inverse()
+                X_BodyBody1: RigidTransform = X_BodyW @ X_WBody1
+
+                spatial_inertia: SpatialInertia = body.CalcSpatialInertiaInBodyFrame(
+                    context
+                )
+                R_BodyBody1 = X_BodyBody1.rotation()
+                R_Body1Body = R_BodyBody1.inverse()
+                # Express 'body' inertia in the frame of 'body1'
+                spatial_inertia_body1_frame = spatial_inertia.ReExpress(R_Body1Body)
+                # Express 'body' inertia about 'body1' com
+                spatial_inertia_wrt_body1 = spatial_inertia_body1_frame.Shift(
+                    X_BodyBody1.translation()
+                )
+
+                combined_mass += spatial_inertia_wrt_body1.get_mass()
+                combined_com += spatial_inertia_wrt_body1.get_com()
+                combined_rot_inertia += (
+                    spatial_inertia_wrt_body1.CalcRotationalInertia().CopyToFullMatrix3()
+                )
+            combined_com /= combined_mass
+
         joint_params.append(
             JointParameters(
-                m=mass,
-                cx=com[0],
-                cy=com[1],
-                cz=com[2],
-                hx=mass * com[0],
-                hy=mass * com[1],
-                hz=mass * com[2],
-                Ixx=rot_inertia[0, 0],
-                Iyy=rot_inertia[1, 1],
-                Izz=rot_inertia[2, 2],
-                Ixy=rot_inertia[0, 1],
-                Ixz=rot_inertia[0, 2],
-                Iyz=rot_inertia[1, 2],
+                m=combined_mass,
+                cx=combined_com[0],
+                cy=combined_com[1],
+                cz=combined_com[2],
+                hx=combined_mass * combined_com[0],
+                hy=combined_mass * combined_com[1],
+                hz=combined_mass * combined_com[2],
+                Ixx=combined_rot_inertia[0, 0],
+                Iyy=combined_rot_inertia[1, 1],
+                Izz=combined_rot_inertia[2, 2],
+                Ixy=combined_rot_inertia[0, 1],
+                Ixz=combined_rot_inertia[0, 2],
+                Iyz=combined_rot_inertia[1, 2],
                 rotor_inertia=joint_actuator.rotor_inertia(context)
-                if add_rotor_inertia
+                if add_rotor_inertia and not payload_only
                 else None,
                 reflected_inertia=joint_actuator.rotor_inertia(context)
                 * joint_actuator.gear_ratio(context) ** 2
-                if add_reflected_inertia
+                if add_reflected_inertia and not payload_only
                 else None,
-                viscous_friction=joint.damping() if add_viscous_friction else None,
+                viscous_friction=joint.damping()
+                if add_viscous_friction and not payload_only
+                else None,
                 dynamic_dry_friction=0.0
-                if add_dynamic_dry_friction
+                if add_dynamic_dry_friction and not payload_only
                 else None,  # Not currently modelled by Drake
             )
         )
