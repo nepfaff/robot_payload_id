@@ -204,6 +204,7 @@ def get_plant_joint_params(
             )
         else:
             # Express parameters in the frame of the first body
+            # NOTE: This might not be entirely correct
             combined_mass, combined_com, combined_rot_inertia = (
                 0.0,
                 np.zeros(3),
@@ -227,8 +228,9 @@ def get_plant_joint_params(
                     X_BodyBody1.translation()
                 )
 
-                combined_mass += spatial_inertia_wrt_body1.get_mass()
-                combined_com += spatial_inertia_wrt_body1.get_com()
+                mass = spatial_inertia_wrt_body1.get_mass()
+                combined_mass += mass
+                combined_com += spatial_inertia_body1_frame.get_com() * mass
                 combined_rot_inertia += (
                     spatial_inertia_wrt_body1.CalcRotationalInertia().CopyToFullMatrix3()
                 )

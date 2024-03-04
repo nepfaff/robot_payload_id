@@ -38,7 +38,10 @@ from robot_payload_id.utils import (
 
 
 def compute_entropic_divergence_to_gt_params(
-    num_joints: int, arm_components: ArmComponents, var_sol_dict: Dict[str, float]
+    num_joints: int,
+    arm_components: ArmComponents,
+    var_sol_dict: Dict[str, float],
+    payload_only: bool,
 ) -> None:
     """
     Compute and logs the inertial entropic divergence from the estimated parameters in
@@ -47,7 +50,8 @@ def compute_entropic_divergence_to_gt_params(
     Zero entropic divergence means the estimated parameters are the same as the ground
     truth parameters. This is not possible as not all parameters are identifiable.
     """
-    masses_estimated = np.array([var_sol_dict[f"m{i}(0)"] for i in range(num_joints)])
+    iterator = [num_joints - 1] if payload_only else range(num_joints)
+    masses_estimated = np.array([var_sol_dict[f"m{i}(0)"] for i in iterator])
     coms_estimated = np.array(
         [
             [
@@ -56,7 +60,7 @@ def compute_entropic_divergence_to_gt_params(
                 var_sol_dict[f"hz{i}(0)"],
             ]
             / var_sol_dict[f"m{i}(0)"]
-            for i in range(num_joints)
+            for i in iterator
         ]
     )
     rot_inertias_estimated = np.array(
@@ -78,9 +82,10 @@ def compute_entropic_divergence_to_gt_params(
                     var_sol_dict[f"Izz{i}(0)"],
                 ],
             ]
-            for i in range(num_joints)
+            for i in iterator
         ]
     )
+
     bodies = get_candidate_sys_id_bodies(arm_components.plant)
     masses_gt, coms_gt, rot_inertias_gt = get_plant_inertial_params(
         arm_components.plant, arm_components.plant.CreateDefaultContext(), bodies
@@ -118,6 +123,7 @@ def compute_base_parameter_errors(
     identify_reflected_inertia: bool,
     identify_viscous_friction: bool,
     identify_dynamic_dry_friction: bool,
+    payload_only: bool,
     base_param_mapping: np.ndarray,
     variable_vec: np.ndarray,
     base_variable_vec: np.ndarray,
@@ -132,6 +138,7 @@ def compute_base_parameter_errors(
         add_reflected_inertia=identify_reflected_inertia,
         add_viscous_friction=identify_viscous_friction,
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
+        payload_only=payload_only,
     )
     params_vec_gt = np.concatenate(
         [params.get_lumped_param_list() for params in inertial_params_gt]
@@ -308,6 +315,13 @@ def main():
         + "for payload identification.",
     )
     parser.add_argument(
+        "--gt_model_path",
+        type=Path,
+        help="Path to the ground truth robot model. This could for example have a "
+        + "payload attached. If not provided, the ground truth model is assumed to be "
+        + "the same as the model used for identification (e.g. vanilla iiwa).",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -328,6 +342,7 @@ def main():
     regularization_weight = args.regularization_weight
     perturb_scale = args.perturb_scale
     payload_only = args.payload_only
+    gt_model_path = args.gt_model_path
 
     assert (traj_parameter_path is not None) != (joint_data_path is not None), (
         "One but not both of `--traj_parameter_path` and `--joint_data_path` should be "
@@ -338,13 +353,21 @@ def main():
 
     # Create arm
     num_joints = 1 if args.use_one_link_arm else 7
-    urdf_path = (
+    # NOTE: This model must not have a payload attached. Otherwise, the w0 term will be
+    # wrong and include the payload inertia.
+    model_path = (
         "./models/one_link_arm.sdf"
         if args.use_one_link_arm
         else "./models/iiwa.dmd.yaml"
     )
     arm_components = create_arm(
-        arm_file_path=urdf_path, num_joints=num_joints, time_step=0.0
+        arm_file_path=model_path, num_joints=num_joints, time_step=0.0
+    )
+
+    # Model for computing GT values
+    gt_model_path = str(gt_model_path) if gt_model_path is not None else model_path
+    arm_components_gt = create_arm(
+        arm_file_path=gt_model_path, num_joints=num_joints, time_step=0.0
     )
 
     if traj_parameter_path is not None:
@@ -388,7 +411,7 @@ def main():
     (
         W_data_raw,
         w0_data,
-        tau_data_model_predicted,
+        _,
     ) = extract_numeric_data_matrix_autodiff(
         arm_components=arm_components,
         joint_data=joint_data,
@@ -400,7 +423,19 @@ def main():
     )
     if traj_parameter_path is not None:
         # Use the model-predicted torques
-        tau_data = tau_data_model_predicted
+        (
+            _,
+            _,
+            tau_data,
+        ) = extract_numeric_data_matrix_autodiff(
+            arm_components=arm_components_gt,
+            joint_data=joint_data,
+            add_rotor_inertia=identify_rotor_inertia,
+            add_reflected_inertia=identify_reflected_inertia,
+            add_viscous_friction=identify_viscous_friction,
+            add_dynamic_dry_friction=identify_dynamic_dry_friction,
+            payload_only=payload_only,
+        )
     else:
         # Use the measured torques
         tau_data = joint_data.joint_torques.flatten()
@@ -410,19 +445,25 @@ def main():
     if not args.keep_unidentifiable_params:
         # Load base parameter mapping
         if traj_parameter_path is not None:
-            base_param_mapping_path = traj_parameter_path / "base_param_mapping.npy"
-            if not os.path.exists(base_param_mapping_path):
-                base_param_mapping_path = (
-                    traj_parameter_path / "../base_param_mapping.npy"
+            base_param_mapping_path1 = traj_parameter_path / "base_param_mapping.npy"
+            base_param_mapping_path2 = traj_parameter_path / "../base_param_mapping.npy"
+            if os.path.exists(base_param_mapping_path1):
+                logging.info(
+                    f"Loading base parameter mapping from {base_param_mapping_path1}"
                 )
-            logging.info(
-                f"Loading base parameter mapping from {base_param_mapping_path}"
-            )
-            base_param_mapping = np.load(base_param_mapping_path)
+                base_param_mapping = np.load(base_param_mapping_path1)
+            elif os.path.exists(base_param_mapping_path2):
+                logging.info(
+                    f"Loading base parameter mapping from {base_param_mapping_path2}"
+                )
+                base_param_mapping = np.load(base_param_mapping_path2)
+            else:
+                base_param_mapping = None
 
         # Recompute base parameter mapping if it has wrong shape or is not provided
         if (
             traj_parameter_path is None
+            or base_param_mapping is None
             or W_data_raw.shape[1] != base_param_mapping.shape[0]
         ):
             logging.warning(
@@ -486,15 +527,14 @@ def main():
     # TODO: Perturb the GT parameters to get a more realistic initial guess for
     # simulation-based evaluation
     params_guess = get_plant_joint_params(
-        arm_components.plant,
-        arm_components.plant.CreateDefaultContext(),
+        arm_components_gt.plant,
+        arm_components_gt.plant.CreateDefaultContext(),
         add_rotor_inertia=identify_rotor_inertia,
         add_reflected_inertia=identify_reflected_inertia,
         add_viscous_friction=identify_viscous_friction,
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
+        payload_only=payload_only,
     )
-    if payload_only:
-        params_guess = params_guess[-1:]
     if perturb_scale > 0.0:
         for params in params_guess:
             params.perturb(perturb_scale)
@@ -525,26 +565,25 @@ def main():
         var_sol_dict = dict(zip(variable_names, result.GetSolution(variable_vec)))
         logging.info(f"SDP result:\n{var_sol_dict}")
 
-        if not payload_only:
-            # The GT parameters are currently incorrect when a payload is attached
-            # (payload is ignored in GT parameters).
-            compute_entropic_divergence_to_gt_params(
-                num_joints=num_joints,
-                arm_components=arm_components,
-                var_sol_dict=var_sol_dict,
-            )
-            compute_base_parameter_errors(
-                arm_components=arm_components,
-                result=result,
-                identify_rotor_inertia=identify_rotor_inertia,
-                identify_reflected_inertia=identify_reflected_inertia,
-                identify_viscous_friction=identify_viscous_friction,
-                identify_dynamic_dry_friction=identify_dynamic_dry_friction,
-                base_param_mapping=base_param_mapping,
-                variable_vec=variable_vec,
-                base_variable_vec=base_variable_vec,
-                var_sol_dict=var_sol_dict,
-            )
+        compute_entropic_divergence_to_gt_params(
+            num_joints=num_joints,
+            arm_components=arm_components_gt,
+            var_sol_dict=var_sol_dict,
+            payload_only=payload_only,
+        )
+        compute_base_parameter_errors(
+            arm_components=arm_components_gt,
+            result=result,
+            identify_rotor_inertia=identify_rotor_inertia,
+            identify_reflected_inertia=identify_reflected_inertia,
+            identify_viscous_friction=identify_viscous_friction,
+            identify_dynamic_dry_friction=identify_dynamic_dry_friction,
+            payload_only=payload_only,
+            base_param_mapping=base_param_mapping,
+            variable_vec=variable_vec,
+            base_variable_vec=base_variable_vec,
+            var_sol_dict=var_sol_dict,
+        )
     else:
         logging.warning("Failed to solve inertial parameter SDP!")
         logging.info(f"Solution result:\n{result.get_solution_result()}")
