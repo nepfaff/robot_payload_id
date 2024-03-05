@@ -110,26 +110,29 @@ constraints on the pseudo inertias.
 This requires trajectories that have been designed using optimal excitation trajectory
 design as otherwise the numerics won't be good enough for the optimization to succeed.
 
+Generating GT/ model-predicted data:
 ```bash
 python scripts/solve_inertial_param_sdp.py --traj_parameter_path logs/traj \
 --num_data_points 5000 --use_one_link_arm
 ```
 
-NOTE that one would want to obtain data using optimal experiment design to ensure that
-the numerics are good enough (e.g. condition number optimization).
+Using collected data (sim or real):
+```bash
+python scripts/solve_inertial_param_sdp.py --joint_data_path joint_data/iiwa_only
+```
 
 ### Identifying the arm parameters and then freeze the parameters to identify the payload
 
 First, identify the arm parameters without payload and save them to disk:
 ```bash
-python scripts/solve_inertial_param_sdp.py --num_data_points 5000 \
+python scripts/solve_inertial_param_sdp.py \
 --not_identify_dynamic_dry_friction --joint_data_path joint_data/iiwa_only \
 --output_param_path identified_params/params.npy
 ```
 
 Second, freeze the identified parameters and identify the payload:
 ```bash
-python scripts/solve_inertial_param_sdp.py --num_data_points 5000 \
+python scripts/solve_inertial_param_sdp.py \
 --joint_data_path joint_data/iiwa_with_payload \
 --initial_param_path identified_params/params.npy --payload_only
 ```
