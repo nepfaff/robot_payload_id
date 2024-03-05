@@ -43,6 +43,7 @@ from robot_payload_id.symbolic import (
     eval_expression_vec,
 )
 from robot_payload_id.utils import (
+    ArmPlantComponents,
     FourierSeriesTrajectoryAttributes,
     JointData,
     name_constraint,
@@ -976,7 +977,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             arm_file_path=model_path, num_joints=num_joints, time_step=0.0
         )
         self._ad_plant_components = create_autodiff_plant(
-            arm_components=self._arm_components,
+            plant_components=ArmPlantComponents(plant=self._arm_components.plant),
             add_rotor_inertia=add_rotor_inertia,
             add_reflected_inertia=add_reflected_inertia,
             add_viscous_friction=add_viscous_friction,
@@ -1015,7 +1016,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
 
         # Evaluate and stack symbolic data matrix
         W_data_raw, _, _ = extract_numeric_data_matrix_autodiff(
-            arm_components=self._ad_plant_components,
+            plant_components=self._ad_plant_components,
             joint_data=joint_data,
             add_rotor_inertia=self._add_rotor_inertia,
             add_reflected_inertia=self._add_reflected_inertia,

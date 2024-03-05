@@ -258,7 +258,7 @@ def get_plant_joint_params(
                 * joint_actuator.gear_ratio(context) ** 2
                 if add_reflected_inertia and not payload_only
                 else None,
-                viscous_friction=joint.damping()
+                viscous_friction=joint.GetDamping(context)
                 if add_viscous_friction and not payload_only
                 else None,
                 dynamic_dry_friction=0.0

@@ -181,7 +181,7 @@ def create_symbolic_plant(
 
 
 def create_autodiff_plant(
-    arm_components: ArmComponents,
+    plant_components: ArmPlantComponents,
     add_rotor_inertia: bool,
     add_reflected_inertia: bool,
     add_viscous_friction: bool = False,
@@ -191,7 +191,9 @@ def create_autodiff_plant(
     """Creates an autodiff plant for a robotic arm system.
 
     Args:
-        arm_components (ArmComponents): The components of the robotic arm system.
+        plant_components (ArmPlantComponents): This must contain the plant. Optionally,
+            it can also contain the plant's context, in which case the context will
+            be used to initialize the autodiff plant's context.
         add_rotor_inertia (bool): Whether to add autodiff reflected rotor inertia
             parameters.
         add_reflected_inertia (bool): Whether to add autodiff reflected inertia
@@ -213,10 +215,13 @@ def create_autodiff_plant(
         "The options `add_rotor_inertia` and `add_reflected_inertia` are mutually "
         "exclusive."
     )
+    num_joints = plant_components.plant.num_positions()
 
     # Create an autodiff plant
-    ad_plant: MultibodyPlant = arm_components.plant.ToAutoDiffXd()
+    ad_plant: MultibodyPlant = plant_components.plant.ToAutoDiffXd()
     ad_plant_context = ad_plant.CreateDefaultContext()
+    if plant_components.plant_context is not None:
+        ad_plant_context.SetTimeStateAndParametersFrom(plant_components.plant_context)
 
     # Create the autodiff parameters
     ad_parameters: List[JointParameters] = []
@@ -230,9 +235,9 @@ def create_autodiff_plant(
             + add_viscous_friction
             + add_dynamic_dry_friction
         )
-        num_params = arm_components.num_joints * num_params_per_joint
-    for i in range(arm_components.num_joints):
-        if payload_only and i < arm_components.num_joints - 1:
+        num_params = num_joints * num_params_per_joint
+    for i in range(num_joints):
+        if payload_only and i < num_joints - 1:
             # Skip all but the last link
             continue
 
@@ -331,7 +336,9 @@ def create_autodiff_plant(
         if add_viscous_friction and not payload_only:
             viscous_friction_vec = np.zeros(num_params)
             viscous_friction_vec[(i * num_params_per_joint) + offset] = 1
-            viscous_friction_ad = AutoDiffXd(joint.damping(), viscous_friction_vec)
+            viscous_friction_ad = AutoDiffXd(
+                joint.default_damping(), viscous_friction_vec
+            )
             offset += 1
         if add_dynamic_dry_friction and not payload_only:
             dynamic_dry_friction_vec = np.zeros(num_params)

@@ -31,6 +31,7 @@ from robot_payload_id.data import (
 from robot_payload_id.environment import create_arm
 from robot_payload_id.symbolic import create_autodiff_plant
 from robot_payload_id.utils import (
+    ArmPlantComponents,
     BsplineTrajectoryAttributes,
     JointData,
     name_unnamed_constraints,
@@ -291,7 +292,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             arm_file_path=model_path, num_joints=num_joints, time_step=0.0
         )
         self._ad_plant_components = create_autodiff_plant(
-            arm_components=arm_components,
+            plant_components=ArmPlantComponents(plant=arm_components.plant),
             add_rotor_inertia=add_rotor_inertia,
             add_reflected_inertia=add_reflected_inertia,
             add_viscous_friction=add_viscous_friction,
@@ -408,7 +409,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
 
         # Evaluate and stack symbolic data matrix
         W_data_raw, _, _ = extract_numeric_data_matrix_autodiff(
-            arm_components=self._ad_plant_components,
+            plant_components=self._ad_plant_components,
             joint_data=joint_data,
             add_rotor_inertia=self._add_rotor_inertia,
             add_reflected_inertia=self._add_reflected_inertia,

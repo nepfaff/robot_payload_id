@@ -30,10 +30,12 @@ from robot_payload_id.eric_id.drake_torch_dynamics import (
 from robot_payload_id.optimization import solve_inertial_param_sdp
 from robot_payload_id.utils import (
     ArmComponents,
+    ArmPlantComponents,
     BsplineTrajectoryAttributes,
     FourierSeriesTrajectoryAttributes,
     JointData,
     get_plant_joint_params,
+    write_parameters_to_plant,
 )
 
 
@@ -297,7 +299,7 @@ def main():
     parser.add_argument(
         "--regularization_weight",
         type=float,
-        default=1e-6,
+        default=1e-3,
         help="The regularization weight.",
     )
     parser.add_argument(
@@ -322,6 +324,25 @@ def main():
         + "the same as the model used for identification (e.g. vanilla iiwa).",
     )
     parser.add_argument(
+        "--initial_param_path",
+        type=Path,
+        help="Path to the initial parameter `.npy` file. If not provided, the initial "
+        + "parameters are set to the model's parameters.",
+    )
+    parser.add_argument(
+        "--output_param_path",
+        type=Path,
+        help="Path to the output parameter `.npy` file. If not provided, the parameters "
+        + "are not saved to disk.",
+    )
+    parser.add_argument(
+        "--use_initial_params_for_regularization",
+        action="store_true",
+        help="Use the initial parameters for regularization. This might not be a good "
+        + "idea if the initial parameters contain random values which can occur when "
+        + "some of the parameters are unidentifiable.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -343,6 +364,9 @@ def main():
     perturb_scale = args.perturb_scale
     payload_only = args.payload_only
     gt_model_path = args.gt_model_path
+    initial_param_path = args.initial_param_path
+    output_param_path = args.output_param_path
+    use_initial_params_for_regularization = args.use_initial_params_for_regularization
 
     assert (traj_parameter_path is not None) != (joint_data_path is not None), (
         "One but not both of `--traj_parameter_path` and `--joint_data_path` should be "
@@ -363,6 +387,17 @@ def main():
     arm_components = create_arm(
         arm_file_path=model_path, num_joints=num_joints, time_step=0.0
     )
+
+    # Load parameters
+    if initial_param_path is not None:
+        logging.info(f"Loading initial parameters from {initial_param_path}")
+        var_sol_dict = np.load(initial_param_path, allow_pickle=True).item()
+        arm_plant_components = write_parameters_to_plant(arm_components, var_sol_dict)
+    else:
+        arm_plant_components = ArmPlantComponents(
+            plant=arm_components.plant,
+            plant_context=arm_components.plant.CreateDefaultContext(),
+        )
 
     # Model for computing GT values
     gt_model_path = str(gt_model_path) if gt_model_path is not None else model_path
@@ -413,7 +448,7 @@ def main():
         w0_data,
         _,
     ) = extract_numeric_data_matrix_autodiff(
-        arm_components=arm_components,
+        plant_components=arm_plant_components,
         joint_data=joint_data,
         add_rotor_inertia=identify_rotor_inertia,
         add_reflected_inertia=identify_reflected_inertia,
@@ -421,14 +456,15 @@ def main():
         add_dynamic_dry_friction=identify_dynamic_dry_friction,
         payload_only=payload_only,
     )
-    if traj_parameter_path is not None:
+    if joint_data_path is None:
         # Use the model-predicted torques
+        logging.info("Using model-predicted torques.")
         (
             _,
             _,
             tau_data,
         ) = extract_numeric_data_matrix_autodiff(
-            arm_components=arm_components_gt,
+            plant_components=arm_plant_components,
             joint_data=joint_data,
             add_rotor_inertia=identify_rotor_inertia,
             add_reflected_inertia=identify_reflected_inertia,
@@ -486,7 +522,7 @@ def main():
                     sample_times_s=np.zeros(num_random_points),
                 )
                 W_data_random, _, _ = extract_numeric_data_matrix_autodiff(
-                    arm_components=arm_components,
+                    plant_components=arm_plant_components,
                     joint_data=joint_data_random,
                     add_rotor_inertia=identify_rotor_inertia,
                     add_reflected_inertia=identify_reflected_inertia,
@@ -524,20 +560,30 @@ def main():
             )
 
     # Construct initial parameter guess
-    # TODO: Perturb the GT parameters to get a more realistic initial guess for
-    # simulation-based evaluation
-    params_guess = get_plant_joint_params(
-        arm_components_gt.plant,
-        arm_components_gt.plant.CreateDefaultContext(),
-        add_rotor_inertia=identify_rotor_inertia,
-        add_reflected_inertia=identify_reflected_inertia,
-        add_viscous_friction=identify_viscous_friction,
-        add_dynamic_dry_friction=identify_dynamic_dry_friction,
-        payload_only=payload_only,
-    )
-    if perturb_scale > 0.0:
-        for params in params_guess:
-            params.perturb(perturb_scale)
+    if use_initial_params_for_regularization and initial_param_path is not None:
+        logging.info("Using loaded parameters for regularization.")
+        params_guess = get_plant_joint_params(
+            arm_plant_components.plant,
+            arm_plant_components.plant_context,
+            add_rotor_inertia=identify_rotor_inertia,
+            add_reflected_inertia=identify_reflected_inertia,
+            add_viscous_friction=identify_viscous_friction,
+            add_dynamic_dry_friction=identify_dynamic_dry_friction,
+            payload_only=payload_only,
+        )
+    else:
+        params_guess = get_plant_joint_params(
+            arm_components_gt.plant,
+            arm_components_gt.plant.CreateDefaultContext(),
+            add_rotor_inertia=identify_rotor_inertia,
+            add_reflected_inertia=identify_reflected_inertia,
+            add_viscous_friction=identify_viscous_friction,
+            add_dynamic_dry_friction=identify_dynamic_dry_friction,
+            payload_only=payload_only,
+        )
+        if perturb_scale > 0.0:
+            for params in params_guess:
+                params.perturb(perturb_scale)
 
     (
         _,
@@ -584,6 +630,12 @@ def main():
             base_variable_vec=base_variable_vec,
             var_sol_dict=var_sol_dict,
         )
+
+        if output_param_path is not None:
+            logging.info(f"Saving parameters to {output_param_path}")
+            directory: Path = output_param_path.parent
+            directory.mkdir(parents=True, exist_ok=True)
+            np.save(output_param_path, var_sol_dict)
     else:
         logging.warning("Failed to solve inertial parameter SDP!")
         logging.info(f"Solution result:\n{result.get_solution_result()}")

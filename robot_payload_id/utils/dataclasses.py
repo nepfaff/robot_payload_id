@@ -369,9 +369,9 @@ class ArmPlantComponents:
 
     plant: MultibodyPlant
     """The plant."""
-    plant_context: Context
+    plant_context: Optional[Context] = None
     """The context of the plant."""
-    parameters: List[JointParameters]
+    parameters: Optional[List[JointParameters]] = None
     """The plant parameters."""
     state_variables: Optional[SymJointStateVariables] = None
     """The symbolic plant state variables."""

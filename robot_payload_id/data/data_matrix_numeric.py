@@ -18,6 +18,7 @@ from pydrake.all import (
     Expression,
     MathematicalProgram,
     MultibodyForces_,
+    MultibodyPlant_,
 )
 from tqdm import tqdm
 
@@ -170,7 +171,7 @@ def extract_numeric_data_matrix_through_symbolic_decomposition_with_dynamic_subs
 
 
 def extract_numeric_data_matrix_autodiff(
-    arm_components: Union[ArmComponents, ArmPlantComponents],
+    plant_components: ArmPlantComponents,
     joint_data: JointData,
     add_rotor_inertia: bool,
     add_reflected_inertia: bool,
@@ -184,8 +185,8 @@ def extract_numeric_data_matrix_autodiff(
     In particular, for tau = W * alpha + w0, this method computes W and w0.
 
     Args:
-        arm_components (Union[ArmComponents, ArmPlantComponents]): The arm components
-            or the autodiff arm plant components.
+        plant_components (ArmPlantComponents): This must contain the plant. Optionally,
+            it can also contain the plant's context.
         joint_data (JointData): The joint data. Only the joint positions, velocities,
             and accelerations are used for the data matrix computation. The joint
             torques are flattened and returned.
@@ -215,10 +216,10 @@ def extract_numeric_data_matrix_autodiff(
 
     # Create autodiff arm
     ad_plant_components = (
-        arm_components
-        if isinstance(arm_components, ArmPlantComponents)
+        plant_components
+        if isinstance(plant_components.plant, MultibodyPlant_[AutoDiffXd])
         else create_autodiff_plant(
-            arm_components=arm_components,
+            plant_components=plant_components,
             add_rotor_inertia=add_rotor_inertia,
             add_reflected_inertia=add_reflected_inertia,
             add_viscous_friction=add_viscous_friction,

@@ -173,6 +173,8 @@ def solve_inertial_param_sdp(
     else:
         base_variable_vec = variable_vec
 
+        logging.info(f"Condition number: {np.linalg.cond(W_data)}")
+
     # Create decision variables z = x.T @ base_param_mapping to preserve good
     # conditioning
     z = prog.NewContinuousVariables(base_variable_vec.shape[0], "z")
