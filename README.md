@@ -53,6 +53,10 @@ using `--log_level ERROR` is needed for nice progress bars.
 and joint friction as this seems to lead to better results, even when identifying these
 parameters later on.
 
+The `--payload_only` flag enables designing trajectories that only optimize the
+excitation of the payload parameters. These are the 10 inertial parameters of the last
+link.
+
 ### Use a Fourier series trajectory as an initial guess for BSpline trajectory optimization
 
 First, convert the optimized Fourier series trajectory into a BSpline trajectory:
@@ -90,6 +94,15 @@ python scripts/visualize_trajectory.py --traj_parameter_path logs/traj
 python scripts/symbolic_id.py --config-name one_link_arm_symbolic_id
 ```
 
+## Collect joint data
+
+```bash
+python scripts/collect_joint_data.py --scenario_path models/iiwa_scenario.yaml \
+--traj_parameter_path logs/traj_bspline --save_data_path joint_data/iiwa
+```
+
+Add the `--use_hardware` flag to collect data on the real robot.
+
 ## SDP System ID
 
 Generates data, constructs the data matrix and solves the SDP using posidefinite
@@ -104,6 +117,22 @@ python scripts/solve_inertial_param_sdp.py --traj_parameter_path logs/traj \
 
 NOTE that one would want to obtain data using optimal experiment design to ensure that
 the numerics are good enough (e.g. condition number optimization).
+
+### Identifying the arm parameters and then freeze the parameters to identify the payload
+
+First, identify the arm parameters without payload and save them to disk:
+```bash
+python scripts/solve_inertial_param_sdp.py --num_data_points 5000 \
+--not_identify_dynamic_dry_friction --joint_data_path joint_data/iiwa_only \
+--output_param_path identified_params/params.npy
+```
+
+Second, freeze the identified parameters and identify the payload:
+```bash
+python scripts/solve_inertial_param_sdp.py --num_data_points 5000 \
+--joint_data_path joint_data/iiwa_with_payload \
+--initial_param_path identified_params/params.npy --payload_only
+```
 
 ## Reparameterized System ID
 
