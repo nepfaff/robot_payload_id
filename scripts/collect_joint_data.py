@@ -33,7 +33,6 @@ from robot_payload_id.utils import (
     BsplineTrajectoryAttributes,
     FourierSeriesTrajectoryAttributes,
     JointData,
-    filter_time_series_data,
 )
 
 
@@ -263,32 +262,13 @@ def main():
         simulator.get_context()
     ).sample_times()
 
-    # Estimate accelerations using finite differences
-    sample_period = scenario.plant_config.time_step
-    joint_accelerations = np.gradient(measured_velocity_data, sample_period, axis=0)
-    fs_hz = 1.0 / sample_period
-    filtered_joint_accelerations = filter_time_series_data(
-        data=joint_accelerations,
-        order=10,
-        cutoff_freq_hz=5,
-        fs_hz=fs_hz,
-    )
-
-    # Filter torque data
-    filtered_tau_measured = filter_time_series_data(
-        data=measured_torque_data,
-        order=10,
-        cutoff_freq_hz=5,
-        fs_hz=fs_hz,
-    )
-
     # Save data
     if save_data_path is not None:
         joint_data = JointData(
             joint_positions=measured_position_data,
             joint_velocities=measured_velocity_data,
-            joint_accelerations=filtered_joint_accelerations,
-            joint_torques=filtered_tau_measured,
+            joint_accelerations=np.array([np.nan]),
+            joint_torques=measured_torque_data,
             sample_times_s=sample_times_s,
         )
         joint_data.save_to_disk(save_data_path)
