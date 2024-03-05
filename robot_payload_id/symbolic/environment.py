@@ -323,21 +323,23 @@ def create_autodiff_plant(
             rotor_inertia_vec = np.zeros(num_params)
             rotor_inertia_vec[(i * num_params_per_joint) + offset] = 1
             rotor_inertia_ad = AutoDiffXd(
-                joint_actuator.default_rotor_inertia(), rotor_inertia_vec
+                joint_actuator.rotor_inertia(ad_plant_context).value(),
+                rotor_inertia_vec,
             )
             offset += 1
         if add_reflected_inertia and not payload_only:
             reflected_inertia_vec = np.zeros(num_params)
             reflected_inertia_vec[(i * num_params_per_joint) + offset] = 1
             reflected_inertia_ad = AutoDiffXd(
-                joint_actuator.default_reflected_inertia(), reflected_inertia_vec
+                joint_actuator.calc_reflected_inertia(ad_plant_context).value(),
+                reflected_inertia_vec,
             )
             offset += 1
         if add_viscous_friction and not payload_only:
             viscous_friction_vec = np.zeros(num_params)
             viscous_friction_vec[(i * num_params_per_joint) + offset] = 1
             viscous_friction_ad = AutoDiffXd(
-                joint.default_damping(), viscous_friction_vec
+                joint.GetDamping(ad_plant_context).value(), viscous_friction_vec
             )
             offset += 1
         if add_dynamic_dry_friction and not payload_only:
