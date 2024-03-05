@@ -1,0 +1,50 @@
+# Sweep over data sources and data processing parameters
+
+program: scripts/solve_inertial_param_sdp.py
+method: bayes
+
+metric:
+  goal: minimize
+  name: sdp_cost
+
+parameters:
+  joint_data_path:
+    values: [
+      "joint_data/sim/iiwa_only/bspline",
+      "joint_data/sim/iiwa_only/bspline_jerkBounds",
+      "joint_data/sim/iiwa_only/fourier",
+    ]
+  vel_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  vel_cutoff_freq_hz:
+    distribution: uniform
+    min: 0.1
+    max: 40.0
+  acc_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  acc_cutoff_freq_hz:
+    distribution: uniform
+    min: 0.1
+    max: 40.0
+  torque_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  torque_cutoff_freq_hz:
+    distribution: uniform
+    min: 0.1
+    max: 40.0
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --wandb_mode=online
+  - --regularization_weight=0.0
+  - --process_joint_data
+  - --not_perform_eval
+  - ${args}

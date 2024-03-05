@@ -146,6 +146,8 @@ python scripts/identify_model.py --config-name iiwa_id
 
 ### Sweeping Parameters
 
+#### Eric ID
+
 A sweep can be started with
 ```bash
 wandb sweep config/sweep/iiwa_id_sweep.yaml
@@ -158,3 +160,15 @@ bash scripts/parallel_sweep.sh config/sweep/iiwa_id_sweep.yaml ${NUM_PARALLEL}
 ```
 where `NUM_PARALLEL` is a variable containing the number of parallel runs. By default,
 the maximum number of cores is used.
+
+#### SDP data processing
+
+The SDP results are very sensitive to the data processing. It can make sense to
+sweep over the data processing parameters to identify the best parameters for ones
+particular collected joint data.
+
+A sweep can be started with
+```bash
+wandb sweep config/sweep/sdp_data_sweep.yaml
+```
+Individual agents for the sweep can be started using the printed `wandb agent` command.

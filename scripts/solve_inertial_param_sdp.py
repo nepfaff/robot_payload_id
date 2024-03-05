@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 
+from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
@@ -15,6 +16,8 @@ from pydrake.all import (
     to_sympy,
 )
 from scipy.linalg import lu
+
+import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
@@ -400,6 +403,18 @@ def main():
         + "`--process_joint_data` is set.",
     )
     parser.add_argument(
+        "--wandb_mode",
+        type=str,
+        choices=["disabled", "online", "offline"],
+        default="disabled",
+        help="The mode to use for Weights & Biases logging.",
+    )
+    parser.add_argument(
+        "--not_perform_eval",
+        action="store_true",
+        help="Whether to not perform evaluation after solving the SDP.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -432,6 +447,8 @@ def main():
     acc_cutoff_freq_hz = args.acc_cutoff_freq_hz
     torque_filter_order = args.torque_order
     torque_cutoff_freq_hz = args.torque_cutoff_freq_hz
+    wandb_mode = args.wandb_mode
+    perform_eval = not args.not_perform_eval
 
     assert (traj_parameter_path is not None) != (joint_data_path is not None), (
         "One but not both of `--traj_parameter_path` and `--joint_data_path` should be "
@@ -439,6 +456,12 @@ def main():
     )
 
     logging.basicConfig(level=args.log_level)
+    wandb.init(
+        project="robot_payload_id",
+        name=f"inertial_param_sdp ({datetime.now()})",
+        config=vars(args),
+        mode=wandb_mode,
+    )
 
     # Create arm
     num_joints = 1 if args.use_one_link_arm else 7
@@ -686,29 +709,32 @@ def main():
         solver_kPrintToConsole=args.kPrintToConsole,
     )
     if result.is_success():
-        logging.info(f"Final cost: {result.get_optimal_cost()}")
+        final_cost = result.get_optimal_cost()
+        logging.info(f"Final cost: {final_cost}")
+        wandb.log({"sdp_cost": final_cost})
         var_sol_dict = dict(zip(variable_names, result.GetSolution(variable_vec)))
         logging.info(f"SDP result:\n{var_sol_dict}")
 
-        compute_entropic_divergence_to_gt_params(
-            num_joints=num_joints,
-            arm_components=arm_components_gt,
-            var_sol_dict=var_sol_dict,
-            payload_only=payload_only,
-        )
-        compute_base_parameter_errors(
-            arm_components=arm_components_gt,
-            result=result,
-            identify_rotor_inertia=identify_rotor_inertia,
-            identify_reflected_inertia=identify_reflected_inertia,
-            identify_viscous_friction=identify_viscous_friction,
-            identify_dynamic_dry_friction=identify_dynamic_dry_friction,
-            payload_only=payload_only,
-            base_param_mapping=base_param_mapping,
-            variable_vec=variable_vec,
-            base_variable_vec=base_variable_vec,
-            var_sol_dict=var_sol_dict,
-        )
+        if perform_eval:
+            compute_entropic_divergence_to_gt_params(
+                num_joints=num_joints,
+                arm_components=arm_components_gt,
+                var_sol_dict=var_sol_dict,
+                payload_only=payload_only,
+            )
+            compute_base_parameter_errors(
+                arm_components=arm_components_gt,
+                result=result,
+                identify_rotor_inertia=identify_rotor_inertia,
+                identify_reflected_inertia=identify_reflected_inertia,
+                identify_viscous_friction=identify_viscous_friction,
+                identify_dynamic_dry_friction=identify_dynamic_dry_friction,
+                payload_only=payload_only,
+                base_param_mapping=base_param_mapping,
+                variable_vec=variable_vec,
+                base_variable_vec=base_variable_vec,
+                var_sol_dict=var_sol_dict,
+            )
 
         if output_param_path is not None:
             logging.info(f"Saving parameters to {output_param_path}")
@@ -716,6 +742,7 @@ def main():
             directory.mkdir(parents=True, exist_ok=True)
             np.save(output_param_path, var_sol_dict)
     else:
+        wandb.log({"sdp_cost": np.inf})
         logging.warning("Failed to solve inertial parameter SDP!")
         logging.info(f"Solution result:\n{result.get_solution_result()}")
         logging.info(f"Solver details:\n{result.get_solver_details()}")

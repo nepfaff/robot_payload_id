@@ -4,7 +4,7 @@ program: scripts/identify_model.py
 method: grid
 
 metric:
-  goal: maximize
+  goal: minimize
   name: val_tau_loss_epoch
 
 parameters:
