@@ -118,7 +118,8 @@ python scripts/solve_inertial_param_sdp.py --traj_parameter_path logs/traj \
 
 Using collected data (sim or real):
 ```bash
-python scripts/solve_inertial_param_sdp.py --joint_data_path joint_data/iiwa_only
+python scripts/solve_inertial_param_sdp.py --joint_data_path joint_data/iiwa_only \
+--process_joint_data
 ```
 
 ### Identifying the arm parameters and then freeze the parameters to identify the payload
@@ -127,13 +128,13 @@ First, identify the arm parameters without payload and save them to disk:
 ```bash
 python scripts/solve_inertial_param_sdp.py \
 --not_identify_dynamic_dry_friction --joint_data_path joint_data/iiwa_only \
---output_param_path identified_params/params.npy
+--process_joint_data --output_param_path identified_params/params.npy
 ```
 
 Second, freeze the identified parameters and identify the payload:
 ```bash
 python scripts/solve_inertial_param_sdp.py \
---joint_data_path joint_data/iiwa_with_payload \
+--joint_data_path joint_data/iiwa_with_payload --process_joint_data \
 --initial_param_path identified_params/params.npy --payload_only
 ```
 

@@ -35,6 +35,7 @@ from robot_payload_id.utils import (
     FourierSeriesTrajectoryAttributes,
     JointData,
     get_plant_joint_params,
+    process_joint_data,
     write_parameters_to_plant,
 )
 
@@ -343,6 +344,62 @@ def main():
         + "some of the parameters are unidentifiable.",
     )
     parser.add_argument(
+        "--process_joint_data",
+        action="store_true",
+        help="Whether to process the joint data before using it.",
+    )
+    parser.add_argument(
+        "--num_endpoints_to_remove",
+        type=int,
+        default=5,
+        help="The number of endpoints to remove from the beginning and end of the "
+        + "trajectory. This is useful as the sample times are not always increasing "
+        + "with the same period at the beginning and end of the trajectory. Only used "
+        + "if `--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--vel_order",
+        type=int,
+        default=20,
+        help="The order of the filter for the joint velocities. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--vel_cutoff_freq_hz",
+        type=float,
+        default=2.0,
+        help="The cutoff frequency of the filter for the joint velocities. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--acc_order",
+        type=int,
+        default=20,
+        help="The order of the filter for the joint accelerations. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--acc_cutoff_freq_hz",
+        type=float,
+        default=2.0,
+        help="The cutoff frequency of the filter for the joint accelerations. Only used "
+        + "if `--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--torque_order",
+        type=int,
+        default=12,
+        help="The order of the filter for the joint torques. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--torque_cutoff_freq_hz",
+        type=float,
+        default=1.6,
+        help="The cutoff frequency of the filter for the joint torques. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -367,6 +424,14 @@ def main():
     initial_param_path = args.initial_param_path
     output_param_path = args.output_param_path
     use_initial_params_for_regularization = args.use_initial_params_for_regularization
+    do_process_joint_data = args.process_joint_data
+    num_endpoints_to_remove = args.num_endpoints_to_remove
+    vel_filter_order = args.vel_order
+    vel_cutoff_freq_hz = args.vel_cutoff_freq_hz
+    acc_filter_order = args.acc_order
+    acc_cutoff_freq_hz = args.acc_cutoff_freq_hz
+    torque_filter_order = args.torque_order
+    torque_cutoff_freq_hz = args.torque_cutoff_freq_hz
 
     assert (traj_parameter_path is not None) != (joint_data_path is not None), (
         "One but not both of `--traj_parameter_path` and `--joint_data_path` should be "
@@ -405,6 +470,7 @@ def main():
         arm_file_path=gt_model_path, num_joints=num_joints, time_step=0.0
     )
 
+    # Generate/ load joint data
     if traj_parameter_path is not None:
         is_fourier_series = os.path.exists(traj_parameter_path / "a_value.npy")
         if is_fourier_series:
@@ -441,6 +507,19 @@ def main():
             )
     else:
         joint_data = JointData.load_from_disk(joint_data_path)
+
+    # Process joint data
+    if do_process_joint_data:
+        joint_data = process_joint_data(
+            joint_data=joint_data,
+            num_endpoints_to_remove=num_endpoints_to_remove,
+            vel_filter_order=vel_filter_order,
+            vel_cutoff_freq_hz=vel_cutoff_freq_hz,
+            acc_filter_order=acc_filter_order,
+            acc_cutoff_freq_hz=acc_cutoff_freq_hz,
+            torque_filter_order=torque_filter_order,
+            torque_cutoff_freq_hz=torque_cutoff_freq_hz,
+        )
 
     # Generate data matrix
     (
