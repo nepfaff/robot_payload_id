@@ -57,12 +57,12 @@ def write_parameters_to_plant(
                 )
                 / mass,
                 G_SP_E=UnitInertia(
-                    Ixx=var_name_param_dict[f"Ixx{i}(0)"],
-                    Iyy=var_name_param_dict[f"Iyy{i}(0)"],
-                    Izz=var_name_param_dict[f"Izz{i}(0)"],
-                    Ixy=var_name_param_dict[f"Ixy{i}(0)"],
-                    Ixz=var_name_param_dict[f"Ixz{i}(0)"],
-                    Iyz=var_name_param_dict[f"Iyz{i}(0)"],
+                    Ixx=var_name_param_dict[f"Ixx{i}(0)"] / mass,
+                    Iyy=var_name_param_dict[f"Iyy{i}(0)"] / mass,
+                    Izz=var_name_param_dict[f"Izz{i}(0)"] / mass,
+                    Ixy=var_name_param_dict[f"Ixy{i}(0)"] / mass,
+                    Ixz=var_name_param_dict[f"Ixz{i}(0)"] / mass,
+                    Iyz=var_name_param_dict[f"Iyz{i}(0)"] / mass,
                 ),
                 skip_validity_check=True,
             ),

@@ -180,7 +180,7 @@ def solve_inertial_param_sdp(
     z = prog.NewContinuousVariables(base_variable_vec.shape[0], "z")
     # Normalize cost to achieve similar scaling between the cost and linear
     # equality constraints (improves numerics and is required for solvability)
-    num_datapoints = len(W_data) / num_links
+    num_datapoints = len(W_data) // num_links
     prog.AddQuadraticCost(
         2 * W_data.T @ W_data / num_datapoints,
         -2 * tau_data.T @ W_data / num_datapoints,
