@@ -27,6 +27,24 @@ def main():
         + "with the same period at the beginning and end of the trajectory.",
     )
     parser.add_argument(
+        "--compute_velocities",
+        action="store_true",
+        help="Whether to compute velocities from the positions rather than taking the "
+        + "ones in `joint_data`.",
+    )
+    parser.add_argument(
+        "--pos_order",
+        type=int,
+        default=20,
+        help="The order of the filter for the joint positions.",
+    )
+    parser.add_argument(
+        "--pos_cutoff_freq_hz",
+        type=float,
+        default=30.0,
+        help="The cutoff frequency of the filter for the joint positions.",
+    )
+    parser.add_argument(
         "--vel_order",
         type=int,
         default=20,
@@ -81,6 +99,9 @@ def main():
     processed_joint_data = process_joint_data(
         joint_data=raw_joint_data,
         num_endpoints_to_remove=args.num_endpoints_to_remove,
+        compute_velocities=args.compute_velocities,
+        pos_filter_order=args.pos_order,
+        pos_cutoff_freq_hz=args.pos_cutoff_freq_hz,
         vel_filter_order=args.vel_order,
         vel_cutoff_freq_hz=args.vel_cutoff_freq_hz,
         acc_filter_order=args.acc_order,

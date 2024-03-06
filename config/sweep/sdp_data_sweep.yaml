@@ -14,6 +14,14 @@ parameters:
       "joint_data/sim/iiwa_only/bspline_jerkBounds",
       "joint_data/sim/iiwa_only/fourier",
     ]
+  pos_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  pos_cutoff_freq_hz:
+    distribution: uniform
+    min: 0.1
+    max: 60.0
   vel_order:
     distribution: int_uniform
     min: 2
