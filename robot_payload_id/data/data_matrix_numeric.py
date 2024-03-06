@@ -347,4 +347,3 @@ def compute_base_param_mapping(
     if scale_by_singular_values:
         base_param_mapping *= 1 / S[mask]
     return base_param_mapping
-    return base_param_mapping

@@ -55,4 +55,6 @@ command:
   - --regularization_weight=0.0
   - --process_joint_data
   - --not_perform_eval
+  # Providing a pre-computed base parameter mapping leads to a massive speedup
+  - --base_param_mapping=logs/base_param_mapping.npy
   - ${args}

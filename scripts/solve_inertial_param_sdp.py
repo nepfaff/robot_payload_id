@@ -237,6 +237,12 @@ def main():
         help="Keep and identify unidentifiable parameters instead of removing them.",
     )
     parser.add_argument(
+        "--base_param_mapping_path",
+        type=Path,
+        help="Path to the base parameter mapping `.npy` file. Providing this will "
+        + "override all default locations.",
+    )
+    parser.add_argument(
         "--num_data_points",
         type=int,
         default=50000,
@@ -443,6 +449,7 @@ def main():
     )
 
     args = parser.parse_args()
+    base_param_mapping_path = args.base_param_mapping_path
     traj_parameter_path = args.traj_parameter_path
     joint_data_path = args.joint_data_path
     num_data_points = args.num_data_points
@@ -608,7 +615,12 @@ def main():
 
     if not args.keep_unidentifiable_params:
         # Load base parameter mapping
-        if traj_parameter_path is not None:
+        if base_param_mapping_path is not None:
+            logging.info(
+                f"Loading base parameter mapping from {base_param_mapping_path}"
+            )
+            base_param_mapping = np.load(base_param_mapping_path)
+        elif traj_parameter_path is not None:
             base_param_mapping_path1 = traj_parameter_path / "base_param_mapping.npy"
             base_param_mapping_path2 = traj_parameter_path / "../base_param_mapping.npy"
             if os.path.exists(base_param_mapping_path1):
@@ -626,8 +638,7 @@ def main():
 
         # Recompute base parameter mapping if it has wrong shape or is not provided
         if (
-            traj_parameter_path is None
-            or base_param_mapping is None
+            base_param_mapping is None
             or W_data_raw.shape[1] != base_param_mapping.shape[0]
         ):
             logging.warning(
