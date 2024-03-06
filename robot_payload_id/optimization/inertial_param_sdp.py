@@ -25,7 +25,7 @@ def add_entropic_divergence_regularization(
     """Adds entropic divergence regularization to the inertial parameter SDP.
     Entropic divergence is from Eq. (19) of "Geometric Robot Dynamic Identification:
     A Convex Programming Approach" (https://ieeexplore.ieee.org/document/8922724):
-    d_M(ϕ, ϕ₀)² = d_F(P || P₀) = -log(|P|) + tr(P₀⁻¹ P), where ℙ(4) represents
+    d_M(ϕ, ϕ₀)² = d_F(P || P₀) = -log(|P|/|P₀|) + tr(P₀⁻¹ P) - 4, where ℙ(4) represents
     pseudo-inertias.
     See https://github.com/alex07143/Geometric-Robot-DynID/blob/592e64c5a9/Functions/Identification/ID_Entropic.m#L67
     for the original MATLAB implementation.
@@ -47,7 +47,11 @@ def add_entropic_divergence_regularization(
 
         prog.AddCost(
             regularization_weight
-            * np.trace(np.linalg.inv(pseudo_inertia_guess) @ pseudo_inertia)
+            * (
+                np.trace(np.linalg.inv(pseudo_inertia_guess) @ pseudo_inertia)
+                + np.log(np.linalg.det(pseudo_inertia_guess))
+                - 4
+            ),
         )
 
 
@@ -222,11 +226,10 @@ def solve_inertial_param_sdp(
         )
 
         # Use euclidean regularization for the non-inertia parameters.
-        # TODO: Treat non-inertial params as elements of the set of positive scalars and
-        # add the corresponding entropic divergence regularization (see part V, part a
-        # in "Geometric Robot Dynamic Identification: A Convex Programming Approach").
-        # This is helpful for ensuring equal scaling between the inertial and
-        # non-inertial parameter regularization terms.
+        # "Geometric Robot Dynamic Identification: A Convex Programming Approach"
+        # suggests to use 1D entropic divergence regularization for non-inertial
+        # parameters. However, this is empirically equivalent to euclidean
+        # regularization and slightly less clean to implement.
         non_inertia_params = []
         non_inertia_params_guess = []
         if not payload_only:
