@@ -221,7 +221,12 @@ def solve_inertial_param_sdp(
             regularization_weight=regularization_weight,
         )
 
-        # Use euclidean regularization for the non-inertia parameters
+        # Use euclidean regularization for the non-inertia parameters.
+        # TODO: Treat non-inertial params as elements of the set of positive scalars and
+        # add the corresponding entropic divergence regularization (see part V, part a
+        # in "Geometric Robot Dynamic Identification: A Convex Programming Approach").
+        # This is helpful for ensuring equal scaling between the inertial and
+        # non-inertial parameter regularization terms.
         non_inertia_params = []
         non_inertia_params_guess = []
         if not payload_only:
