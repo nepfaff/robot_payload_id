@@ -144,9 +144,9 @@ python scripts/solve_inertial_param_sdp.py \
 python scripts/identify_model.py --config-name iiwa_id
 ```
 
-### Sweeping Parameters
+## Sweeping Parameters
 
-#### Eric ID
+### Eric ID
 
 A sweep can be started with
 ```bash
@@ -161,7 +161,7 @@ bash scripts/parallel_sweep.sh config/sweep/iiwa_id_sweep.yaml ${NUM_PARALLEL}
 where `NUM_PARALLEL` is a variable containing the number of parallel runs. By default,
 the maximum number of cores is used.
 
-#### SDP data processing
+### SDP data processing
 
 The SDP results are very sensitive to the data processing. It can make sense to
 sweep over the data processing parameters to identify the best parameters for ones
@@ -172,3 +172,7 @@ A sweep can be started with
 wandb sweep config/sweep/sdp_data_sweep.yaml
 ```
 Individual agents for the sweep can be started using the printed `wandb agent` command.
+
+## Credit
+
+Any code in `robot_payload_id/eric_id` has been copied/ adopted from Eric Cousineau ([Github repo](https://github.com/EricCousineau-TRI/drake_sys_id)).
