@@ -3,6 +3,7 @@ import logging
 
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from robot_payload_id.data import extract_numeric_data_matrix_autodiff
@@ -189,14 +190,98 @@ def main():
         add_viscous_friction=add_viscous_friction,
         add_dynamic_dry_friction=add_dynamic_dry_friction,
     )
+    predicted_torques = predicted_torques.reshape(joint_data.joint_torques.shape)
 
     # Compute torque error
     num_datapoints = len(joint_data.sample_times_s)
-    torque_error = predicted_torques - joint_data.joint_torques.flatten()
-    torque_error_sum_normalized = torque_error.T @ torque_error / num_datapoints
+    torque_error = predicted_torques - joint_data.joint_torques
 
     # Print results
-    print("Torque error sum normalized: ", torque_error_sum_normalized)
+    print("Torque mean squared error (per joint):", np.mean(torque_error**2, axis=0))
+    print("Torque RMS error (per joint):", np.sqrt(np.mean(torque_error**2, axis=0)))
+    print(
+        "Torque mean squared error (sum over joints):",
+        np.sum(torque_error**2) / num_datapoints,
+    )
+    print(
+        "Torque RMS error (sum over joints):",
+        np.sqrt(np.sum(torque_error**2) / num_datapoints),
+    )
+
+    # Plot predicted and measured torques
+    num_joints = joint_data.joint_positions.shape[1]
+    fig, axes = plt.subplots(
+        nrows=num_joints, ncols=1, figsize=(num_joints * 7, 15), sharex=True
+    )
+    for i in range(num_joints):
+        ax = axes[i]
+        ax.plot(
+            joint_data.sample_times_s,
+            predicted_torques[:, i],
+            label="Predicted torque",
+        )
+        ax.plot(
+            joint_data.sample_times_s,
+            joint_data.joint_torques[:, i],
+            label="Measured torque",
+        )
+        ax.set_title(f"Joint {i+1}")
+        if i == 0:  # Add a legend to the first subplot
+            ax.legend()
+    # Set a common x-label
+    fig.text(
+        0.5,
+        0.04,
+        "Sample Times (s)",
+        ha="center",
+        fontsize=12,
+    )
+    # Set a common y-label
+    fig.text(
+        0.04,
+        0.5,
+        "Torque (Nm)",
+        va="center",
+        rotation="vertical",
+        fontsize=12,
+    )
+    plt.show()
+
+    # Plot torque errors
+    fig, axes = plt.subplots(
+        nrows=num_joints, ncols=1, figsize=(num_joints * 7, 15), sharex=True
+    )
+    torque_error_per_joint = np.abs(
+        np.reshape(torque_error, (num_datapoints, num_joints))
+    )
+    for i in range(num_joints):
+        ax = axes[i]
+        ax.plot(
+            joint_data.sample_times_s,
+            torque_error_per_joint[:, i],
+            label="Absolute torque error",
+        )
+        ax.set_title(f"Joint {i+1}")
+        if i == 0:  # Add a legend to the first subplot
+            ax.legend()
+    # Set a common x-label
+    fig.text(
+        0.5,
+        0.04,
+        "Sample Times (s)",
+        ha="center",
+        fontsize=12,
+    )
+    # Set a common y-label
+    fig.text(
+        0.04,
+        0.5,
+        "Absolute torque error (Nm)",
+        va="center",
+        rotation="vertical",
+        fontsize=12,
+    )
+    plt.show()
 
 
 if __name__ == "__main__":
