@@ -66,7 +66,23 @@ def main():
         "--time_horizon",
         type=float,
         default=10.0,
-        help="The time horizon/ duration of the trajectory.",
+        help="The time horizon/ duration of the trajectory. Only used for Fourier "
+        + "series trajectories.",
+    )
+    parser.add_argument(
+        "--only_log_excitation_traj_data",
+        action="store_true",
+        help="Whether to only log data during excitation trajectory execution rather "
+        + "than during the entire runtime.",
+    )
+    parser.add_argument(
+        "--duration_to_remove_at_start",
+        type=float,
+        default=1.0,
+        help="The duration to remove from the start of the trajectory. Only used if "
+        + "`only_log_excitation_traj_data` is True. This is useful as there might be "
+        + "significant noise when transitioning from the slow start trajectory to the "
+        + "fast excitation trajectory.",
     )
     parser.add_argument(
         "--html_path",
@@ -88,6 +104,8 @@ def main():
     save_data_path = args.save_data_path
     use_hardware = args.use_hardware
     time_horizon = args.time_horizon
+    only_log_excitation_traj_data = args.only_log_excitation_traj_data
+    duration_to_remove_at_start = args.duration_to_remove_at_start
     html_path = args.html_path
 
     builder = DiagramBuilder()
@@ -236,7 +254,8 @@ def main():
     visualizer.StartRecording()
     simulator.Initialize()
 
-    simulator.AdvanceTo(traj_source_initializer.get_end_time() + 1.0)
+    simulation_end_margin = 1.0
+    simulator.AdvanceTo(traj_source_initializer.get_end_time() + simulation_end_margin)
 
     # Save data
     visualizer.StopRecording()
@@ -261,6 +280,30 @@ def main():
     sample_times_s = measured_position_logger.FindLog(
         simulator.get_context()
     ).sample_times()
+
+    if only_log_excitation_traj_data:
+        # Only keep data during excitation trajectory execution
+        data_start_time = (
+            traj_source_initializer.get_excitation_traj_start_time()
+        ) + duration_to_remove_at_start
+        excitation_traj_end_time = traj_source_initializer.get_end_time()
+        excitation_traj_start_idx = np.argmax(sample_times_s >= data_start_time)
+        data_end_time = np.argmax(sample_times_s >= excitation_traj_end_time)
+        commanded_position_data = commanded_position_data[
+            excitation_traj_start_idx:data_end_time
+        ]
+        measured_position_data = measured_position_data[
+            excitation_traj_start_idx:data_end_time
+        ]
+        measured_velocity_data = measured_velocity_data[
+            excitation_traj_start_idx:data_end_time
+        ]
+        measured_torque_data = measured_torque_data[
+            excitation_traj_start_idx:data_end_time
+        ]
+        sample_times_s = sample_times_s[excitation_traj_start_idx:data_end_time]
+        # Shift sample times to start at 0
+        sample_times_s -= sample_times_s[0]
 
     # Save data
     if save_data_path is not None:

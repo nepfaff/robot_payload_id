@@ -220,13 +220,14 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
             )
             * self._start_traj_limit_fraction,
         )
+        self._excitation_traj_start_time = start_traj_retimed.end_time()
 
         # Delay the excitation trajectory to start after the start trajectory ends
         excitation_traj_time = PiecewisePolynomial().FirstOrderHold(
             [0.0, self._excitation_traj.end_time()],
             [[0.0, self._excitation_traj.end_time()]],
         )
-        excitation_traj_time.shiftRight(start_traj_retimed.end_time())
+        excitation_traj_time.shiftRight(self._excitation_traj_start_time)
         excitation_traj_delayed = PathParameterizedTrajectory(
             path=self._excitation_traj, time_scaling=excitation_traj_time
         )
@@ -235,6 +236,9 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
             [start_traj_retimed, excitation_traj_delayed]
         )
         self._traj_source.UpdateTrajectory(self._combined_traj)
+
+    def get_excitation_traj_start_time(self) -> float:
+        return self._excitation_traj_start_time
 
     def get_end_time(self) -> float:
         return self._combined_traj.end_time()
