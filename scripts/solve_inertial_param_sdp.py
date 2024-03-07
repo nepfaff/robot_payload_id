@@ -615,6 +615,7 @@ def main():
 
     if not args.keep_unidentifiable_params:
         # Load base parameter mapping
+        base_param_mapping = None
         if base_param_mapping_path is not None:
             logging.info(
                 f"Loading base parameter mapping from {base_param_mapping_path}"
@@ -633,8 +634,6 @@ def main():
                     f"Loading base parameter mapping from {base_param_mapping_path2}"
                 )
                 base_param_mapping = np.load(base_param_mapping_path2)
-            else:
-                base_param_mapping = None
 
         # Recompute base parameter mapping if it has wrong shape or is not provided
         if (
