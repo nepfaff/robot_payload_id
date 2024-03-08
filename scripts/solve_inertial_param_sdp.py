@@ -576,6 +576,11 @@ def main():
             torque_filter_order=torque_filter_order,
             torque_cutoff_freq_hz=torque_cutoff_freq_hz,
         )
+    else:
+        assert not np.isnan(np.sum(joint_data.joint_accelerations)), (
+            "NaNs found in joint_data.joint_accelerations. Consider setting "
+            + "--process_joint_data."
+        )
 
     # Generate data matrix
     (
