@@ -1162,8 +1162,8 @@ tqdm = "^4.66.1"
 [package.source]
 type = "git"
 url = "https://github.com/nepfaff/iiwa_setup.git"
-reference = "62ff2528b4d669e6764aff08580b402e14df3f12"
-resolved_reference = "62ff2528b4d669e6764aff08580b402e14df3f12"
+reference = "076734928022ae0405e1afa47dc9ab3ae936fd11"
+resolved_reference = "076734928022ae0405e1afa47dc9ab3ae936fd11"
 
 [[package]]
 name = "imageio"
@@ -4065,4 +4065,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "9763503b9b5625cd7ecb32b0333a6170f3c3462666b479e2178f809dda464f8c"
+content-hash = "1d86ce948ba85c34c72e4b67d8d1b58fd4862d5a4759a7b6ebbc2c16b798b956"

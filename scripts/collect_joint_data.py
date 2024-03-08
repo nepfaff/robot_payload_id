@@ -170,13 +170,13 @@ def main():
     )
 
     # Add controller
-    controler_plant = station.get_iiwa_controller_plant()
-    num_positions = controler_plant.num_positions()
+    controller_plant = station.get_iiwa_controller_plant()
+    num_positions = controller_plant.num_positions()
     controller = builder.AddNamedSystem(
         "controller",
         InverseDynamicsControllerWithGravityCompensationCancellation(
-            station=station,
             scenario=scenario,
+            controller_plant=controller_plant,
             kp_gains=np.full(7, 600),
             damping_ratios=np.full(7, 0.2),
         ),
