@@ -42,6 +42,20 @@ class JointData:
     sample_times_s: np.ndarray
     """The sample times in seconds of shape (T,)."""
 
+    def remove_duplicate_samples(self) -> "JointData":
+        """
+        Removes duplicate samples from the joint data. Returns a new JointData object
+        rather than modifying the current one.
+        """
+        _, unique_indices = np.unique(self.sample_times_s, return_index=True)
+        return JointData(
+            joint_positions=self.joint_positions[unique_indices],
+            joint_velocities=self.joint_velocities[unique_indices],
+            joint_accelerations=self.joint_accelerations[unique_indices],
+            joint_torques=self.joint_torques[unique_indices],
+            sample_times_s=self.sample_times_s[unique_indices],
+        )
+
     def save_to_disk(self, path: Path) -> None:
         """Saves the joint data to disk.
 

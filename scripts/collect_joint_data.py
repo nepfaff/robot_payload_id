@@ -305,12 +305,20 @@ def main():
         # Shift sample times to start at 0
         sample_times_s -= sample_times_s[0]
 
+    # Remove duplicated samples
+    _, unique_indices = np.unique(sample_times_s, return_index=True)
+    commanded_position_data = commanded_position_data[unique_indices]
+    measured_position_data = measured_position_data[unique_indices]
+    measured_velocity_data = measured_velocity_data[unique_indices]
+    measured_torque_data = measured_torque_data[unique_indices]
+    sample_times_s = sample_times_s[unique_indices]
+
     # Save data
     if save_data_path is not None:
         joint_data = JointData(
             joint_positions=measured_position_data,
             joint_velocities=measured_velocity_data,
-            joint_accelerations=np.array([np.nan]),
+            joint_accelerations=np.zeros_like(measured_position_data) * np.nan,
             joint_torques=measured_torque_data,
             sample_times_s=sample_times_s,
         )
