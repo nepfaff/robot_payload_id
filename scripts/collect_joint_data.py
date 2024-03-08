@@ -85,6 +85,12 @@ def main():
         + "fast excitation trajectory.",
     )
     parser.add_argument(
+        "--logging_period",
+        type=float,
+        default=1e-3,
+        help="The period at which to log data.",
+    )
+    parser.add_argument(
         "--html_path",
         type=Path,
         default=None,
@@ -106,6 +112,7 @@ def main():
     time_horizon = args.time_horizon
     only_log_excitation_traj_data = args.only_log_excitation_traj_data
     duration_to_remove_at_start = args.duration_to_remove_at_start
+    logging_period = args.logging_period
     html_path = args.html_path
 
     builder = DiagramBuilder()
@@ -214,16 +221,20 @@ def main():
         desired_state_demux.get_input_port(),
     )
     commanded_position_logger: VectorLogSink = builder.AddNamedSystem(
-        "commanded_position_logger", VectorLogSink(num_positions)
+        "commanded_position_logger",
+        VectorLogSink(num_positions, publish_period=logging_period),
     )
     measured_position_logger: VectorLogSink = builder.AddNamedSystem(
-        "measured_position_logger", VectorLogSink(num_positions)
+        "measured_position_logger",
+        VectorLogSink(num_positions, publish_period=logging_period),
     )
     measured_velocity_logger: VectorLogSink = builder.AddNamedSystem(
-        "measured_velocity_logger", VectorLogSink(num_positions)
+        "measured_velocity_logger",
+        VectorLogSink(num_positions, publish_period=logging_period),
     )
     measured_torque_logger: VectorLogSink = builder.AddNamedSystem(
-        "measured_torque_logger", VectorLogSink(num_positions)
+        "measured_torque_logger",
+        VectorLogSink(num_positions, publish_period=logging_period),
     )
     builder.Connect(
         desired_state_demux.get_output_port(0),
