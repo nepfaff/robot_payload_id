@@ -115,6 +115,10 @@ Generating GT/ model-predicted data:
 python scripts/solve_inertial_param_sdp.py --traj_parameter_path logs/traj \
 --num_data_points 5000 --use_one_link_arm
 ```
+Note that the model-predicted data corresponds to simulation data from
+`collect_joint_data.py` if the simulation timestep is set to zero (continuous-time
+simulation). Otherwise, the simulation data will be slightly noisy and closer to real
+robot data.
 
 Using collected data (sim or real):
 ```bash
