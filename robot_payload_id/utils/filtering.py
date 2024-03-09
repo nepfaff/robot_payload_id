@@ -60,7 +60,7 @@ def filter_time_series_data(
 
 def process_joint_data(
     joint_data: JointData,
-    num_endpoints_to_remove: int = 10,
+    num_endpoints_to_remove: int = 1,
     compute_velocities: bool = True,
     pos_filter_order: int = 20,
     pos_cutoff_freq_hz: float = 30.0,

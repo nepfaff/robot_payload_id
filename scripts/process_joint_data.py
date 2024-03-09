@@ -21,7 +21,7 @@ def main():
     parser.add_argument(
         "--num_endpoints_to_remove",
         type=int,
-        default=5,
+        default=1,
         help="The number of endpoints to remove from the beginning and end of the "
         + "trajectory. This is useful as the sample times are not always increasing "
         + "with the same period at the beginning and end of the trajectory.",
