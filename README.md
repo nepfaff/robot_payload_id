@@ -103,6 +103,25 @@ python scripts/collect_joint_data.py --scenario_path models/iiwa_scenario.yaml \
 
 Add the `--use_hardware` flag to collect data on the real robot.
 
+## Process collected joint data
+
+The collected joint data will likely be quite noisy.
+
+It can help to average joint data from executing the same trajectory multiple times
+for improving the signal-to-noise ratio:
+```bash
+python scripts/average_joint_data.py joint_data_dir/ joint_data_averaged/
+```
+where `joint_data_dir` contains the joint data directories to average and
+`joint_data_averaged` is the directory to write the averaged joint data to.
+
+Filtering is very important and it is recommended to tune the parameters carefully.
+Sweeping over different filter parameters can be helpful in this regard (see
+sweeping section below).
+Once filtering parameters have been determined, the data can be processed using the
+`scripts/process_joint_data.py` script or by passing the parameters as arguments to
+`scripts/solve_inertial_param_sdp.py` with the `--process_joint_data` flag.
+
 ## SDP System ID
 
 Generates data, constructs the data matrix and solves the SDP using posidefinite
