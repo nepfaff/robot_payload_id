@@ -53,66 +53,34 @@ class FourierSeriesTrajectory(Trajectory):
         self._omega = traj_attrs.omega
         self._num_positions, self._num_terms = self._a.shape
 
+        # Used for computing the positions, velocities, and accelerations
+        self._l_values = np.arange(1, self._num_terms + 1)
+        self._omega_l = self._omega * self._l_values
+
     def _compute_positions(self, time: np.ndarray) -> np.ndarray:
         """qᵢ(t) = ∑ₗ₌₁ᴺᵢ (aₗⁱ sin(ωₙ lt) + bₗⁱ cos(ωₙ lt)) + qᵢ₀"""
-        return np.array(
-            [
-                sum(
-                    (
-                        self._a[i][l - 1] * np.sin(self._omega * l * time)
-                        + self._b[i][l - 1] * np.cos(self._omega * l * time)
-                    )
-                    for l in range(1, self._num_terms + 1)
-                )
-                + self._q0[i]
-                for i in range(self._num_positions)
-            ]
+        cos_part = np.cos(self._omega_l * time)
+        sin_part = np.sin(self._omega_l * time)
+        return (
+            np.einsum("ij,j->i", self._a, sin_part)
+            + np.einsum("ij,j->i", self._b, cos_part)
+            + self._q0
         )
 
     def _compute_velocities(self, time: np.ndarray) -> np.ndarray:
         """q̇ᵢ(t) = ∑ₗ₌₁ᴺᵢ (aₗⁱ ωₙ l cos(ωₙ lt) - bₗⁱ ωₙ l sin(ωₙ lt))"""
-        return np.array(
-            [
-                sum(
-                    (
-                        self._a[i][l - 1]
-                        * self._omega
-                        * l
-                        * np.cos(self._omega * l * time)
-                        - self._b[i][l - 1]
-                        * self._omega
-                        * l
-                        * np.sin(self._omega * l * time)
-                    )
-                    for l in range(1, self._num_terms + 1)
-                )
-                for i in range(self._num_positions)
-            ]
+        cos_part = self._omega_l * np.cos(self._omega_l * time)
+        sin_part = self._omega_l * np.sin(self._omega_l * time)
+        return np.einsum("il,l->i", self._a, cos_part) - np.einsum(
+            "il,l->i", self._b, sin_part
         )
 
     def _compute_accelerations(self, time: np.ndarray) -> np.ndarray:
         """q̈ᵢ(t) = ∑ₗ₌₁ᴺᵢ (-aₗⁱ ωₙ^2 l^2 sin(ωₙ lt) - bₗⁱ ωₙ^2 l^2 cos(ωₙ lt))"""
-        return np.array(
-            [
-                sum(
-                    (
-                        -self._a[i][l - 1]
-                        * self._omega
-                        * l
-                        * self._omega
-                        * l
-                        * np.sin(self._omega * l * time)
-                        - self._b[i][l - 1]
-                        * self._omega
-                        * l
-                        * self._omega
-                        * l
-                        * np.cos(self._omega * l * time)
-                    )
-                    for l in range(1, self._num_terms + 1)
-                )
-                for i in range(self._num_positions)
-            ]
+        sin_part = ((self._omega_l) ** 2) * np.sin(self._omega_l * time)
+        cos_part = ((self._omega_l) ** 2) * np.cos(self._omega_l * time)
+        return np.einsum("il,l->i", -self._a, sin_part) + np.einsum(
+            "il,l->i", -self._b, cos_part
         )
 
     def rows(self) -> int:
