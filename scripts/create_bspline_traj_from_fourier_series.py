@@ -196,6 +196,7 @@ def main():
         traj_attrs=fourier_traj_attrs,
     )
 
+    plant = arm_components.plant
     num_control_points = num_control_points_initial
     is_success = False
     iters = 0
@@ -229,18 +230,32 @@ def main():
                 spline_order=spline_order,
                 duration=trajectory_duration,
             )
+            trajopt.AddPositionBounds(
+                lb=plant.GetPositionLowerLimits(),
+                ub=plant.GetPositionUpperLimits(),
+            )
+            trajopt.AddVelocityBounds(
+                lb=plant.GetVelocityLowerLimits(),
+                ub=plant.GetVelocityUpperLimits(),
+            )
+            trajopt.AddAccelerationBounds(
+                lb=plant.GetAccelerationLowerLimits(),
+                ub=plant.GetAccelerationUpperLimits(),
+            )
+            # The jerk limits are rather arbitrary and are mainly there to prevent
+            # acceleration discontinuities that lead to commanded torque discontinuities
+            # when using inverse dynamics control
+            trajopt.AddJerkBounds(
+                lb=-np.full(num_joints, 25), ub=np.full(num_joints, 25)
+            )
+
             prog = trajopt.get_mutable_prog()
             joint_data_sym = construct_and_sample_traj_sym(
                 var_values=prog.decision_variables(),
                 num_timesteps=num_timesteps,
                 num_control_points=num_control_points,
                 num_joints=num_joints,
-                trajopt=KinematicTrajectoryOptimization(
-                    num_positions=num_joints,
-                    num_control_points=num_control_points,
-                    spline_order=spline_order,
-                    duration=trajectory_duration,
-                ),
+                trajopt=trajopt,
             )
             for pos, pos_gt, vel, vel_gt, acc, acc_gt in zip(
                 joint_data_sym.joint_positions,
@@ -258,6 +273,7 @@ def main():
                 if match_acceleration:
                     prog.AddQuadraticCost((acc - acc_gt).T @ (acc - acc_gt))
 
+        print("Solving the problem...")
         result = Solve(prog)
         is_success = result.is_success()
 
