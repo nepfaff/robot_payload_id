@@ -48,6 +48,23 @@ def main():
         joint_data = joint_data_raw.remove_duplicate_samples()
         joint_datas.append(joint_data)
 
+    # Remove all non-common samples
+    min_length = min([len(jd.sample_times_s) for jd in joint_datas])
+    for jd in joint_datas:
+        jd.joint_positions = jd.joint_positions[:min_length]
+        jd.joint_velocities = jd.joint_velocities[:min_length]
+        jd.joint_accelerations = jd.joint_accelerations[:min_length]
+        jd.joint_torques = jd.joint_torques[:min_length]
+        jd.sample_times_s = jd.sample_times_s[:min_length]
+
+    # Validate that all samples are equally spaced
+    sample_period = joint_datas[0].sample_times_s[1] - joint_datas[0].sample_times_s[0]
+    for jd in joint_datas:
+        assert np.allclose(
+            jd.sample_times_s[1:] - jd.sample_times_s[:-1], sample_period
+        ), "Sample times are not equally spaced."
+    logging.info(f"Sample period: {sample_period} seconds.")
+
     averaged_joint_data = JointData(
         joint_positions=np.mean([jd.joint_positions for jd in joint_datas], axis=0),
         joint_velocities=np.mean([jd.joint_velocities for jd in joint_datas], axis=0),
