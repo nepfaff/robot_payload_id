@@ -14,6 +14,8 @@ parameters:
       "joint_data/sim/iiwa_only/bspline_jerkBounds",
       "joint_data/sim/iiwa_only/fourier",
     ]
+  filter_positions:
+    values: [true, false]
   pos_order:
     distribution: int_uniform
     min: 2
@@ -57,4 +59,4 @@ command:
   - --not_perform_eval
   # Providing a pre-computed base parameter mapping leads to a massive speedup
   - --base_param_mapping=logs/base_param_mapping.npy
-  - ${args}
+  - ${args_no_boolean_flags}

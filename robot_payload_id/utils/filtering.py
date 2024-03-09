@@ -62,6 +62,7 @@ def process_joint_data(
     joint_data: JointData,
     num_endpoints_to_remove: int = 1,
     compute_velocities: bool = True,
+    filter_positions: bool = False,
     pos_filter_order: int = 20,
     pos_cutoff_freq_hz: float = 30.0,
     vel_filter_order: int = 20,
@@ -83,6 +84,7 @@ def process_joint_data(
             the trajectory.
         compute_velocities (bool, optional): Whether to compute velocities from the
             positions rather than taking the ones in `joint_data`.
+        filter_positions (bool, optional): Whether to filter the joint positions.
         pos_filter_order (int, optional): The order of the filter for the joint
             positions.
         pos_cutoff_freq_hz (float, optional): The cutoff frequency of the filter for the
@@ -124,13 +126,16 @@ def process_joint_data(
     logging.info(f"Sample period: {sample_period} seconds.")
     sample_freq = 1.0 / sample_period
 
-    # Filter position data
-    filtered_joint_positions = filter_time_series_data(
-        data=joint_positions,
-        order=pos_filter_order,
-        cutoff_freq_hz=pos_cutoff_freq_hz,
-        fs_hz=sample_freq,
-    )
+    if filter_positions:
+        # Filter position data
+        filtered_joint_positions = filter_time_series_data(
+            data=joint_positions,
+            order=pos_filter_order,
+            cutoff_freq_hz=pos_cutoff_freq_hz,
+            fs_hz=sample_freq,
+        )
+    else:
+        filtered_joint_positions = joint_positions
 
     if compute_velocities:
         # Estimate velocities using finite differences

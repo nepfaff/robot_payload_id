@@ -33,6 +33,11 @@ def main():
         + "ones in `joint_data`.",
     )
     parser.add_argument(
+        "--filter_positions",
+        action="store_true",
+        help="Whether to filter the joint positions.",
+    )
+    parser.add_argument(
         "--pos_order",
         type=int,
         default=20,
@@ -100,6 +105,7 @@ def main():
         joint_data=raw_joint_data,
         num_endpoints_to_remove=args.num_endpoints_to_remove,
         compute_velocities=args.compute_velocities,
+        filter_positions=args.filter_positions,
         pos_filter_order=args.pos_order,
         pos_cutoff_freq_hz=args.pos_cutoff_freq_hz,
         vel_filter_order=args.vel_order,
