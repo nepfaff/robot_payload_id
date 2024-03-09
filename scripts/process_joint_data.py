@@ -62,7 +62,7 @@ def main():
         help="The cutoff frequency of the filter for the joint velocities.",
     )
     parser.add_argument(
-        "-acc_order",
+        "--acc_order",
         type=int,
         default=20,
         help="The order of the filter for the joint accelerations.",
