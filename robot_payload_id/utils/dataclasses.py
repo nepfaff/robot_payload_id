@@ -225,6 +225,19 @@ class JointParameters:
             param_list.append(self.dynamic_dry_friction)
         return param_list
 
+    def get_com(self) -> np.ndarray:
+        """
+        Returns the center of mass of the joint.
+        """
+        if self.cx is not None and self.cy is not None and self.cz is not None:
+            return np.array([self.cx, self.cy, self.cz])
+        elif self.hx is not None and self.hy is not None and self.hz is not None:
+            return np.array([self.hx, self.hy, self.hz]) / self.m
+        raise NotImplementedError(
+            "Currently only supporting all center of mass or all mass times center "
+            + "of mass."
+        )
+
     def get_inertia_matrix(self) -> np.ndarray:
         """
         Returns the rotational inertia matrix of the joint.

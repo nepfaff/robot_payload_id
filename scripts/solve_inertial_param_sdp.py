@@ -27,8 +27,6 @@ from robot_payload_id.data import (
 from robot_payload_id.environment import create_arm
 from robot_payload_id.eric_id.drake_torch_dynamics import (
     calc_inertia_entropic_divergence,
-    get_candidate_sys_id_bodies,
-    get_plant_inertial_params,
 )
 from robot_payload_id.optimization import solve_inertial_param_sdp
 from robot_payload_id.utils import (
@@ -92,10 +90,21 @@ def compute_entropic_divergence_to_gt_params(
         ]
     )
 
-    bodies = get_candidate_sys_id_bodies(arm_components.plant)
-    masses_gt, coms_gt, rot_inertias_gt = get_plant_inertial_params(
-        arm_components.plant, arm_components.plant.CreateDefaultContext(), bodies
+    joint_params_gt = get_plant_joint_params(
+        plant=arm_components.plant,
+        context=arm_components.plant.CreateDefaultContext(),
+        add_rotor_inertia=False,
+        add_reflected_inertia=False,
+        add_viscous_friction=False,
+        add_dynamic_dry_friction=False,
+        payload_only=payload_only,
     )
+    masses_gt = np.array([params.m for params in joint_params_gt])
+    coms_gt = np.array([params.get_com() for params in joint_params_gt])
+    rot_inertias_gt = np.array(
+        [params.get_inertia_matrix() for params in joint_params_gt]
+    )
+
     inertia_entropic_divergence = calc_inertia_entropic_divergence(
         masses_estimated,
         coms_estimated,
@@ -245,7 +254,7 @@ def main():
     parser.add_argument(
         "--num_data_points",
         type=int,
-        default=50000,
+        default=10000,
         help="Number of data points to use.",
     )
     parser.add_argument(
@@ -529,6 +538,10 @@ def main():
     arm_components_gt = create_arm(
         arm_file_path=gt_model_path, num_joints=num_joints, time_step=0.0
     )
+    arm_plant_components_gt = ArmPlantComponents(
+        plant=arm_components_gt.plant,
+        plant_context=arm_components_gt.plant.CreateDefaultContext(),
+    )
 
     # Generate/ load joint data
     if traj_parameter_path is not None:
@@ -606,13 +619,13 @@ def main():
     )
     if joint_data_path is None:
         # Use the model-predicted torques
-        logging.info("Using model-predicted torques.")
+        logging.info("Using model-predicted torques as the measured torques.")
         (
             _,
             _,
             tau_data,
         ) = extract_numeric_data_matrix_autodiff(
-            plant_components=arm_plant_components,
+            plant_components=arm_plant_components_gt,
             joint_data=joint_data,
             add_rotor_inertia=identify_rotor_inertia,
             add_reflected_inertia=identify_reflected_inertia,
