@@ -228,8 +228,16 @@ def main():
         "measured_position_logger",
         VectorLogSink(num_positions, publish_period=logging_period),
     )
+    commanded_velocity_logger: VectorLogSink = builder.AddNamedSystem(
+        "commanded_velocity_logger",
+        VectorLogSink(num_positions, publish_period=logging_period),
+    )
     measured_velocity_logger: VectorLogSink = builder.AddNamedSystem(
         "measured_velocity_logger",
+        VectorLogSink(num_positions, publish_period=logging_period),
+    )
+    commanded_torque_logger: VectorLogSink = builder.AddNamedSystem(
+        "commanded_torque_logger",
         VectorLogSink(num_positions, publish_period=logging_period),
     )
     measured_torque_logger: VectorLogSink = builder.AddNamedSystem(
@@ -245,8 +253,16 @@ def main():
         measured_position_logger.get_input_port(),
     )
     builder.Connect(
+        desired_state_demux.get_output_port(1),
+        commanded_velocity_logger.get_input_port(),
+    )
+    builder.Connect(
         station.GetOutputPort("iiwa.velocity_estimated"),
         measured_velocity_logger.get_input_port(),
+    )
+    builder.Connect(
+        controller.GetOutputPort("iiwa.torque_commanded"),
+        commanded_torque_logger.get_input_port(),
     )
     builder.Connect(
         station.GetOutputPort("iiwa.torque_measured"),
@@ -282,8 +298,14 @@ def main():
     measured_position_data = (
         measured_position_logger.FindLog(simulator.get_context()).data().T
     )
+    commanded_velocity_data = (
+        commanded_velocity_logger.FindLog(simulator.get_context()).data().T
+    )
     measured_velocity_data = (
         measured_velocity_logger.FindLog(simulator.get_context()).data().T
+    )
+    commanded_torque_data = (
+        commanded_torque_logger.FindLog(simulator.get_context()).data().T
     )
     measured_torque_data = (
         measured_torque_logger.FindLog(simulator.get_context()).data().T
@@ -299,20 +321,28 @@ def main():
         ) + duration_to_remove_at_start
         excitation_traj_end_time = traj_source_initializer.get_end_time()
         excitation_traj_start_idx = np.argmax(sample_times_s >= data_start_time)
-        data_end_time = np.argmax(sample_times_s >= excitation_traj_end_time)
+        excitation_traj_end_idx = np.argmax(sample_times_s >= excitation_traj_end_time)
         commanded_position_data = commanded_position_data[
-            excitation_traj_start_idx:data_end_time
+            excitation_traj_start_idx:excitation_traj_end_idx
         ]
         measured_position_data = measured_position_data[
-            excitation_traj_start_idx:data_end_time
+            excitation_traj_start_idx:excitation_traj_end_idx
+        ]
+        commanded_velocity_data = commanded_velocity_data[
+            excitation_traj_start_idx:excitation_traj_end_idx
         ]
         measured_velocity_data = measured_velocity_data[
-            excitation_traj_start_idx:data_end_time
+            excitation_traj_start_idx:excitation_traj_end_idx
+        ]
+        commanded_torque_data = commanded_torque_data[
+            excitation_traj_start_idx:excitation_traj_end_idx
         ]
         measured_torque_data = measured_torque_data[
-            excitation_traj_start_idx:data_end_time
+            excitation_traj_start_idx:excitation_traj_end_idx
         ]
-        sample_times_s = sample_times_s[excitation_traj_start_idx:data_end_time]
+        sample_times_s = sample_times_s[
+            excitation_traj_start_idx:excitation_traj_end_idx
+        ]
         # Shift sample times to start at 0
         sample_times_s -= sample_times_s[0]
 
@@ -320,7 +350,9 @@ def main():
     _, unique_indices = np.unique(sample_times_s, return_index=True)
     commanded_position_data = commanded_position_data[unique_indices]
     measured_position_data = measured_position_data[unique_indices]
+    commanded_velocity_data = commanded_velocity_data[unique_indices]
     measured_velocity_data = measured_velocity_data[unique_indices]
+    commanded_torque_data = commanded_torque_data[unique_indices]
     measured_torque_data = measured_torque_data[unique_indices]
     sample_times_s = sample_times_s[unique_indices]
 
@@ -334,6 +366,15 @@ def main():
             sample_times_s=sample_times_s,
         )
         joint_data.save_to_disk(save_data_path)
+
+        # Also save commanded data
+        np.save(
+            save_data_path / "commanded_joint_positions.npy", commanded_position_data
+        )
+        np.save(
+            save_data_path / "commanded_joint_velocities.npy", commanded_velocity_data
+        )
+        np.save(save_data_path / "commanded_joint_torques.npy", commanded_torque_data)
 
     # Print tracking statistics
     print(
