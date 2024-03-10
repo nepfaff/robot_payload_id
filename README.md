@@ -149,8 +149,7 @@ python scripts/solve_inertial_param_sdp.py --joint_data_path joint_data/iiwa_onl
 
 First, identify the arm parameters without payload and save them to disk:
 ```bash
-python scripts/solve_inertial_param_sdp.py \
---not_identify_dynamic_dry_friction --joint_data_path joint_data/iiwa_only \
+python scripts/solve_inertial_param_sdp.py --joint_data_path joint_data/iiwa_only \
 --process_joint_data --output_param_path identified_params/params.npy
 ```
 

@@ -24,6 +24,7 @@ def write_parameters_to_plant(
     """
     plant = arm_components.plant
     plant_context = plant.CreateDefaultContext()
+    # Check if only contains payload parameters
     payload_only = len(var_name_param_dict) == 10
 
     for i in range(arm_components.num_joints):
