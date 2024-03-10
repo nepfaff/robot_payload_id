@@ -203,38 +203,20 @@ def get_plant_joint_params(
                 subgraph[0], context
             )
         else:
-            # Express parameters in the frame of the first body
-            # NOTE: This might not be entirely correct
-            combined_mass, combined_com, combined_rot_inertia = (
-                0.0,
-                np.zeros(3),
-                np.zeros((3, 3)),
+            # Express parameters in the frame of the first body.
+
+            # Calculate the spatial inertia of the subgraph about B1o (origin of the
+            # first body in the subgraph), expressed in B1 (frame of the first body in
+            # the subgraph).
+            B1_frame = subgraph[0].body_frame()
+            M_SB1o_B1 = plant.CalcSpatialInertia(
+                context=context,
+                frame_F=B1_frame,
+                body_indexes=[body.index() for body in subgraph],
             )
-            X_WBody1 = subgraph[0].body_frame().CalcPoseInWorld(context)
-            for body in subgraph:
-                X_WBody = body.body_frame().CalcPoseInWorld(context)
-                X_BodyW = X_WBody.inverse()
-                X_BodyBody1: RigidTransform = X_BodyW @ X_WBody1
-
-                spatial_inertia: SpatialInertia = body.CalcSpatialInertiaInBodyFrame(
-                    context
-                )
-                R_BodyBody1 = X_BodyBody1.rotation()
-                R_Body1Body = R_BodyBody1.inverse()
-                # Express 'body' inertia in the frame of 'body1'
-                spatial_inertia_body1_frame = spatial_inertia.ReExpress(R_Body1Body)
-                # Express 'body' inertia about 'body1' com
-                spatial_inertia_wrt_body1 = spatial_inertia_body1_frame.Shift(
-                    X_BodyBody1.translation()
-                )
-
-                mass = spatial_inertia_wrt_body1.get_mass()
-                combined_mass += mass
-                combined_com += spatial_inertia_body1_frame.get_com() * mass
-                combined_rot_inertia += (
-                    spatial_inertia_wrt_body1.CalcRotationalInertia().CopyToFullMatrix3()
-                )
-            combined_com /= combined_mass
+            combined_mass = M_SB1o_B1.get_mass()
+            combined_com = M_SB1o_B1.get_com()
+            combined_rot_inertia = M_SB1o_B1.CalcRotationalInertia().CopyToFullMatrix3()
 
         joint_params.append(
             JointParameters(
