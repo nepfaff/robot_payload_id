@@ -8,6 +8,7 @@ import numpy as np
 
 from robot_payload_id.data import extract_numeric_data_matrix_autodiff
 from robot_payload_id.environment import create_arm
+from robot_payload_id.symbolic import create_autodiff_plant
 from robot_payload_id.utils import (
     ArmPlantComponents,
     JointData,
@@ -154,6 +155,22 @@ def main():
         add_reflected_inertia = "reflected_inertia0(0)" in var_sol_dict
         add_viscous_friction = "viscous_friction0(0)" in var_sol_dict
         add_dynamic_dry_friction = "dynamic_dry_friction0(0)" in var_sol_dict
+
+        if add_dynamic_dry_friction:
+            # Add dynamic dry friction to the parameters s.t. it is used by
+            # extract_numeric_data_matrix_autodiff
+            logging.info("Adding dynamic dry friction to the plant components.")
+            dynamic_dry_friction_coefficients = [
+                var_sol_dict[f"dynamic_dry_friction{i}(0)"] for i in range(num_joints)
+            ]
+            arm_plant_components = create_autodiff_plant(
+                plant_components=arm_plant_components,
+                add_rotor_inertia=add_rotor_inertia,
+                add_reflected_inertia=add_reflected_inertia,
+                add_viscous_friction=add_viscous_friction,
+                add_dynamic_dry_friction=add_dynamic_dry_friction,
+                dynamic_dry_friction_coefficients=dynamic_dry_friction_coefficients,
+            )
     else:
         arm_plant_components = ArmPlantComponents(
             plant=arm_components.plant,

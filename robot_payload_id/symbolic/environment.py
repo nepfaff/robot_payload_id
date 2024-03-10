@@ -187,6 +187,7 @@ def create_autodiff_plant(
     add_viscous_friction: bool = False,
     add_dynamic_dry_friction: bool = False,
     payload_only: bool = False,
+    dynamic_dry_friction_coefficients: List[float] = None,
 ) -> ArmPlantComponents:
     """Creates an autodiff plant for a robotic arm system.
 
@@ -207,6 +208,9 @@ def create_autodiff_plant(
         payload_only (bool): Whether to only include the 10 inertial parameters of the
             last link. These are the parameters that we care about for payload
             identification. This takes precedence over other arguments.
+        dynamic_dry_friction_coefficients (List[float]): The coefficients of the dynamic
+            dry friction model. If None, the coefficients are set to zero. This
+            argument exists as MultiBodyPlant does not yet support dynamic dry friction.
 
     Returns:
         ArmPlantComponents: The autodiff plant and associated autodiff components.
@@ -345,7 +349,14 @@ def create_autodiff_plant(
         if add_dynamic_dry_friction and not payload_only:
             dynamic_dry_friction_vec = np.zeros(num_params)
             dynamic_dry_friction_vec[(i * num_params_per_joint) + offset] = 1
-            dynamic_dry_friction_ad = AutoDiffXd(0.0, dynamic_dry_friction_vec)
+            dynamic_dry_friction_value = (
+                dynamic_dry_friction_coefficients[i]
+                if dynamic_dry_friction_coefficients is not None
+                else 0.0
+            )
+            dynamic_dry_friction_ad = AutoDiffXd(
+                dynamic_dry_friction_value, dynamic_dry_friction_vec
+            )
 
         ad_parameters.append(
             JointParameters(
@@ -394,10 +405,11 @@ def create_autodiff_plant(
         if add_reflected_inertia and not payload_only:
             # We only want to count reflected inertia once
             joint_actuator.SetRotorInertia(ad_plant_context, 0.0)
-        # if add_viscous_friction:
-        # Not yet implemented in Drake (see
-        # https://github.com/RobotLocomotion/drake/issues/14405)
-        # joint.SetDamping(ad_plant_context, viscous_friction_ad)
+        if add_viscous_friction:
+            # We only want to count viscous friction once
+            # TODO: Change this to use Drake's build in one (see
+            # https://github.com/RobotLocomotion/drake/issues/14405)
+            joint.SetDamping(ad_plant_context, 0.0)
 
     return ArmPlantComponents(
         plant=ad_plant,
