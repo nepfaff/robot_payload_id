@@ -28,6 +28,7 @@ def main():
     parser.add_argument(
         "--joint_data_path",
         type=Path,
+        required=True,
         help="Path to the joint data folder. The folder must contain "
         + "`joint_positions.npy`, `joint_velocities.npy`, `joint_accelerations.npy`, "
         + "`joint_torques.npy`, and `sample_times_s.npy`. NOTE: Only one of "

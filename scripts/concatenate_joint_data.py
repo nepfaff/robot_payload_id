@@ -39,11 +39,7 @@ def main():
         if not dir.is_dir():
             continue
         logging.info(f"Loading joint data from {dir}.")
-        joint_data_raw = JointData.load_from_disk(dir)
-        joint_data_raw.joint_accelerations = (
-            np.zeros_like(joint_data_raw.joint_positions) * np.nan
-        )
-        joint_data = joint_data_raw.remove_duplicate_samples()
+        joint_data = JointData.load_from_disk(dir)
         joint_datas.append(joint_data)
 
     sample_period = joint_datas[0].sample_times_s[1] - joint_datas[0].sample_times_s[0]
