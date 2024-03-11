@@ -72,6 +72,14 @@ def main():
     logging.info(f"Saving concatenated joint data to {output_dir}.")
     concatenated_joint_data.save_to_disk(output_dir)
 
+    # Log the input file paths
+    input_file_paths = [str(p) for p in input_dir.iterdir() if p.is_dir()]
+    input_file_paths.sort()
+    input_file_paths_txt = output_dir / "input_file_paths.txt"
+    with open(input_file_paths_txt, "w") as file:
+        file.write("\n".join(input_file_paths))
+    logging.info(f"Saved input file paths to {input_file_paths_txt}.")
+
 
 if __name__ == "__main__":
     main()
