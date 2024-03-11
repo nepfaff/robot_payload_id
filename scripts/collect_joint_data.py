@@ -261,7 +261,7 @@ def main():
         measured_velocity_logger.get_input_port(),
     )
     builder.Connect(
-        controller.GetOutputPort("iiwa.torque_commanded"),
+        controller.get_output_port(),
         commanded_torque_logger.get_input_port(),
     )
     builder.Connect(
