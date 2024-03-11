@@ -287,9 +287,14 @@ def extract_numeric_data_matrix_autodiff(
             if add_viscous_friction:
                 ad_torques += viscous_frictions_ad * joint_data.joint_velocities[i]
             if add_dynamic_dry_friction:
-                ad_torques += dynamic_dry_frictions_ad * np.sign(
+                dynamic_dry_friction_torque = dynamic_dry_frictions_ad * np.sign(
                     joint_data.joint_velocities[i]
                 )
+                # Theshold to avoid numerical issues
+                dynamic_dry_friction_torque[
+                    np.abs(joint_data.joint_velocities[i]) < 0.001
+                ] = 0.0
+                ad_torques += dynamic_dry_friction_torque
 
         # Differentiate w.r.t. parameters
         ad_torques_derivative = np.vstack(
