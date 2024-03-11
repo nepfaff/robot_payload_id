@@ -122,6 +122,10 @@ Once filtering parameters have been determined, the data can be processed using 
 `scripts/process_joint_data.py` script or by passing the parameters as arguments to
 `scripts/solve_inertial_param_sdp.py` with the `--process_joint_data` flag.
 
+After filtering, one might want to increase the data amount by combining the data from
+multiple excitation trajectories. This can be achieved using
+`scripts/concatenate_joint_data.py`.
+
 ## SDP System ID
 
 Generates data, constructs the data matrix and solves the SDP using posidefinite
