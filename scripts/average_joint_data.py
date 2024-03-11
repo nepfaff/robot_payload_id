@@ -83,6 +83,14 @@ def main():
         f"Mean position variance across time for each joint: {mean_variance_across_time}"
     )
 
+    # Compute average joint velocity variance across data sets
+    joint_velocities_list = [jd.joint_velocities for jd in joint_datas]
+    variances = np.var(joint_velocities_list, axis=0)
+    mean_variance_across_time = np.mean(variances, axis=0)
+    logging.info(
+        f"Mean velocity variance across time for each joint: {mean_variance_across_time}"
+    )
+
     # Compute average joint torque variance across data sets
     joint_torques_list = [jd.joint_torques for jd in joint_datas]
     variances = np.var(joint_torques_list, axis=0)
