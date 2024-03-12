@@ -22,32 +22,32 @@ parameters:
     max: 30
   pos_cutoff_freq_hz:
     distribution: uniform
-    min: 1.0
-    max: 60.0
+    min: 30.0
+    max: 90.0
   vel_order:
     distribution: int_uniform
     min: 2
     max: 30
   vel_cutoff_freq_hz:
     distribution: uniform
-    min: 1.0
-    max: 40.0
+    min: 5.0
+    max: 30.0
   acc_order:
     distribution: int_uniform
     min: 2
     max: 30
   acc_cutoff_freq_hz:
     distribution: uniform
-    min: 1.0
-    max: 60.0
+    min: 3.0
+    max: 35.0
   torque_order:
     distribution: int_uniform
     min: 2
     max: 30
   torque_cutoff_freq_hz:
     distribution: uniform
-    min: 1.0
-    max: 40.0
+    min: 1.5
+    max: 15.0
 
 command:
   - ${env}
