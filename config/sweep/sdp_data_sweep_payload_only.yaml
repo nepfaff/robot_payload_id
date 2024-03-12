@@ -1,0 +1,62 @@
+# Sweep over data sources and data processing parameters
+
+program: scripts/solve_inertial_param_sdp.py
+method: bayes
+
+metric:
+  goal: minimize
+  name: sdp_cost
+
+parameters:
+  joint_data_path:
+    values: [
+      joint_data/real/excitation_only/iiwa_with_wsg/fourier_payload_only_averaged,
+      joint_data/real/excitation_only/iiwa_with_wsg/fourier_40k_averaged
+    ]
+  filter_positions:
+    values: [true, false]
+  pos_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  pos_cutoff_freq_hz:
+    distribution: uniform
+    min: 30.0
+    max: 90.0
+  vel_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  vel_cutoff_freq_hz:
+    distribution: uniform
+    min: 5.0
+    max: 30.0
+  acc_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  acc_cutoff_freq_hz:
+    distribution: uniform
+    min: 3.0
+    max: 35.0
+  torque_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  torque_cutoff_freq_hz:
+    distribution: uniform
+    min: 1.5
+    max: 15.0
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --wandb_mode=online
+  - --regularization_weight=0.0
+  - --process_joint_data
+  - --not_perform_eval
+  - --payload_only
+  # Change this to match the no-payload identified parameters path!
+  - --initial_param_path=identified_params/real/excitation_only/iiwa_only/fourier_40k_averaged_improvedDynamicDryFriction.npy
+  - ${args_no_boolean_flags}
