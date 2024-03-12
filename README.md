@@ -20,7 +20,8 @@ poetry install -vvv
 (the `-vvv` flag adds verbose output).
 
 For local Drake and manipulation installations, insert the following at the end of the
-`.venv/bin/activate` and `.venv/bin/activate.nu` files, modifying the paths and python version as required:
+`.venv/bin/activate` and `.venv/bin/activate.nu` files, modifying the paths and python
+version as required:
 ```bash
 export PYTHONPATH=~/drake-build/install/lib/python3.10/site-packages:${PYTHONPATH}
 export PYTHONPATH=~/manipulation:${PYTHONPATH}
@@ -201,4 +202,5 @@ Individual agents for the sweep can be started using the printed `wandb agent` c
 
 ## Credit
 
-Any code in `robot_payload_id/eric_id` has been copied/ adopted from Eric Cousineau ([Github repo](https://github.com/EricCousineau-TRI/drake_sys_id)).
+Any code in `robot_payload_id/eric_id` has been copied/ adopted from Eric Cousineau
+([Github repo](https://github.com/EricCousineau-TRI/drake_sys_id)).
