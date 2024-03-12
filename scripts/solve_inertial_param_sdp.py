@@ -639,7 +639,8 @@ def main():
     # Transform from affine `tau = W * params + w0` into linear `(tau - w0) = W * params`
     tau_data -= w0_data
 
-    if not args.keep_unidentifiable_params:
+    # All parameters are identifiable when only identifying the payload parameters
+    if not args.keep_unidentifiable_params and not payload_only:
         # Load base parameter mapping
         base_param_mapping = None
         if base_param_mapping_path is not None:
