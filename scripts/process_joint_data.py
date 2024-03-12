@@ -40,49 +40,49 @@ def main():
     parser.add_argument(
         "--pos_order",
         type=int,
-        default=20,
+        default=10,
         help="The order of the filter for the joint positions.",
     )
     parser.add_argument(
         "--pos_cutoff_freq_hz",
         type=float,
-        default=30.0,
+        default=60.0,
         help="The cutoff frequency of the filter for the joint positions.",
     )
     parser.add_argument(
         "--vel_order",
         type=int,
-        default=20,
+        default=10,
         help="The order of the filter for the joint velocities.",
     )
     parser.add_argument(
         "--vel_cutoff_freq_hz",
         type=float,
-        default=2.0,
+        default=10.0,
         help="The cutoff frequency of the filter for the joint velocities.",
     )
     parser.add_argument(
         "--acc_order",
         type=int,
-        default=20,
+        default=10,
         help="The order of the filter for the joint accelerations.",
     )
     parser.add_argument(
         "--acc_cutoff_freq_hz",
         type=float,
-        default=2.0,
+        default=10.0,
         help="The cutoff frequency of the filter for the joint accelerations.",
     )
     parser.add_argument(
         "--torque_order",
         type=int,
-        default=12,
+        default=10,
         help="The order of the filter for the joint torques.",
     )
     parser.add_argument(
         "--torque_cutoff_freq_hz",
         type=float,
-        default=1.6,
+        default=10.0,
         help="The cutoff frequency of the filter for the joint torques.",
     )
     parser.add_argument(
