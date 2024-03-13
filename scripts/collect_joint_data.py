@@ -295,6 +295,12 @@ def main():
     simulation_end_margin = 1.0
     simulator.AdvanceTo(traj_source_initializer.get_end_time() + simulation_end_margin)
 
+    actual_realtime_rate = simulator.get_actual_realtime_rate()
+    if actual_realtime_rate < 1.0:
+        logging.warning(
+            f"Execution was {actual_realtime_rate:.2f}x slower than real time!"
+        )
+
     # Save data
     visualizer.StopRecording()
     visualizer.PublishRecording()
