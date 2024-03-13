@@ -805,6 +805,66 @@ def main():
                 var_sol_dict=var_sol_dict,
             )
 
+            if initial_param_path is not None and payload_only:
+                # Compute the difference in the last link's parameters. This corresponds
+                # to the payload parameters if `initial_param_path` are the parameters
+                # without payload.
+                inital_last_link_params = get_plant_joint_params(
+                    arm_plant_components.plant,
+                    arm_plant_components.plant_context,
+                    add_rotor_inertia=identify_rotor_inertia,
+                    add_reflected_inertia=identify_reflected_inertia,
+                    add_viscous_friction=identify_viscous_friction,
+                    add_dynamic_dry_friction=identify_dynamic_dry_friction,
+                    payload_only=payload_only,
+                )[-1]
+                # We can subtract the lumped parameters as they are all in the last
+                # link's frame.
+                last_link_idx = num_joints - 1
+                payload_mass = (
+                    var_sol_dict[f"m{last_link_idx}(0)"] - inital_last_link_params.m
+                )
+                payload_hcom = (
+                    np.array(
+                        [
+                            var_sol_dict[f"hx{last_link_idx}(0)"],
+                            var_sol_dict[f"hy{last_link_idx}(0)"],
+                            var_sol_dict[f"hz{last_link_idx}(0)"],
+                        ]
+                    )
+                    - inital_last_link_params.m * inital_last_link_params.get_com()
+                )
+                payload_com = payload_hcom / payload_mass
+                payload_rot_inertia = (
+                    np.array(
+                        [
+                            [
+                                var_sol_dict[f"Ixx{last_link_idx}(0)"],
+                                var_sol_dict[f"Ixy{last_link_idx}(0)"],
+                                var_sol_dict[f"Ixz{last_link_idx}(0)"],
+                            ],
+                            [
+                                var_sol_dict[f"Ixy{last_link_idx}(0)"],
+                                var_sol_dict[f"Iyy{last_link_idx}(0)"],
+                                var_sol_dict[f"Iyz{last_link_idx}(0)"],
+                            ],
+                            [
+                                var_sol_dict[f"Ixz{last_link_idx}(0)"],
+                                var_sol_dict[f"Iyz{last_link_idx}(0)"],
+                                var_sol_dict[f"Izz{last_link_idx}(0)"],
+                            ],
+                        ]
+                    )
+                    - inital_last_link_params.get_inertia_matrix()
+                )
+                logging.info(
+                    "Difference in the last link's parameters (payload parameters). "
+                    + "Note that these are in the last link's frame:"
+                )
+                logging.info(f"Payload mass: {payload_mass}")
+                logging.info(f"Payload CoM: {payload_com}")
+                logging.info(f"Payload inertia:\n{payload_rot_inertia}")
+
         if output_param_path is not None:
             logging.info(f"Saving parameters to {output_param_path}")
             directory: Path = output_param_path.parent
