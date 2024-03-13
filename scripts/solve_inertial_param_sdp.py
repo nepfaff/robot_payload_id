@@ -318,7 +318,7 @@ def main():
     parser.add_argument(
         "--regularization_weight",
         type=float,
-        default=1e-3,
+        default=1e-4,
         help="The regularization weight.",
     )
     parser.add_argument(
@@ -500,6 +500,12 @@ def main():
         "One but not both of `--traj_parameter_path` and `--joint_data_path` should be "
         + "set."
     )
+
+    if payload_only and regularization_weight > 0.0:
+        logging.warning(
+            "Regularization is not recommended when identifying only the payload "
+            + "parameters as these are fully identifiable."
+        )
 
     logging.basicConfig(level=args.log_level)
     wandb.init(
