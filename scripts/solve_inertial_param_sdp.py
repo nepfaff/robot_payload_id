@@ -362,6 +362,12 @@ def main():
         + "some of the parameters are unidentifiable.",
     )
     parser.add_argument(
+        "--known_max_mass",
+        type=float,
+        help="The known maximum mass of the robot. This is used to set the upper bound "
+        + "for the combined mass parameters.",
+    )
+    parser.add_argument(
         "--process_joint_data",
         action="store_true",
         help="Whether to process the joint data before using it.",
@@ -481,6 +487,7 @@ def main():
     initial_param_path = args.initial_param_path
     output_param_path = args.output_param_path
     use_initial_params_for_regularization = args.use_initial_params_for_regularization
+    known_max_mass = args.known_max_mass
     do_process_joint_data = args.process_joint_data
     num_endpoints_to_remove = args.num_endpoints_to_remove
     compute_velocities = not args.not_compute_velocities
@@ -775,6 +782,7 @@ def main():
         identify_viscous_friction=identify_viscous_friction,
         identify_dynamic_dry_friction=identify_dynamic_dry_friction,
         payload_only=payload_only,
+        known_max_mass=known_max_mass,
         solver_kPrintToConsole=args.kPrintToConsole,
     )
     if result.is_success():

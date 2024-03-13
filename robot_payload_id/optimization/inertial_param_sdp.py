@@ -68,6 +68,7 @@ def solve_inertial_param_sdp(
     identify_viscous_friction: bool = True,
     identify_dynamic_dry_friction: bool = True,
     payload_only=False,
+    known_max_mass: Optional[float] = None,
     solver_kPrintToConsole: bool = False,
 ) -> Tuple[
     MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray, np.ndarray
@@ -102,6 +103,8 @@ def solve_inertial_param_sdp(
         payload_only (bool, optional): Whether to only include the 10 inertial
             parameters of the last link. These are the parameters that we care about
             for payload identification.
+        known_max_mass (float, optional): The known maximum mass of the robot. This is
+            used as an upper bound on the sum of the identified masses.
         solver_kPrintToConsole (bool, optional): Whether to print solver output.
 
     Returns:
@@ -290,6 +293,11 @@ def solve_inertial_param_sdp(
         )
         for dynamic_dry_friction in dynamic_dry_frictions:
             prog.AddConstraint(dynamic_dry_friction >= 0)
+
+    # Maximum total mass constraint
+    if known_max_mass is not None:
+        masses = np.array([var.m for var in variables])
+        prog.AddConstraint(masses.sum() <= known_max_mass)
 
     options = None
     if solver_kPrintToConsole:
