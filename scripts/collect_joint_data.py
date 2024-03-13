@@ -85,6 +85,13 @@ def main():
         + "fast excitation trajectory.",
     )
     parser.add_argument(
+        "--noise_scale",
+        type=float,
+        default=0.0,
+        help="The scale of the noise to add to the simulation data. This cannot be "
+        + "set for hardware experiments.",
+    )
+    parser.add_argument(
         "--logging_period",
         type=float,
         default=1e-3,
@@ -112,8 +119,11 @@ def main():
     time_horizon = args.time_horizon
     only_log_excitation_traj_data = args.only_log_excitation_traj_data
     duration_to_remove_at_start = args.duration_to_remove_at_start
+    noise_scale = args.noise_scale
     logging_period = args.logging_period
     html_path = args.html_path
+
+    assert not (use_hardware and noise_scale > 0.0)
 
     builder = DiagramBuilder()
     scenario = LoadScenario(filename=scenario_path)
@@ -170,6 +180,7 @@ def main():
     )
 
     # Add controller
+    # NOTE: These gains are tuned for an iiwa7 without payload
     controller_plant = station.get_iiwa_controller_plant()
     num_positions = controller_plant.num_positions()
     controller = builder.AddNamedSystem(
@@ -355,6 +366,21 @@ def main():
     commanded_torque_data = commanded_torque_data[unique_indices]
     measured_torque_data = measured_torque_data[unique_indices]
     sample_times_s = sample_times_s[unique_indices]
+
+    # Add noise
+    if noise_scale > 0.0:
+        position_noise = np.random.normal(
+            scale=noise_scale * 0.001, size=measured_position_data.shape
+        )
+        measured_position_data += position_noise
+        velocity_noise = np.random.normal(
+            scale=noise_scale * 0.01, size=measured_velocity_data.shape
+        )
+        measured_velocity_data += velocity_noise
+        torque_noise = np.random.normal(
+            scale=noise_scale * 0.1, size=measured_torque_data.shape
+        )
+        measured_torque_data += torque_noise
 
     # Save data
     if save_data_path is not None:
