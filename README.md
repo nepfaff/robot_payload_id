@@ -164,6 +164,9 @@ python scripts/solve_inertial_param_sdp.py \
 --joint_data_path joint_data/iiwa_with_payload --process_joint_data \
 --initial_param_path identified_params/params.npy --payload_only
 ```
+The payload inertial parameters should correspond to the last link parameters
+identified by the second run minus the ones identified by the first run, i.e. the ones
+stored in `identified_params/params.npy` and passed to the second run. 
 
 ## Reparameterized System ID
 
