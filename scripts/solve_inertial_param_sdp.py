@@ -1,4 +1,5 @@
 import argparse
+import copy
 import logging
 import os
 
@@ -8,16 +9,17 @@ from typing import Dict
 
 import numpy as np
 import sympy
+import wandb
 
 from pydrake.all import (
     DecomposeAffineExpressions,
     MathematicalProgramResult,
+    SpatialInertia,
+    UnitInertia,
     from_sympy,
     to_sympy,
 )
 from scipy.linalg import lu
-
-import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
@@ -336,6 +338,12 @@ def main():
         + "for payload identification.",
     )
     parser.add_argument(
+        "--payload_frame_name",
+        type=str,
+        help="The frame to express the identified payload parameters in. This is only "
+        + "used for logging when `--payload_only` is set.",
+    )
+    parser.add_argument(
         "--gt_model_path",
         type=Path,
         help="Path to the ground truth robot model. This could for example have a "
@@ -483,6 +491,7 @@ def main():
     regularization_weight = args.regularization_weight
     perturb_scale = args.perturb_scale
     payload_only = args.payload_only
+    payload_frame_name = args.payload_frame_name
     gt_model_path = args.gt_model_path
     initial_param_path = args.initial_param_path
     output_param_path = args.output_param_path
@@ -813,7 +822,7 @@ def main():
                 var_sol_dict=var_sol_dict,
             )
 
-            if initial_param_path is not None and payload_only:
+            if payload_only:
                 # Compute the difference in the last link's parameters. This corresponds
                 # to the payload parameters if `initial_param_path` are the parameters
                 # without payload.
@@ -865,13 +874,58 @@ def main():
                     )
                     - inital_last_link_params.get_inertia_matrix()
                 )
-                logging.info(
-                    "Difference in the last link's parameters (payload parameters). "
-                    + "Note that these are in the last link's frame:"
-                )
-                logging.info(f"Payload mass: {payload_mass}")
-                logging.info(f"Payload CoM: {payload_com}")
-                logging.info(f"Payload inertia:\n{payload_rot_inertia}")
+
+                if payload_frame_name is None:
+                    logging.info(
+                        "Difference in the last link's parameters (payload parameters). "
+                        + "Note that these are in the last link's frame:"
+                    )
+                    logging.info(f"Payload mass: {payload_mass}")
+                    logging.info(f"Payload CoM: {payload_com}")
+                    logging.info(f"Payload inertia:\n{payload_rot_inertia}")
+                else:
+                    # Transform into the payload frame
+                    last_link = arm_plant_components_gt.plant.GetBodyByName(
+                        f"iiwa_link_7"
+                    )
+                    payload_frame = arm_plant_components_gt.plant.GetFrameByName(
+                        payload_frame_name
+                    )
+                    plant_context = copy.deepcopy(arm_plant_components_gt.plant_context)
+                    last_link.SetSpatialInertiaInBodyFrame(
+                        plant_context,
+                        SpatialInertia(
+                            mass=payload_mass,
+                            p_PScm_E=payload_com,
+                            G_SP_E=UnitInertia(
+                                Ixx=payload_rot_inertia[0, 0] / payload_mass,
+                                Iyy=payload_rot_inertia[1, 1] / payload_mass,
+                                Izz=payload_rot_inertia[2, 2] / payload_mass,
+                                Ixy=payload_rot_inertia[0, 1] / payload_mass,
+                                Ixz=payload_rot_inertia[0, 2] / payload_mass,
+                                Iyz=payload_rot_inertia[1, 2] / payload_mass,
+                            ),
+                        ),
+                    )
+                    # Spatial inertia of payload about the payload frame origin,
+                    # expressed in the payload frame.
+                    M_PPayload_Payload = (
+                        arm_plant_components_gt.plant.CalcSpatialInertia(
+                            context=plant_context,
+                            frame_F=payload_frame,
+                            body_indexes=[last_link.index()],
+                        )
+                    )
+                    logging.info(
+                        "Difference in the last link's parameters (payload parameters). "
+                        + "Note that these are in specified payload frame:"
+                    )
+                    logging.info(f"Payload mass: {M_PPayload_Payload.get_mass()}")
+                    logging.info(f"Payload CoM: {M_PPayload_Payload.get_com()}")
+                    logging.info(
+                        "Payload inertia:\n"
+                        + f"{M_PPayload_Payload.CalcRotationalInertia().CopyToFullMatrix3()}"
+                    )
 
         if output_param_path is not None:
             logging.info(f"Saving parameters to {output_param_path}")

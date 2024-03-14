@@ -166,7 +166,9 @@ python scripts/solve_inertial_param_sdp.py \
 ```
 The payload inertial parameters should correspond to the last link parameters
 identified by the second run minus the ones identified by the first run, i.e. the ones
-stored in `identified_params/params.npy` and passed to the second run. 
+stored in `identified_params/params.npy` and passed to the second run. This parameter
+difference is printed by the script. Specify `--payload_frame_name` if you want to
+print them in a particular frame.
 
 ## Reparameterized System ID
 
