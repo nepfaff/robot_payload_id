@@ -341,7 +341,8 @@ def main():
         "--payload_frame_name",
         type=str,
         help="The frame to express the identified payload parameters in. This is only "
-        + "used for logging when `--payload_only` is set.",
+        + "used for logging when `--payload_only` is set. The frame must exist in "
+        + "`--gt_model_path`.",
     )
     parser.add_argument(
         "--gt_model_path",
