@@ -1,11 +1,13 @@
 import logging
 
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 
 from pydrake.all import (
+    Context,
     JointActuator,
+    MultibodyPlant,
     RevoluteJoint,
     RigidBody,
     SpatialInertia,
@@ -18,12 +20,16 @@ from robot_payload_id.utils import ArmComponents, ArmPlantComponents
 def write_parameters_to_plant(
     arm_components: ArmComponents,
     var_name_param_dict: Dict[str, float],
+    plant_context: Optional[Context] = None,
 ) -> ArmPlantComponents:
     """
-    Create a plant context that has the parameters written to it.
+    Create a plant context that has the parameters written to it. The plant is assumed
+    to contain a robot arm.
     """
     plant = arm_components.plant
-    plant_context = plant.CreateDefaultContext()
+    plant_context = (
+        plant.CreateDefaultContext() if plant_context is None else plant_context
+    )
     # Check if only contains payload parameters
     payload_only = len(var_name_param_dict) == 10
 
@@ -86,5 +92,67 @@ def write_parameters_to_plant(
             logging.warning(
                 "Dynamic dry friction not implemented yet in Drake. Skipping."
             )
+
+    return ArmPlantComponents(plant=plant, plant_context=plant_context)
+
+
+def write_parameters_to_rigid_body(
+    plant: MultibodyPlant,
+    var_name_param_dict: Dict[str, float],
+    body_name: str,
+    plant_context: Optional[Context] = None,
+) -> ArmComponents:
+    """
+    Create a plant context that has the parameters written to it. The parameters are
+    of a single rigid body in the plant.
+
+    `var_name_param_dict` is a dictionary that contains the 10 inertial parameters.
+    """
+    # Create a plant context
+    plant_context = (
+        plant.CreateDefaultContext() if plant_context is None else plant_context
+    )
+    body: RigidBody = plant.GetBodyByName(body_name)
+
+    # Extract the parameters
+    for name, value in var_name_param_dict.items():
+        if "m" in name:
+            mass = abs(value)
+        if "hx" in name:
+            hx = value
+        if "hy" in name:
+            hy = value
+        if "hz" in name:
+            hz = value
+        if "Ixx" in name:
+            Ixx = value
+        if "Iyy" in name:
+            Iyy = value
+        if "Izz" in name:
+            Izz = value
+        if "Ixy" in name:
+            Ixy = value
+        if "Ixz" in name:
+            Ixz = value
+        if "Iyz" in name:
+            Iyz = value
+
+    # TODO: Project the inertia to the closest valid one
+    body.SetSpatialInertiaInBodyFrame(
+        plant_context,
+        SpatialInertia(
+            mass=mass,
+            p_PScm_E=np.array([hx, hy, hz]) / mass,
+            G_SP_E=UnitInertia(
+                Ixx=Ixx / mass,
+                Iyy=Iyy / mass,
+                Izz=Izz / mass,
+                Ixy=Ixy / mass,
+                Ixz=Ixz / mass,
+                Iyz=Iyz / mass,
+            ),
+            skip_validity_check=True,
+        ),
+    )
 
     return ArmPlantComponents(plant=plant, plant_context=plant_context)
