@@ -205,6 +205,10 @@ wandb sweep config/sweep/sdp_data_sweep.yaml
 ```
 Individual agents for the sweep can be started using the printed `wandb agent` command.
 
+## Evaluation
+
+Inertial ellipsoids can be visualized with `scripts/visualize_inertial_ellipsoids.py`.
+
 ## Credit
 
 Any code in `robot_payload_id/eric_id` has been copied/ adopted from Eric Cousineau
