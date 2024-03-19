@@ -9,7 +9,6 @@ from typing import Dict
 
 import numpy as np
 import sympy
-import wandb
 
 from pydrake.all import (
     DecomposeAffineExpressions,
@@ -20,6 +19,8 @@ from pydrake.all import (
     to_sympy,
 )
 from scipy.linalg import lu
+
+import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
@@ -917,6 +918,10 @@ def main():
                             body_indexes=[last_link.index()],
                         )
                     )
+                    # Express inerita w.r.t. CoM to match SDFormat convention
+                    M_PPayloadcom_Payload = M_PPayload_Payload.Shift(
+                        M_PPayload_Payload.get_com()
+                    )
                     logging.info(
                         "Difference in the last link's parameters (payload parameters). "
                         + "Note that these are in specified payload frame:"
@@ -924,8 +929,8 @@ def main():
                     logging.info(f"Payload mass: {M_PPayload_Payload.get_mass()}")
                     logging.info(f"Payload CoM: {M_PPayload_Payload.get_com()}")
                     logging.info(
-                        "Payload inertia:\n"
-                        + f"{M_PPayload_Payload.CalcRotationalInertia().CopyToFullMatrix3()}"
+                        "Payload inertia (w.r.t CoM):\n"
+                        + f"{M_PPayloadcom_Payload.CalcRotationalInertia().CopyToFullMatrix3()}"
                     )
 
         if output_param_path is not None:
