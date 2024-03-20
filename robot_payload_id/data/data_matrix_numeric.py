@@ -7,7 +7,7 @@ import logging
 import time
 
 from datetime import timedelta
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import numpy as np
 
@@ -188,8 +188,7 @@ def extract_numeric_data_matrix_autodiff(
         plant_components (ArmPlantComponents): This must contain the plant. Optionally,
             it can also contain the plant's context.
         joint_data (JointData): The joint data. Only the joint positions, velocities,
-            and accelerations are used for the data matrix computation. The joint
-            torques are flattened and returned.
+            and accelerations are used for the data matrix computation.
         add_rotor_inertia (bool): Whether to add rotor inertia as a parameter.
         add_reflected_inertia (bool): Whether to add reflected inertia as a parameter.
             NOTE: This is mutually exclusive with add_rotor_inertia.
@@ -276,9 +275,9 @@ def extract_numeric_data_matrix_autodiff(
             ad_plant_components.plant_context, forces
         )
         ad_torques = ad_plant_components.plant.CalcInverseDynamics(
-            ad_plant_components.plant_context,
-            joint_data.joint_accelerations[i],
-            forces,
+            context=ad_plant_components.plant_context,
+            known_vdot=joint_data.joint_accelerations[i],
+            external_forces=forces,
         )
 
         if not payload_only:

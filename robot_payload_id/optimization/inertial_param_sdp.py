@@ -79,8 +79,10 @@ def solve_inertial_param_sdp(
 
     Args:
         num_links (int): The number of links in the robot.
-        W_data (np.ndarray): The data matrix.
-        tau_data (np.ndarray): The joint torque data.
+        W_data (np.ndarray): The data matrix of shape (N * num_links, 10) where N is the
+            number of data points.
+        tau_data (np.ndarray): The joint torque data of shape (N * num_links,) where N
+            is the number of data points.
         base_param_mapping (np.ndarray, optional): The base parameter mapping matrix
             that maps the full parameters to the identifiable parameters. It corresponds
             to the part of V in the SVD that corresponds to non-zero singular values. If
