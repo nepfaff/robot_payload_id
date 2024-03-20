@@ -309,3 +309,72 @@ def solve_inertial_param_sdp(
     logging.info("Starting to solve SDP...")
     result = Solve(prog=prog, solver_options=options)
     return prog, result, variable_names, variable_vec, base_variable_vec
+
+
+def solve_ft_payload_sdp(
+    ft_data_matrix: np.ndarray,
+    ft_data: np.ndarray,
+    solver_kPrintToConsole: bool = False,
+) -> Tuple[MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray]:
+    """
+    Solves the payload inertial parameter SDP with a quadratic cost using the wrist F/T
+    sensor data.
+
+    Args:
+        ft_data_matrix (np.ndarray): The spatial payload data matrix of shape
+            (N * 6, 10) where N is the number of data points.
+        ft_data (np.ndarray): The wrist F/T sensor data of shape (N * 6,) where N is the
+            number of data points. Each data point has form [Fx, Fy, Fz, Tx, Ty, Tz].
+        solver_kPrintToConsole (bool, optional): Whether to print solver output.
+
+    Returns:
+        Tuple[MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray]:
+            A tuple containing the MathematicalProgram, MathematicalProgramResult, an
+            array of the variable names, and an array of the MathematicalProgram
+            variables.
+    """
+    logging.info(
+        "Condition number of the spatial payload data matrix: "
+        + f"{np.linalg.cond(ft_data_matrix)}"
+    )
+
+    prog = MathematicalProgram()
+
+    # Create decision variables
+    variables = JointParameters(
+        m=prog.NewContinuousVariables(1, f"m")[0],
+        hx=prog.NewContinuousVariables(1, f"hx")[0],
+        hy=prog.NewContinuousVariables(1, f"hy")[0],
+        hz=prog.NewContinuousVariables(1, f"hz")[0],
+        Ixx=prog.NewContinuousVariables(1, f"Ixx")[0],
+        Ixy=prog.NewContinuousVariables(1, f"Ixy")[0],
+        Ixz=prog.NewContinuousVariables(1, f"Ixz")[0],
+        Iyy=prog.NewContinuousVariables(1, f"Iyy")[0],
+        Iyz=prog.NewContinuousVariables(1, f"Iyz")[0],
+        Izz=prog.NewContinuousVariables(1, f"Izz")[0],
+    )
+    variable_vec = variables.get_lumped_param_list()
+    variable_names = np.array([var.get_name() for var in variable_vec])
+
+    # Normalize cost
+    num_datapoints = len(ft_data_matrix) // 6
+    prog.AddQuadraticCost(
+        2 * ft_data_matrix.T @ ft_data_matrix / num_datapoints,
+        -2 * ft_data.T @ ft_data_matrix / num_datapoints,
+        ft_data.T @ ft_data / num_datapoints,
+        vars=variable_vec,
+        is_convex=True,
+    )
+
+    # Inertial parameter feasibility constraints
+    pseudo_inertia = variables.get_pseudo_inertia_matrix()
+    prog.AddPositiveSemidefiniteConstraint(pseudo_inertia - 1e-6 * np.identity(4))
+
+    options = None
+    if solver_kPrintToConsole:
+        options = SolverOptions()
+        options.SetOption(CommonSolverOption.kPrintToConsole, 1)
+
+    logging.info("Starting to solve SDP...")
+    result = Solve(prog=prog, solver_options=options)
+    return prog, result, variable_names, variable_vec

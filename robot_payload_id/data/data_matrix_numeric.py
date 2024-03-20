@@ -16,9 +16,12 @@ from pydrake.all import (
     DecomposeLumpedParameters,
     Evaluate,
     Expression,
+    JacobianWrtVariable,
     MathematicalProgram,
     MultibodyForces_,
     MultibodyPlant_,
+    SpatialAcceleration,
+    SpatialForce,
 )
 from tqdm import tqdm
 
@@ -308,6 +311,179 @@ def extract_numeric_data_matrix_autodiff(
         )
 
     return W_data, w0, tau_data
+
+
+def construct_ft_matrix(
+    linear_gravity: np.ndarray,
+    angular_velocity: np.ndarray,
+    linear_acceleration: np.ndarray,
+    angular_acceleration: np.ndarray,
+) -> np.ndarray:
+    """
+    Constructs the 6x10 matrix that maps the inertial parameters to the force-torque
+    sensor measurements. The equations take the form [f, tau] = mat * alpha, where f
+    and tau are the force and torque measurements, and alpha are the lumped inertial
+    parameters of form [m, hx, hy, hz, Ixx, Ixy, Ixz, Iyy, Iyz, Izz].
+    All parameters and measurements should be expressed in the sensor frame S.
+
+    See equation 5 in "Improving Force Control Performance by Computational Elimination
+    of Non-Contact Forces/Torques" by Kubus et al.
+
+    Args:
+        linear_gravity (np.ndarray): The linear gravity vector of shape (3,). Expressed
+            in the sensor frame. g_W_S.
+        angular_velocity (np.ndarray): The angular velocity vector of shape (3,).
+            Expressed in the sensor frame. omega_WS_S.
+        linear_acceleration (np.ndarray): The linear acceleration vector of shape (3,).
+            Expressed in the sensor frame. a_WS_S.
+        angular_acceleration (np.ndarray): The angular acceleration vector of shape
+            (3,). Expressed in the sensor frame. alpha_WS_S.
+
+    Returns:
+        np.ndarray: The 6x10 matrix that maps the inertial parameters to the
+            force-torque sensor measurements.
+    """
+    mat = np.zeros((6, 10))
+    mat[0, 0:4] = [
+        linear_acceleration[0] - linear_gravity[0],
+        -angular_velocity[1] ** 2 - angular_velocity[2] ** 2,
+        angular_velocity[0] * angular_velocity[1] - angular_acceleration[2],
+        angular_velocity[0] * angular_velocity[2] + angular_acceleration[1],
+    ]
+    mat[1, 0:4] = [
+        linear_acceleration[1] - linear_gravity[1],
+        angular_velocity[0] * angular_velocity[1] + angular_acceleration[2],
+        -angular_velocity[0] ** 2 - angular_velocity[2] ** 2,
+        angular_velocity[1] * angular_velocity[2] - angular_acceleration[0],
+    ]
+    mat[2, 0:4] = [
+        linear_acceleration[2] - linear_gravity[2],
+        angular_velocity[0] * angular_velocity[2] - angular_acceleration[1],
+        angular_velocity[1] * angular_velocity[2] + angular_acceleration[0],
+        -angular_velocity[1] ** 2 - angular_velocity[0] ** 2,
+    ]
+    mat[3, 0:4] = [
+        0.0,
+        0.0,
+        linear_acceleration[2] - linear_gravity[2],
+        linear_gravity[1] - linear_acceleration[1],
+    ]
+    mat[4, 0:4] = [
+        0.0,
+        linear_gravity[2] - linear_acceleration[2],
+        0.0,
+        linear_acceleration[0] - linear_gravity[0],
+    ]
+    mat[5, 0:4] = [
+        0.0,
+        linear_acceleration[1] - linear_gravity[1],
+        linear_gravity[0] - linear_acceleration[0],
+        0.0,
+    ]
+    mat[3, 4:10] = [
+        angular_acceleration[0],
+        angular_acceleration[1] - angular_velocity[0] * angular_velocity[2],
+        angular_acceleration[2] + angular_velocity[0] * angular_velocity[1],
+        -angular_velocity[1] * angular_velocity[2],
+        angular_velocity[1] ** 2 - angular_velocity[2] ** 2,
+        angular_velocity[1] * angular_velocity[2],
+    ]
+    mat[4, 4:10] = [
+        angular_velocity[0] * angular_velocity[2],
+        angular_acceleration[0] + angular_velocity[1] * angular_velocity[2],
+        angular_velocity[2] ** 2 - angular_velocity[0] ** 2,
+        angular_acceleration[1],
+        angular_acceleration[2] - angular_velocity[0] * angular_velocity[1],
+        -angular_velocity[0] * angular_velocity[2],
+    ]
+    mat[5, 4:10] = [
+        -angular_velocity[0] * angular_velocity[1],
+        angular_velocity[0] ** 2 - angular_velocity[1] ** 2,
+        angular_acceleration[0] - angular_velocity[1] * angular_velocity[2],
+        angular_velocity[0] * angular_velocity[1],
+        angular_acceleration[1] + angular_velocity[0] * angular_velocity[2],
+        angular_acceleration[2],
+    ]
+    return mat
+
+
+def construct_ft_data_matrix(
+    plant_components: ArmPlantComponents,
+    ft_body_name: str,
+    ft_sensor_frame_name: str,
+    joint_data: JointData,
+    use_progress_bar: bool = True,
+) -> np.ndarray:
+    """Constructs the numeric data matrix for the force-torque sensor measurements.
+    See `construct_ft_matrix` for more details.
+
+    Args:
+        plant_components (ArmPlantComponents): This must contain the plant. Optionally,
+            it can also contain the plant's context.
+        body_name: The name of the body to which the force-torque sensor is welded.
+            This could be the F/T sensor body if it is modelled as such.
+        ft_sensor_frame_name (str): The name of the frame that the F/T sensor is
+            measuring in.
+        joint_data (JointData): The joint data. Only the joint positions, velocities,
+            and accelerations are used for the data matrix computation.
+        use_progress_bar (bool, optional): Whether to use a progress bar.
+
+    Returns:
+        np.ndarray: The numeric data matrix of shape (num_joints * num_timesteps, 10).
+    """
+    plant = plant_components.plant
+    context = plant_components.plant_context
+
+    ft_sensor_body = plant.GetBodyByName(ft_body_name)
+    ft_sensor_body_frame = ft_sensor_body.body_frame()
+    # Transform from sensor body frame S to measurement frame F
+    measurement_frame = plant.GetFrameByName(ft_sensor_frame_name)
+    X_SF = measurement_frame.CalcPose(context, ft_sensor_body_frame)
+
+    # Transform from the world frame to the sensor frame S
+    X_WS = plant.EvalBodyPoseInWorld(context=context, body=ft_sensor_body)
+    X_WF = X_WS @ X_SF
+    X_FW = X_WF.inverse()
+    R_FW = X_FW.rotation()
+
+    num_timesteps = len(joint_data.sample_times_s)
+    data_matrix = np.zeros((num_timesteps * 6, 10))
+    for i in tqdm(
+        range(num_timesteps),
+        desc="Extracting data matrix",
+        disable=not use_progress_bar,
+    ):
+        # Set joint data
+        plant.SetPositions(context, joint_data.joint_positions[i])
+        plant.SetVelocities(context, joint_data.joint_velocities[i])
+
+        # Compute forces due to gravity
+        g_W = [0.0, 0.0, -9.81]
+        g_W_F = R_FW @ g_W
+
+        # Compute spatial velocity
+        V_WS = plant.EvalBodySpatialVelocityInWorld(
+            context=context,
+            body=ft_sensor_body,
+        )
+        omega_WS_F = R_FW @ V_WS.rotational()
+
+        # Compute spatial accelerations
+        A_WS = plant.EvalBodySpatialAccelerationInWorld(
+            context=context,
+            body=ft_sensor_body,
+        )
+        a_WS_F = R_FW @ A_WS.translational()
+        alpha_WS_F = R_FW @ A_WS.rotational()
+
+        data_matrix[i * 6 : (i + 1) * 6, :] = construct_ft_matrix(
+            linear_gravity=g_W_F,
+            angular_velocity=omega_WS_F,
+            linear_acceleration=a_WS_F,
+            angular_acceleration=alpha_WS_F,
+        )
+
+    return data_matrix
 
 
 def compute_base_param_mapping(

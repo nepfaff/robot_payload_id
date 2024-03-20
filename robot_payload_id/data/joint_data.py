@@ -2,10 +2,20 @@ from typing import Optional
 
 import numpy as np
 
-from pydrake.all import AutoDiffXd, MultibodyForces_, MultibodyPlant
+from pydrake.all import (
+    AutoDiffXd,
+    JacobianWrtVariable,
+    MultibodyForces_,
+    MultibodyPlant,
+    SpatialForce,
+)
 from tqdm import tqdm
 
-from robot_payload_id.utils import FourierSeriesTrajectoryAttributes, JointData
+from robot_payload_id.utils import (
+    ArmPlantComponents,
+    FourierSeriesTrajectoryAttributes,
+    JointData,
+)
 
 
 def generate_random_joint_data(
@@ -332,3 +342,79 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
         sample_times_s=np.arange(num_timesteps) * sample_delta,
     )
     return joint_data
+
+
+def compute_ft_sensor_measurements(
+    arm_plant_components: ArmPlantComponents,
+    joint_data: JointData,
+    ft_sensor_frame_name: str,
+) -> JointData:
+    """"""
+    plant = arm_plant_components.plant
+    context = arm_plant_components.plant_context
+
+    measurement_frame = plant.GetFrameByName(ft_sensor_frame_name)
+    X_WF = measurement_frame.CalcPoseInWorld(context)
+    X_FW = X_WF.inverse()
+    R_FW = X_FW.rotation()
+
+    # spatial_jacobian = plant.CalcJacobianSpatialVelocity(
+    #     context=context,
+    #     with_respect_to=JacobianWrtVariable.kQDot,
+    #     frame_B=plant.GetFrameByName(ft_sensor_frame_name),
+    #     p_BoBp_B=np.zeros(3),
+    #     frame_A=plant.world_frame(),
+    #     frame_E=plant.world_frame(),
+    # )
+    # spatial_jacobian_transpose_inv = np.linalg.pinv(spatial_jacobian.T)
+
+    ft_sensor_measurements = np.empty((joint_data.joint_positions.shape[0], 6))
+    for i in range(joint_data.joint_positions.shape[0]):
+        # Set joint data
+        plant.SetPositions(context, joint_data.joint_positions[i])
+        plant.SetVelocities(context, joint_data.joint_velocities[i])
+
+        # # Compute inverse dynamics
+        # forces = MultibodyForces_(plant)
+        # plant.CalcForceElementsContribution(context, forces)
+        # joint_torques = plant.CalcInverseDynamics(
+        #     context=context,
+        #     known_vdot=joint_data.joint_accelerations[i],
+        #     external_forces=forces,
+        # )
+
+        # # Convert generalized forces into spatial forces
+        # spatial_force = spatial_jacobian_transpose_inv @ joint_torques
+
+        # ft_sensor_measurement = np.concatenate(
+        #     [spatial_force.translational(), spatial_force.rotational()]
+        # )
+
+        # TODO: Figure out who to ask about this. Doesn't make sense without this
+        # taking accelerations but inverting Jacobian bad as not full rank.
+
+        # Compute the reaction force F_CJc_Jc on the child body C at the last joint's
+        # child frame Jc. For the iiwa, Jc is 'iiwa_link_7'.
+        # TODO: See https://drakedevelopers.slack.com/archives/C2WBPQDB7/p1710888837360519?thread_ts=1710863581.014389&cid=C2WBPQDB7
+        reaction_force: SpatialForce = plant.get_reaction_forces_output_port().Eval(
+            context
+        )[-1]
+        # Invert using action-reaction principle.
+        ft_sensor_measurement = -np.concatenate(
+            [reaction_force.translational(), reaction_force.rotational()]
+        )
+
+        # Transform into measurement frame. This works as there is no lever arm effect.
+        ft_sensor_measurement_in_F = np.concatenate(
+            [R_FW @ ft_sensor_measurement[:3], R_FW @ ft_sensor_measurement[3:]]
+        )
+        ft_sensor_measurements[i] = ft_sensor_measurement_in_F
+
+    return JointData(
+        joint_positions=joint_data.joint_positions,
+        joint_velocities=joint_data.joint_velocities,
+        joint_accelerations=joint_data.joint_accelerations,
+        joint_torques=joint_data.joint_torques,
+        ft_sensor_measurements=ft_sensor_measurements,
+        sample_times_s=joint_data.sample_times_s,
+    )

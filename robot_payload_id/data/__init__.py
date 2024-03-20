@@ -1,5 +1,6 @@
 from .data_matrix_numeric import (
     compute_base_param_mapping,
+    construct_ft_data_matrix,
     extract_numeric_data_matrix_autodiff,
 )
 from .data_matrix_symbolic import (
@@ -15,5 +16,6 @@ from .data_matrix_symbolic import (
 from .joint_data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
     compute_autodiff_joint_data_from_simple_sinusoidal_traj_params,
+    compute_ft_sensor_measurements,
     generate_random_joint_data,
 )
