@@ -223,16 +223,15 @@ def main():
     torque_error = predicted_torques - joint_data.joint_torques
 
     # Print results
-    print("Torque mean squared error (per joint):", np.mean(torque_error**2, axis=0))
-    print("Torque RMS error (per joint):", np.sqrt(np.mean(torque_error**2, axis=0)))
+    torque_squared_error_per_joint = np.mean(torque_error**2, axis=0)
+    print("Torque mean squared error (per joint):", torque_squared_error_per_joint)
+    torque_rms_error_per_joint = np.sqrt(np.mean(torque_error**2, axis=0))
+    print("Torque mean RMS error (per joint):", torque_rms_error_per_joint)
     print(
         "Torque mean squared error (sum over joints):",
-        np.sum(torque_error**2) / num_datapoints,
+        np.sum(torque_squared_error_per_joint),
     )
-    print(
-        "Torque RMS error (sum over joints):",
-        np.sqrt(np.sum(torque_error**2) / num_datapoints),
-    )
+    print("Torque RMS error (sum over joints):", np.sum(torque_rms_error_per_joint))
 
     # Plot predicted and measured torques
     num_joints = joint_data.joint_positions.shape[1]
