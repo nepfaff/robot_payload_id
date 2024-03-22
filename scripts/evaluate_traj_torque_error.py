@@ -225,7 +225,7 @@ def main():
     # Print results
     torque_squared_error_per_joint = np.mean(torque_error**2, axis=0)
     print("Torque mean squared error (per joint):", torque_squared_error_per_joint)
-    torque_rms_error_per_joint = np.sqrt(np.mean(torque_error**2, axis=0))
+    torque_rms_error_per_joint = np.sqrt(torque_squared_error_per_joint)
     print("Torque mean RMS error (per joint):", torque_rms_error_per_joint)
     print(
         "Torque mean squared error (sum over joints):",
