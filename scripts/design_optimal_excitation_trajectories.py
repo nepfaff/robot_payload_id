@@ -76,11 +76,17 @@ def main():
         help="The number of control points to use. Only used for B-spline optimization.",
     )
     parser.add_argument(
-        "--time_horizon",
+        "--min_time_horizon",
+        type=float,
+        default=10,
+        help="The time horizon/ duration of the trajectory.",
+    )
+    parser.add_argument(
+        "--max_time_horizon",
         type=float,
         default=10,
         help="The time horizon/ duration of the trajectory. The sampling time step is "
-        + "computed as time_horizon / num_timesteps.",
+        + "computed as max_time_horizon / num_timesteps.",
     )
     parser.add_argument(
         "--snopt_iteration_limit",
@@ -273,7 +279,8 @@ def main():
     num_fourier_terms = args.num_fourier_terms
     omega = args.omega
     num_timesteps = args.num_timesteps
-    time_horizon = args.time_horizon
+    min_time_horizon = args.min_time_horizon
+    max_time_horizon = args.max_time_horizon
     snopt_iteration_limit = args.snopt_iteration_limit
     budget = args.budget
     max_al_iterations = args.max_al_iterations
@@ -309,8 +316,8 @@ def main():
                 model_path=model_path,
                 num_timesteps=num_timesteps,
                 num_control_points=num_control_points,
-                min_trajectory_duration=time_horizon,
-                max_trajectory_duration=time_horizon,
+                min_trajectory_duration=min_time_horizon,
+                max_trajectory_duration=max_time_horizon,
                 max_al_iterations=max_al_iterations,
                 budget_per_iteration=budget,
                 mu_initial=mu_initial,
@@ -336,8 +343,8 @@ def main():
                 robot_model_instance_name="arm",
                 num_timesteps=num_timesteps,
                 num_control_points=num_control_points,
-                min_trajectory_duration=time_horizon,
-                max_trajectory_duration=time_horizon,
+                min_trajectory_duration=min_time_horizon,
+                max_trajectory_duration=max_time_horizon,
                 max_al_iterations=max_al_iterations,
                 budget_per_iteration=budget,
                 mu_initial=mu_initial,
@@ -368,7 +375,7 @@ def main():
                             num_fourier_terms=num_fourier_terms,
                             omega=omega,
                             num_timesteps=num_timesteps,
-                            time_horizon=time_horizon,
+                            time_horizon=max_time_horizon,
                             plant=plant,
                             plant_context=plant_context,
                             robot_model_instance_idx=robot_model_instance_idx,
@@ -397,7 +404,7 @@ def main():
                         num_fourier_terms=num_fourier_terms,
                         omega=omega,
                         num_timesteps=num_timesteps,
-                        time_horizon=time_horizon,
+                        time_horizon=max_time_horizon,
                         max_al_iterations=max_al_iterations,
                         budget_per_iteration=budget,
                         mu_initial=mu_initial,
@@ -428,7 +435,7 @@ def main():
                         num_fourier_terms=num_fourier_terms,
                         omega=omega,
                         num_timesteps=num_timesteps,
-                        time_horizon=time_horizon,
+                        time_horizon=max_time_horizon,
                         plant=plant,
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
@@ -450,7 +457,7 @@ def main():
                         num_fourier_terms=num_fourier_terms,
                         omega=omega,
                         num_timesteps=num_timesteps,
-                        time_horizon=time_horizon,
+                        time_horizon=max_time_horizon,
                         plant=plant,
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
@@ -469,7 +476,7 @@ def main():
                         num_fourier_terms=num_fourier_terms,
                         omega=omega,
                         num_timesteps=num_timesteps,
-                        time_horizon=time_horizon,
+                        time_horizon=max_time_horizon,
                         plant=plant,
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
@@ -493,7 +500,7 @@ def main():
                 num_fourier_terms=num_fourier_terms,
                 omega=omega,
                 num_timesteps=num_timesteps,
-                time_horizon=time_horizon,
+                time_horizon=max_time_horizon,
                 plant=plant,
                 robot_model_instance_idx=robot_model_instance_idx,
                 iteration_limit=snopt_iteration_limit,
