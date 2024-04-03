@@ -1,9 +1,7 @@
 import logging
 import os
-import time
 
 from abc import abstractmethod
-from datetime import timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
@@ -34,7 +32,8 @@ from robot_payload_id.utils import (
     ArmPlantComponents,
     BsplineTrajectoryAttributes,
     JointData,
-    name_unnamed_constraints,
+    flatten_list,
+    name_constraint,
 )
 
 from .nevergrad_augmented_lagrangian import NevergradAugmentedLagrangian
@@ -477,39 +476,48 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
 
     def _add_traj_duration_constraint(self) -> None:
         if self._min_trajectory_duration == self._max_trajectory_duration:
-            self._prog.AddLinearEqualityConstraint(
-                self._prog.decision_variables()[-1] == self._max_trajectory_duration
+            name_constraint(
+                self._prog.AddLinearEqualityConstraint(
+                    self._prog.decision_variables()[-1] == self._max_trajectory_duration
+                ),
+                "duration",
             )
         else:
-            self._trajopt.AddDurationConstraint(
-                lb=self._min_trajectory_duration, ub=self._max_trajectory_duration
+            name_constraint(
+                self._trajopt.AddDurationConstraint(
+                    lb=self._min_trajectory_duration, ub=self._max_trajectory_duration
+                ),
+                "duration",
             )
-        name_unnamed_constraints(self._prog, "duration")
 
     def _add_bound_constraints(self) -> None:
         """Add position, velocity, and acceleration bound constraints."""
-        self._trajopt.AddPositionBounds(
+        position_bound_bindings = self._trajopt.AddPositionBounds(
             lb=self._plant.GetPositionLowerLimits() * self._save_limit_fraction,
             ub=self._plant.GetPositionUpperLimits() * self._save_limit_fraction,
         )
-        name_unnamed_constraints(self._prog, "positionBounds")
-        self._trajopt.AddVelocityBounds(
+        for binding in position_bound_bindings:
+            name_constraint(binding, f"positionBounds")
+        velocity_bound_bindings = self._trajopt.AddVelocityBounds(
             lb=self._plant.GetVelocityLowerLimits() * self._save_limit_fraction,
             ub=self._plant.GetVelocityUpperLimits() * self._save_limit_fraction,
         )
-        name_unnamed_constraints(self._prog, "velocityBounds")
-        self._trajopt.AddAccelerationBounds(
+        for binding in velocity_bound_bindings:
+            name_constraint(binding, f"velocityBounds")
+        acceleration_bound_bindings = self._trajopt.AddAccelerationBounds(
             lb=self._plant.GetAccelerationLowerLimits() * self._save_limit_fraction,
             ub=self._plant.GetAccelerationUpperLimits() * self._save_limit_fraction,
         )
-        name_unnamed_constraints(self._prog, "accelerationBounds")
+        for binding in flatten_list(acceleration_bound_bindings):
+            name_constraint(binding, f"accelerationBounds")
         # The jerk limits are rather arbitrary and are mainly there to prevent
         # acceleration discontinuities that lead to commanded torque discontinuities
         # when using inverse dynamics control
-        self._trajopt.AddJerkBounds(
+        jerk_bound_bindings = self._trajopt.AddJerkBounds(
             lb=-np.full(self._num_joints, 25), ub=np.full(self._num_joints, 25)
         )
-        name_unnamed_constraints(self._prog, "jerkBounds")
+        for binding in flatten_list(jerk_bound_bindings):
+            name_constraint(binding, f"jerkBounds")
 
     def _add_start_and_end_point_constraints(self) -> None:
         """Add constraints to start and end with zero velocities/ accelerations."""
@@ -525,26 +533,34 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
 
         # Velocity endpoint constraints
-        self._trajopt.AddVelocityConstraintAtNormalizedTime(
-            constraint=zero_constraint, s=0
+        name_constraint(
+            self._trajopt.AddVelocityConstraintAtNormalizedTime(
+                constraint=zero_constraint, s=0
+            ),
+            "startVelocity",
         )
-        name_unnamed_constraints(self._prog, "startVelocity")
-        self._trajopt.AddVelocityConstraintAtNormalizedTime(
-            constraint=zero_constraint, s=1
+        name_constraint(
+            self._trajopt.AddVelocityConstraintAtNormalizedTime(
+                constraint=zero_constraint, s=1
+            ),
+            "endVelocity",
         )
-        name_unnamed_constraints(self._prog, "endVelocity")
 
         # Acceleration endpoint constraints
         if self._constraint_acceleration_endpoints:
             # Note that path and joint acceleration constraints are equivalent for s=0,1
-            self._trajopt.AddPathAccelerationConstraint(
-                lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
+            name_constraint(
+                self._trajopt.AddPathAccelerationConstraint(
+                    lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=0
+                ),
+                "startAcceleration",
             )
-            name_unnamed_constraints(self._prog, "startAcceleration")
-            self._trajopt.AddPathAccelerationConstraint(
-                lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
+            name_constraint(
+                self._trajopt.AddPathAccelerationConstraint(
+                    lb=np.zeros(self._num_joints), ub=np.zeros(self._num_joints), s=1
+                ),
+                "endAcceleration",
             )
-            name_unnamed_constraints(self._prog, "endAcceleration")
 
     def _add_collision_constraints(self, min_distance: float = 0.01) -> None:
         """Add collision avoidance constraints."""
@@ -555,9 +571,9 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         )
         evaluate_at_s = np.linspace(0, 1, int(3 * self._max_trajectory_duration * 100))
         for s in evaluate_at_s:
-            self._trajopt.AddPathPositionConstraint(constraint, s)
-            name_unnamed_constraints(
-                self._prog, f"collisionAvoidance_normalized_time_{s}"
+            name_constraint(
+                self._trajopt.AddPathPositionConstraint(constraint, s),
+                f"collisionAvoidance_position_{s}",
             )
 
     def _extract_and_log_optimization_result(
