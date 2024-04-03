@@ -74,6 +74,7 @@ def main():
     existing_model_alpha = args.existing_model_alpha
 
     logging.basicConfig(level=args.log_level)
+    np.random.seed(0)
 
     # Create plant
     builder = DiagramBuilder()
