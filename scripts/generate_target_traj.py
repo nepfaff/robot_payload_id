@@ -58,7 +58,7 @@ def main():
     parser.add_argument(
         "--num_control_points",
         type=int,
-        default=100,
+        default=30,
         help="The number of control points to use for the B-spline trajectory.",
     )
     parser.add_argument(
