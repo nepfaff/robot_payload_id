@@ -141,6 +141,7 @@ def main():
         "Mean abs joint accelerations: ",
         np.mean(np.abs(joint_data.joint_accelerations), axis=0),
     )
+    print("Trajectory duration: ", joint_data.sample_times_s[-1])
 
     simulator = Simulator(arm_components.diagram)
     simulator.set_target_realtime_rate(1.0)
