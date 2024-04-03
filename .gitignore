@@ -9,3 +9,4 @@ wandb/
 joint_data
 identified_params
 pyrightconfig.json
+target_trajs

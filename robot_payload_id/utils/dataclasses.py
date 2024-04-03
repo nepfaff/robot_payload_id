@@ -15,6 +15,7 @@ from pydrake.all import (
     Meshcat,
     MeshcatVisualizer,
     MultibodyPlant,
+    Trajectory,
     TrajectorySource,
     VectorLogSink,
 )
@@ -85,6 +86,34 @@ class JointData:
             joint_accelerations=np.load(path / "joint_accelerations.npy"),
             joint_torques=np.load(path / "joint_torques.npy"),
             sample_times_s=np.load(path / "sample_times_s.npy"),
+        )
+
+    @classmethod
+    def from_trajectory(
+        cls, trajectory: Trajectory, sample_times_s: np.ndarray
+    ) -> "JointData":
+        """
+        Creates a JointData object from a Trajectory object.
+
+        Args:
+            trajectory: The trajectory object.
+            sample_times_s: The sample times in seconds of shape (T,).
+
+        Returns:
+            The joint data.
+        """
+        return cls(
+            joint_positions=np.asarray(
+                [trajectory.value(t) for t in sample_times_s]
+            ).squeeze(),
+            joint_velocities=np.asarray(
+                [trajectory.EvalDerivative(t, 1) for t in sample_times_s]
+            ).squeeze(),
+            joint_accelerations=np.asarray(
+                [trajectory.EvalDerivative(t, 2) for t in sample_times_s]
+            ).squeeze(),
+            joint_torques=np.nan * np.ones_like(sample_times_s),
+            sample_times_s=sample_times_s,
         )
 
 
