@@ -213,6 +213,12 @@ def main():
         + "start and end points. However, these might then turn out infeasible.",
     )
     parser.add_argument(
+        "--constrain_position_endpoints",
+        action="store_true",
+        help="Whether to add position constraints at the start and end of the "
+        + "trajectory. This is only used if an initial trajectory is provided.",
+    )
+    parser.add_argument(
         "--payload_only",
         action="store_true",
         help="Only consider the 10 inertial parameters of the last link. These are the "
@@ -296,6 +302,7 @@ def main():
     add_viscous_friction = args.add_viscous_friction
     add_dynamic_dry_friction = args.add_dynamic_dry_friction
     add_endpoint_constraints = not args.not_add_endpoint_constraints
+    constrain_position_endpoints = args.constrain_position_endpoints
     payload_only = args.payload_only
 
     if args.use_bspline:
@@ -329,6 +336,7 @@ def main():
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
                 payload_only=payload_only,
                 include_endpoint_constraints=add_endpoint_constraints,
+                constrain_position_endpoints=constrain_position_endpoints,
                 nevergrad_method=nevergrad_method,
                 spline_order=4,
                 traj_initial=traj_initial,
@@ -356,6 +364,7 @@ def main():
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
                 payload_only=payload_only,
                 include_endpoint_constraints=add_endpoint_constraints,
+                constrain_position_endpoints=constrain_position_endpoints,
                 nevergrad_method=nevergrad_method,
                 spline_order=4,
                 traj_initial=traj_initial,

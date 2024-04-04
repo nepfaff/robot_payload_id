@@ -125,10 +125,11 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
         self._min_trajectory_duration = min_trajectory_duration
         self._max_trajectory_duration = max_trajectory_duration
         self._logging_path = logging_path
+        self._traj_initial = traj_initial
         self._num_control_points = num_control_points
 
         # Create optimization problem
-        initial_traj_guess = (
+        self._initial_traj_guess = (
             BsplineTrajectory(
                 basis=BsplineBasis(
                     order=spline_order,
@@ -141,7 +142,7 @@ class ExcitationTrajectoryOptimizerBspline(ExcitationTrajectoryOptimizerBase):
             if traj_initial is None
             else traj_initial
         )
-        self._trajopt = KinematicTrajectoryOptimization(initial_traj_guess)
+        self._trajopt = KinematicTrajectoryOptimization(self._initial_traj_guess)
         self._prog = self._trajopt.get_mutable_prog()
         wandb.run.summary["num_decision_variables"] = self._prog.num_vars()
 
@@ -191,6 +192,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         add_dynamic_dry_friction: bool,
         payload_only: bool,
         include_endpoint_constraints: bool,
+        constrain_position_endpoints: bool = False,
         constraint_acceleration_endpoints: bool = False,
         nevergrad_method: str = "NGOpt",
         spline_order: int = 4,
@@ -232,6 +234,9 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 the last link. This takes precedence over other arguments.
             include_endpoint_constraints (bool): Whether to include start and end point
                 constraints.
+            constrain_position_endpoints (bool): Whether to add position constraints at
+                the start and end of the trajectory. This is only used if an initial
+                trajectory is provided.
             constraint_acceleration_endpoints (bool): Whether to add acceleration
                 constraints at the start and end of the trajectory.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
@@ -271,6 +276,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         self._add_viscous_friction = add_viscous_friction
         self._add_dynamic_dry_friction = add_dynamic_dry_friction
         self._payload_only = payload_only
+        self._constrain_position_endpoints = constrain_position_endpoints
         self._constraint_acceleration_endpoints = constraint_acceleration_endpoints
         self._nevergrad_method = nevergrad_method
 
@@ -546,6 +552,31 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
             "endVelocity",
         )
 
+        # Position endpoint constraints
+        if self._constrain_position_endpoints and self._traj_initial is not None:
+            name_constraint(
+                self._trajopt.AddPathPositionConstraint(
+                    constraint=LinearEqualityConstraint(
+                        Aeq=np.eye(self._num_joints),
+                        beq=self._initial_traj_guess.value(0.0),
+                    ),
+                    s=0,
+                ),
+                "startPosition",
+            )
+            name_constraint(
+                self._trajopt.AddPathPositionConstraint(
+                    constraint=LinearEqualityConstraint(
+                        Aeq=np.eye(self._num_joints),
+                        beq=self._initial_traj_guess.value(
+                            self._initial_traj_guess.end_time()
+                        ),
+                    ),
+                    s=1,
+                ),
+                "endPosition",
+            )
+
         # Acceleration endpoint constraints
         if self._constraint_acceleration_endpoints:
             # Note that path and joint acceleration constraints are equivalent for s=0,1
@@ -643,6 +674,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
         add_dynamic_dry_friction: bool,
         payload_only: bool,
         include_endpoint_constraints: bool,
+        constrain_position_endpoints: bool = False,
         nevergrad_method: str = "NGOpt",
         spline_order: int = 4,
         traj_initial: Optional[BsplineTrajectory] = None,
@@ -685,6 +717,9 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 the last link. This takes precedence over other arguments.
             include_endpoint_constraints (bool): Whether to include start and end point
                 constraints.
+            constrain_position_endpoints (bool): Whether to add position constraints at
+                the start and end of the trajectory. This is only used if an initial
+                trajectory is provided.
             nevergrad_method (str): The method to use for the Nevergrad optimizer.
                 Refer to https://facebookresearch.github.io/nevergrad/optimization.html#choosing-an-optimizer
                 for a complete list of methods.
@@ -731,6 +766,7 @@ class ExcitationTrajectoryOptimizerBsplineBlackBoxALNumeric(
                 add_dynamic_dry_friction=add_dynamic_dry_friction,
                 payload_only=payload_only,
                 include_endpoint_constraints=include_endpoint_constraints,
+                constrain_position_endpoints=constrain_position_endpoints,
                 nevergrad_method=nevergrad_method,
                 spline_order=spline_order,
                 traj_initial=traj_initial,

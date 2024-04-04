@@ -1,6 +1,6 @@
 import os
 
-from typing import List
+from typing import Any, List
 
 from manipulation.utils import ConfigureParser
 from pydrake.all import MathematicalProgram, MultibodyPlant, Parser
@@ -33,3 +33,7 @@ def name_unnamed_constraints(prog: MathematicalProgram, name: str) -> None:
     for constraint in constraints:
         if constraint.get_description() == "":
             constraint.set_description(name)
+
+
+def flatten_list(list_of_lists: List[List[Any]]) -> List[Any]:
+    return [item for sublist in list_of_lists for item in sublist]
