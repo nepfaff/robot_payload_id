@@ -429,7 +429,7 @@
     <!-- This link and its corresponding weld joint allows us to sense forces via MBP's
     reaction forces output port. -->
     <link name="ft_sensor_link">
-        <pose>0 0 0.025 0 0 0</pose>
+        <pose relative_to="iiwa_joint_7">0 0 0.06 0 0 0</pose>
         <inertial>
             <pose>0 0 0 0 0 0</pose>
             <mass>0.44</mass>
@@ -443,6 +443,7 @@
             </inertia>
         </inertial>
         <visual name="ft_sensor_visual">
+            <pose>0 0 0 0 0 0</pose>
             <geometry>
                 <cylinder>
                     <length>0.05</length>
