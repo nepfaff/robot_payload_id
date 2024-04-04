@@ -434,12 +434,12 @@
             <pose>0 0 0 0 0 0</pose>
             <mass>0.44</mass>
             <inertia>
-                <ixx>1e-7</ixx>
+                <ixx>1e-2</ixx>
                 <ixy>0.0</ixy>
                 <ixz>0.0</ixz>
-                <iyy>1e-7</iyy>
+                <iyy>1e-2</iyy>
                 <iyz>0.0</iyz>
-                <izz>1e-7</izz>
+                <izz>1e-2</izz>
             </inertia>
         </inertial>
         <visual name="ft_sensor_visual">

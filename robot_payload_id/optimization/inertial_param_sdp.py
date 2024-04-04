@@ -357,6 +357,7 @@ def solve_ft_payload_sdp(
     variable_names = np.array([var.get_name() for var in variable_vec])
 
     # Normalize cost
+    # 3 forces and 3 torques per data point
     num_datapoints = len(ft_data_matrix) // 6
     prog.AddQuadraticCost(
         2 * ft_data_matrix.T @ ft_data_matrix / num_datapoints,

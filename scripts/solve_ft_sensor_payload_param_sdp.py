@@ -5,44 +5,26 @@ import os
 
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
 
 import numpy as np
-import sympy
 
-from pydrake.all import (
-    DecomposeAffineExpressions,
-    MathematicalProgramResult,
-    SpatialInertia,
-    UnitInertia,
-    from_sympy,
-    to_sympy,
-)
-from scipy.linalg import lu
+from pydrake.all import SpatialInertia, UnitInertia
 
 import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
-    compute_base_param_mapping,
     compute_ft_sensor_measurements,
     construct_ft_data_matrix,
-    extract_numeric_data_matrix_autodiff,
 )
 from robot_payload_id.environment import create_arm
-from robot_payload_id.eric_id.drake_torch_dynamics import (
-    calc_inertia_entropic_divergence,
-)
-from robot_payload_id.optimization import solve_ft_payload_sdp, solve_inertial_param_sdp
+from robot_payload_id.optimization import solve_ft_payload_sdp
 from robot_payload_id.utils import (
-    ArmComponents,
     ArmPlantComponents,
     BsplineTrajectoryAttributes,
     FourierSeriesTrajectoryAttributes,
     JointData,
-    get_plant_joint_params,
     process_joint_data,
-    write_parameters_to_plant,
 )
 
 
@@ -249,6 +231,7 @@ def main():
     )
 
     # Create arm
+    # 7 joints + 1 F/T sensor weldjoint
     num_joints = 8
     arm_components = create_arm(
         arm_file_path=model_path.as_posix(), num_joints=num_joints, time_step=0.0
