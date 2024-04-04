@@ -436,15 +436,10 @@ def construct_ft_data_matrix(
 
     ft_sensor_body = plant.GetBodyByName(ft_body_name)
     ft_sensor_body_frame = ft_sensor_body.body_frame()
-    # Transform from sensor body frame S to measurement frame F
+
+    # Transform from sensor body frame S to measurement frame F (fixed transform).
     measurement_frame = plant.GetFrameByName(ft_sensor_frame_name)
     X_SF = measurement_frame.CalcPose(context, ft_sensor_body_frame)
-
-    # Transform from the world frame to the sensor frame S
-    X_WS = plant.EvalBodyPoseInWorld(context=context, body=ft_sensor_body)
-    X_WF = X_WS @ X_SF
-    X_FW = X_WF.inverse()
-    R_FW = X_FW.rotation()
 
     num_timesteps = len(joint_data.sample_times_s)
     data_matrix = np.zeros((num_timesteps * 6, 10))
@@ -453,22 +448,28 @@ def construct_ft_data_matrix(
         desc="Extracting data matrix",
         disable=not use_progress_bar,
     ):
-        # Set joint data
+        # Set joint data.
         plant.SetPositions(context, joint_data.joint_positions[i])
         plant.SetVelocities(context, joint_data.joint_velocities[i])
 
-        # Compute forces due to gravity
-        g_W = [0.0, 0.0, -9.81]
+        # Transform from the world frame to the sensor frame S.
+        X_WS = plant.EvalBodyPoseInWorld(context=context, body=ft_sensor_body)
+        X_WF = X_WS @ X_SF
+        X_FW = X_WF.inverse()
+        R_FW = X_FW.rotation()
+
+        # Compute forces due to gravity.
+        g_W = [0.0, 0.0, 9.81]
         g_W_F = R_FW @ g_W
 
-        # Compute spatial velocity
+        # Compute spatial velocity.
         V_WS = plant.EvalBodySpatialVelocityInWorld(
             context=context,
             body=ft_sensor_body,
         )
         omega_WS_F = R_FW @ V_WS.rotational()
 
-        # Compute spatial accelerations
+        # Compute spatial accelerations.
         A_WS = plant.EvalBodySpatialAccelerationInWorld(
             context=context,
             body=ft_sensor_body,
