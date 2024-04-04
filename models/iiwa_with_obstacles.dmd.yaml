@@ -46,7 +46,7 @@ directives:
       rotation: !Rpy { deg: [0.0, 0.0, 90.0]}
 
 - add_model:
-    name: arm
+    name: iiwa
     file: package://drake/manipulation/models/iiwa_description/iiwa7/iiwa7_with_box_collision.sdf
     default_joint_positions:
         iiwa_joint_1: [0]
@@ -58,7 +58,7 @@ directives:
         iiwa_joint_7: [0]
 - add_weld:
     parent: world
-    child: arm::iiwa_link_0
+    child: iiwa::iiwa_link_0
     X_PC:
         translation: [0.0, 0.0, 0.0127]
 
@@ -67,7 +67,7 @@ directives:
     name: gripper_payload_box
     file: package://robot_payload_id/gripper_payload_box.sdf
 - add_weld:
-    parent: arm::iiwa_link_7
+    parent: iiwa::iiwa_link_7
     child: gripper_payload_box::gripper_payload_box_link
     X_PC:
         translation: [0.0, 0.0, 0.18] # box_heigh / 2 + 0.05

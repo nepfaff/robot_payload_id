@@ -225,6 +225,11 @@ def main():
         + "parameters that we want to estimate for payload identification.",
     )
     parser.add_argument(
+        "--no_obstacles",
+        action="store_true",
+        help="Whether to not include obstacles in the optimization.",
+    )
+    parser.add_argument(
         "--wandb_mode",
         type=str,
         default="online",
@@ -270,7 +275,11 @@ def main():
     model_path = (
         "./models/one_link_arm_with_obstacle.dmd.yaml"
         if use_one_link_arm
-        else "./models/iiwa_with_obstacles.dmd.yaml"
+        else (
+            "./models/iiwa.dmd.yaml"
+            if args.no_obstacles
+            else "./models/iiwa_with_obstacles.dmd.yaml"
+        )
     )
 
     arm_components = create_arm(arm_file_path=model_path, num_joints=num_joints)
@@ -278,7 +287,8 @@ def main():
     plant_context = plant.GetMyContextFromRoot(
         arm_components.diagram.CreateDefaultContext()
     )
-    robot_model_instance_idx = plant.GetModelInstanceByName("arm")
+    robot_model_instance_name = "arm" if use_one_link_arm else "iiwa"
+    robot_model_instance_idx = plant.GetModelInstanceByName(robot_model_instance_name)
 
     optimizer = args.optimizer
     cost_function = args.cost_function
@@ -348,7 +358,7 @@ def main():
                 num_joints=num_joints,
                 cost_function=cost_function,
                 model_path=model_path,
-                robot_model_instance_name="arm",
+                robot_model_instance_name=robot_model_instance_name,
                 num_timesteps=num_timesteps,
                 num_control_points=num_control_points,
                 min_trajectory_duration=min_time_horizon,
@@ -420,7 +430,7 @@ def main():
                         mu_multiplier=mu_multiplier,
                         mu_max=mu_max,
                         model_path=model_path,
-                        robot_model_instance_name="arm",
+                        robot_model_instance_name=robot_model_instance_name,
                         num_workers=num_workers,
                         add_rotor_inertia=add_rotor_inertia,
                         add_reflected_inertia=add_reflected_inertia,
