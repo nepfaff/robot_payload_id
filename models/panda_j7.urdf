@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
 This was extracted from
-package://drake/manipulation/models/franka_description/urdf/panda_arm.urdf and
+package://drake_models/franka_description/urdf/panda_arm.urdf and
 stripped down to only have the last joint.
 The frame `panda_joint7_inboard` was also added.
 -->
