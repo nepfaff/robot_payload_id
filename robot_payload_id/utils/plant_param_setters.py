@@ -74,11 +74,18 @@ def write_parameters_to_plant(
                 skip_validity_check=True,
             ),
         )
+        set_rotor_inertia = False
         if f"rotor_inertia{i}(0)" in var_name_param_dict:
             joint_actuator.SetRotorInertia(
                 plant_context, abs(var_name_param_dict[f"rotor_inertia{i}(0)"])
             )
+            set_rotor_inertia = True
         if f"reflected_inertia{i}(0)" in var_name_param_dict:
+            if set_rotor_inertia:
+                logging.warning(
+                    "Both rotor inertia and reflected inertia are set. Ignoring rotor "
+                    + "inertia."
+                )
             gear_ratio = joint_actuator.default_gear_ratio()
             reflected_inertia = var_name_param_dict[f"reflected_inertia{i}(0)"]
             rotor_inertia = reflected_inertia / gear_ratio**2
