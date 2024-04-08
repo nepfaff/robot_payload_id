@@ -230,10 +230,6 @@ def extract_numeric_data_matrix_autodiff(
         reflected_inertia_ad = np.array(
             [params.reflected_inertia for params in ad_plant_components.parameters]
         )
-    if add_viscous_friction and not payload_only:
-        viscous_frictions_ad = np.array(
-            [params.viscous_friction for params in ad_plant_components.parameters]
-        )
     if add_dynamic_dry_friction and not payload_only:
         dynamic_dry_frictions_ad = np.array(
             [params.dynamic_dry_friction for params in ad_plant_components.parameters]
@@ -283,8 +279,6 @@ def extract_numeric_data_matrix_autodiff(
         if not payload_only:
             if add_reflected_inertia:
                 ad_torques += reflected_inertia_ad * joint_data.joint_accelerations[i]
-            if add_viscous_friction:
-                ad_torques += viscous_frictions_ad * joint_data.joint_velocities[i]
             if add_dynamic_dry_friction:
                 dynamic_dry_friction_torque = dynamic_dry_frictions_ad * np.sign(
                     joint_data.joint_velocities[i]

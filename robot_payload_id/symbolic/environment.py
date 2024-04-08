@@ -405,11 +405,9 @@ def create_autodiff_plant(
         if add_reflected_inertia and not payload_only:
             # We only want to count reflected inertia once
             joint_actuator.SetRotorInertia(ad_plant_context, 0.0)
-        if add_viscous_friction:
+        if add_viscous_friction and not payload_only:
             # We only want to count viscous friction once
-            # TODO: Change this to use Drake's build in one (see
-            # https://github.com/RobotLocomotion/drake/issues/14405)
-            joint.SetDamping(ad_plant_context, 0.0)
+            joint.SetDamping(ad_plant_context, viscous_friction_ad)
 
     return ArmPlantComponents(
         plant=ad_plant,
