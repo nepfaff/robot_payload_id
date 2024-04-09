@@ -1,0 +1,14 @@
+directives:
+- add_directives:
+    file: package://robot_payload_id/iiwa7_with_wsg_welded.dmd.yaml
+plant_config:
+    time_step: 1e-3 # 1e-3 for torque_only mode and 5e-3 otherwise
+    contact_model: "hydroelastic_with_fallback"
+    discrete_contact_approximation: "sap"
+model_drivers:
+    iiwa: !IiwaDriver
+        lcm_bus: "default"
+        control_mode: torque_only
+lcm_buses:
+    default:
+        lcm_url: ""
