@@ -408,13 +408,13 @@ class ArmComponents:
     """
 
     num_joints: int
-    diagram: Diagram
     plant: MultibodyPlant
-    trajectory_source: TrajectorySource
-    state_logger: VectorLogSink
-    commanded_torque_logger: VectorLogSink
-    meshcat: Meshcat
-    meshcat_visualizer: MeshcatVisualizer
+    diagram: Diagram = None
+    trajectory_source: TrajectorySource = None
+    state_logger: VectorLogSink = None
+    commanded_torque_logger: VectorLogSink = None
+    meshcat: Meshcat = None
+    meshcat_visualizer: MeshcatVisualizer = None
 
 
 @dataclass
