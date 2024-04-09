@@ -29,10 +29,13 @@ from robot_payload_id.control import (
     ExcitationTrajectorySourceInitializer,
     FourierSeriesTrajectory,
 )
+from robot_payload_id.environment import create_arm
 from robot_payload_id.utils import (
+    ArmComponents,
     BsplineTrajectoryAttributes,
     FourierSeriesTrajectoryAttributes,
     JointData,
+    write_parameters_to_plant,
 )
 
 
@@ -51,6 +54,13 @@ def main():
         help="Path to the trajectory parameter folder. The folder must contain "
         + "'a_value.npy', 'b_value.npy', and 'q0_value.npy' or 'control_points.npy', "
         + "'knots.npy', and 'spline_order.npy'.",
+    )
+    parser.add_argument(
+        "--robot_param_path",
+        type=Path,
+        help="Path to the robot parameter `.npy` file. If not provided, the robot "
+        + "parameters are set to the model's parameters. This is useful for improving "
+        + "the controller performance with better parameters.",
     )
     parser.add_argument(
         "--save_data_path",
@@ -114,6 +124,7 @@ def main():
     logging.basicConfig(level=args.log_level)
     scenario_path = args.scenario_path
     traj_parameter_path = args.traj_parameter_path
+    robot_param_path = args.robot_param_path
     save_data_path = args.save_data_path
     use_hardware = args.use_hardware
     time_horizon = args.time_horizon
@@ -138,6 +149,24 @@ def main():
             package_xmls=[os.path.abspath("models/package.xml")],
         ),
     )
+
+    controller_plant = station.get_iiwa_controller_plant()
+    controller_plant_context = controller_plant.CreateDefaultContext()
+    num_positions = controller_plant.num_positions()
+
+    # Load robot parameters for control
+    if robot_param_path is not None:
+        logging.info(f"Loading robot parameters from {robot_param_path}")
+        var_sol_dict = np.load(robot_param_path, allow_pickle=True).item()
+        if "dynamic_dry_friction0(0)" in var_sol_dict:
+            logging.warning(
+                "Dynamic dry friction is not supported by Drake. All "
+                + "provided dynamic dry friction values are ignored/ set to 0!"
+            )
+
+        arm_components = ArmComponents(plant=controller_plant, num_joints=num_positions)
+        arm_plant_components = write_parameters_to_plant(arm_components, var_sol_dict)
+        controller_plant_context = arm_plant_components.plant_context
 
     # Load trajectory parameters
     is_fourier_series = os.path.exists(traj_parameter_path / "a_value.npy")
@@ -181,13 +210,12 @@ def main():
 
     # Add controller
     # NOTE: These gains are tuned for an iiwa7 without payload
-    controller_plant = station.get_iiwa_controller_plant()
-    num_positions = controller_plant.num_positions()
     controller = builder.AddNamedSystem(
         "controller",
         InverseDynamicsControllerWithGravityCompensationCancellation(
             scenario=scenario,
             controller_plant=controller_plant,
+            controller_plant_context=controller_plant_context,
             kp_gains=np.full(7, 600),
             damping_ratios=np.full(7, 0.2),
         ),
@@ -286,7 +314,16 @@ def main():
 
     # Build and setup simulation
     diagram = builder.Build()
-    simulator = Simulator(diagram)
+    context = diagram.CreateDefaultContext()
+    if robot_param_path is not None and not use_hardware:
+        # Use the provided robot parameters for the simulated iiwa
+        plant = station.GetSubsystemByName("external_station").GetSubsystemByName(
+            "plant"
+        )
+        plant_context = plant.GetMyMutableContextFromRoot(context)
+        arm_components = ArmComponents(plant=plant, num_joints=num_positions)
+        write_parameters_to_plant(arm_components, var_sol_dict, plant_context)
+    simulator = Simulator(diagram, context)
     ApplySimulatorConfig(scenario.simulator_config, simulator)
     simulator.set_target_realtime_rate(1.0)
     visualizer.StartRecording()
@@ -297,9 +334,7 @@ def main():
 
     actual_realtime_rate = simulator.get_actual_realtime_rate()
     if actual_realtime_rate < 1.0:
-        logging.warning(
-            f"Execution was {actual_realtime_rate:.2f}x slower than real time!"
-        )
+        logging.warning(f"Execution was {actual_realtime_rate}x slower than real time!")
 
     # Save data
     visualizer.StopRecording()
