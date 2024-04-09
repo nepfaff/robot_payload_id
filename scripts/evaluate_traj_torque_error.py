@@ -35,6 +35,11 @@ def main():
         + "`--traj_parameter_path` or `--joint_data_path` should be set.",
     )
     parser.add_argument(
+        "--use_commanded_torques",
+        action="store_true",
+        help="Whether to use the commanded torques instead of the measured torques.",
+    )
+    parser.add_argument(
         "--process_joint_data",
         action="store_true",
         help="Whether to process the joint data before using it.",
@@ -126,6 +131,7 @@ def main():
     args = parser.parse_args()
     initial_param_path = args.initial_param_path
     joint_data_path = args.joint_data_path
+    use_commanded_torques = args.use_commanded_torques
     do_process_joint_data = args.process_joint_data
     num_endpoints_to_remove = args.num_endpoints_to_remove
     compute_velocities = not args.not_compute_velocities
@@ -185,6 +191,10 @@ def main():
 
     # Load joint data
     joint_data = JointData.load_from_disk(joint_data_path)
+    if use_commanded_torques:
+        joint_data.joint_torques = np.load(
+            joint_data_path / "commanded_joint_torques.npy"
+        )
 
     # Process joint data
     if do_process_joint_data:

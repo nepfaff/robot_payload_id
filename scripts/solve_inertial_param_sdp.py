@@ -321,7 +321,7 @@ def main():
     parser.add_argument(
         "--regularization_weight",
         type=float,
-        default=1e-4,
+        default=1e-2,
         help="The regularization weight.",
     )
     parser.add_argument(
@@ -376,6 +376,14 @@ def main():
         type=float,
         help="The known maximum mass of the robot. This is used to set the upper bound "
         + "for the combined mass parameters.",
+    )
+    parser.add_argument(
+        "--use_commanded_torques",
+        action="store_true",
+        help="Whether to use the commanded torques instead of the measured torques in "
+        + "joint data. This can be useful if we want to use the identified parameters "
+        + "for control. Note that the commanded and measured torques can be quite "
+        + "different.",
     )
     parser.add_argument(
         "--process_joint_data",
@@ -499,6 +507,7 @@ def main():
     output_param_path = args.output_param_path
     use_initial_params_for_regularization = args.use_initial_params_for_regularization
     known_max_mass = args.known_max_mass
+    use_commanded_torques = args.use_commanded_torques
     do_process_joint_data = args.process_joint_data
     num_endpoints_to_remove = args.num_endpoints_to_remove
     compute_velocities = not args.not_compute_velocities
@@ -604,6 +613,10 @@ def main():
             )
     else:
         joint_data = JointData.load_from_disk(joint_data_path)
+        if use_commanded_torques:
+            joint_data.joint_torques = np.load(
+                joint_data_path / "commanded_joint_torques.npy"
+            )
 
     # Process joint data
     if do_process_joint_data:
