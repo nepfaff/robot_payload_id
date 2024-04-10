@@ -7,11 +7,11 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
-drake = {version = ">=0.0.20240302", source = "drake-nightly"}
-# drake = "^1.26.0"
+# drake = {version = ">=0.0.20240409", source = "drake-nightly"}
+drake = "^1.27.0"
 numpy = "^1.25.2"
-manipulation = {git = "https://github.com/RussTedrake/manipulation.git", rev = "bb9d3844da27f48ce4ede39b6bacb4d216829a22"}
-iiwa_setup = {git = "https://github.com/nepfaff/iiwa_setup.git", rev="3f88f89ec07ed1d4efe3a27cccd3de8d53415d5f"}
+manipulation = {git = "https://github.com/RussTedrake/manipulation.git", rev = "a2d393fdad5e6079db53b0c4e749e2a7fbc935b0"}
+iiwa_setup = {git = "https://github.com/nepfaff/iiwa_setup.git", rev="f0d5bbfc8378313bb88721e13cb909928e9ff31f"}
 tqdm = "^4.66.1"
 hydra-core = "^1.3.2"
 omegaconf = "^2.3.0"

@@ -755,18 +755,18 @@ six = ">=1.4.0"
 
 [[package]]
 name = "drake"
-version = "0.0.20240302"
+version = "1.27.0"
 description = "Model-based design and verification for robotics"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "drake-0.0.20240302-cp310-cp310-manylinux_2_35_x86_64.whl", hash = "sha512:f64b2014dd62e8e8c23e74568e440d96debaa2ff60290ba9a2dab1f31843f61e4b6e559a5dffcc13936f2ba4279b400c8b8968309bc71fbb4e9c164a2dbcbdb7"},
-    {file = "drake-0.0.20240302-cp311-cp311-macosx_12_0_x86_64.whl", hash = "sha512:a45470f1039043e545333913b37f388ad4e2a181346695964cbbe3c2ca91119d9829c212e24662798fa4e92831deb901e269398c0ec9d0eabd236c768601510c"},
-    {file = "drake-0.0.20240302-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha512:31027097196e134974b39d7261f42843f24af544dc436deec7b885934b2c7ab2cb7f5ea815685efdd34eb14c663f6ec798c931dc6e8c624c0b2285e5c0392ecb"},
-    {file = "drake-0.0.20240302-cp311-cp311-manylinux_2_35_x86_64.whl", hash = "sha512:c6d0228679bde8263b66c99084c2bfcb7cf2947bc9f4988bb885bef86ccc922a376b0e1e3529d6e2e01dfb7f33f71dc383c1f0d8d27d9e0e79f57c83bfb2ae3d"},
-    {file = "drake-0.0.20240302-cp312-cp312-macosx_12_0_x86_64.whl", hash = "sha512:f3086c8e453a528e415bcf6fbc24dd981a72d2d0cf58a5c0b9892dba6ad44b015bdcbe3597900d45941a62c0c352d9811e0ec1e47c25449f8084e8d212c0abc5"},
-    {file = "drake-0.0.20240302-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha512:ea0536df70c30675e20d4259e300988d84411b9b87aad85bd68c9604c2b9f14c719df61bec4f2d4a24e5c293676e7d5440c2f07b61ff2c9c1b26f32f3150d585"},
-    {file = "drake-0.0.20240302-cp312-cp312-manylinux_2_35_x86_64.whl", hash = "sha512:1c9e04c0d1ed8a1c035e7308b6bcd7f616232d16a3df7d1d7f4e8e544c9b64eb4c70ca989d8dcd930362b5d511b022b23af0aedad71b4878734ee4a901774023"},
+    {file = "drake-1.27.0-cp310-cp310-manylinux_2_35_x86_64.whl", hash = "sha256:e767ee8311780a5efd253a4251be30e6ec5bcd287a775320e447494fa81b2abf"},
+    {file = "drake-1.27.0-cp311-cp311-macosx_12_0_x86_64.whl", hash = "sha256:c1b4ca3776ec88a2741e933a2dc5ac1aa8994648590118c0b410c951e6cb0d8d"},
+    {file = "drake-1.27.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:44949b16779d304fb433a06d96be0891c00fccec5a8cd2832d5b8a145a5bac24"},
+    {file = "drake-1.27.0-cp311-cp311-manylinux_2_35_x86_64.whl", hash = "sha256:e352601edfeb5d3dfc48df4c0340ad00c35a3fccae0a34b89700dc6ab1c06216"},
+    {file = "drake-1.27.0-cp312-cp312-macosx_12_0_x86_64.whl", hash = "sha256:2cf6b7c55c3fb3fadbf914dabbe2b501aa6bc6aef32e64d5945839efe66234ad"},
+    {file = "drake-1.27.0-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:e075b38aeb86d830c1fafd8fb6108be7650fd9b21ea54065ff429be32355a3f8"},
+    {file = "drake-1.27.0-cp312-cp312-manylinux_2_35_x86_64.whl", hash = "sha256:ade059a57452ecbe7dd25e0f4e206bc40e3e83187df15c0782d862e5853e26b9"},
 ]
 
 [package.dependencies]
@@ -774,11 +774,6 @@ matplotlib = "*"
 numpy = "*"
 pydot = "*"
 PyYAML = "*"
-
-[package.source]
-type = "legacy"
-url = "https://drake-packages.csail.mit.edu/whl/nightly"
-reference = "drake-nightly"
 
 [[package]]
 name = "dulwich"
@@ -1150,10 +1145,10 @@ files = []
 develop = false
 
 [package.dependencies]
-drake = ">=0.0.20240302"
+drake = "^1.27.0"
 hydra-core = "^1.3.2"
 ipython = "^8.15.0"
-manipulation = {git = "https://github.com/RussTedrake/manipulation.git", rev = "bb9d3844da27f48ce4ede39b6bacb4d216829a22"}
+manipulation = {git = "https://github.com/RussTedrake/manipulation.git", rev = "a2d393fdad5e6079db53b0c4e749e2a7fbc935b0"}
 numpy = "^1.25.2"
 omegaconf = "^2.3.0"
 pyyaml = "^6.0.1"
@@ -1162,8 +1157,8 @@ tqdm = "^4.66.1"
 [package.source]
 type = "git"
 url = "https://github.com/nepfaff/iiwa_setup.git"
-reference = "3f88f89ec07ed1d4efe3a27cccd3de8d53415d5f"
-resolved_reference = "3f88f89ec07ed1d4efe3a27cccd3de8d53415d5f"
+reference = "f0d5bbfc8378313bb88721e13cb909928e9ff31f"
+resolved_reference = "f0d5bbfc8378313bb88721e13cb909928e9ff31f"
 
 [[package]]
 name = "imageio"
@@ -1628,7 +1623,7 @@ numpy = {version = "*", markers = "python_version < \"3.12\""}
 
 [[package]]
 name = "manipulation"
-version = "2024.01.01"
+version = "2024.04.08"
 description = "MIT 6.421 - Robotic Manipulation"
 optional = false
 python-versions = "<4.0,>=3.10"
@@ -1637,7 +1632,7 @@ develop = false
 
 [package.dependencies]
 cloudpickle = "2.2.1"
-drake = "==0.0.20240302"
+drake = ">=1.27.0"
 gradescope-utils = ">=0.4.0"
 mpld3 = ">=0.5.6"
 nevergrad = ">=0.4.3"
@@ -1648,14 +1643,14 @@ stable-baselines3 = ">=2.0.0"
 timeout-decorator = ">=0.4.1"
 torch = ">=2.0.1"
 torchvision = ">=0.10.1"
-trimesh = {version = ">=4.0.0", extras = ["recommend"]}
+trimesh = {version = ">=4.0.0 <4.2.0", extras = ["recommend"]}
 vhacdx = ">=0.0.5"
 
 [package.source]
 type = "git"
 url = "https://github.com/RussTedrake/manipulation.git"
-reference = "bb9d3844da27f48ce4ede39b6bacb4d216829a22"
-resolved_reference = "bb9d3844da27f48ce4ede39b6bacb4d216829a22"
+reference = "a2d393fdad5e6079db53b0c4e749e2a7fbc935b0"
+resolved_reference = "a2d393fdad5e6079db53b0c4e749e2a7fbc935b0"
 
 [[package]]
 name = "markdown-it-py"
@@ -4065,4 +4060,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "a6d39d01472723dc10fb5d4c9f1f45c37aa7bf1d39100cd0302cf55ccc30ee61"
+content-hash = "f3ff8c9cfdbbc7d1051379779bd67fe9c87521e4e1fccfdbca8310f55cf38306"
