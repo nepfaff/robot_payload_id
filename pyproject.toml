@@ -8,7 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
 # drake = {version = ">=0.0.20240409", source = "drake-nightly"}
-drake = "^1.27.0"
+drake = "^1.28.0"
 numpy = "^1.25.2"
 manipulation = {git = "https://github.com/RussTedrake/manipulation.git", rev = "a2d393fdad5e6079db53b0c4e749e2a7fbc935b0"}
 iiwa_setup = {git = "https://github.com/nepfaff/iiwa_setup.git", rev="f0d5bbfc8378313bb88721e13cb909928e9ff31f"}
