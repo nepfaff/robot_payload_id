@@ -131,6 +131,8 @@ def process_joint_data(
     if compute_velocities:
         # Estimate velocities using finite differences
         joint_velocities = np.gradient(filtered_joint_positions, sample_period, axis=0)
+    else:
+        joint_velocities = joint_data.joint_velocities
 
     # Filter velocity data
     filtered_velocity_data = filter_time_series_data(
