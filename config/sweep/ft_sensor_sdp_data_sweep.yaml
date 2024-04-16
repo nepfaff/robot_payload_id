@@ -1,0 +1,65 @@
+# Sweep over data sources and data processing parameters
+
+program: scripts/solve_ft_sensor_payload_param_sdp.py
+method: bayes
+
+metric:
+  goal: minimize
+  name: sdp_cost
+
+parameters:
+  joint_data_path:
+    values: [
+      joint_data/sim/iiwa_with_ft_and_wsg/fourier_10s_40k_ft_continuous/
+    ]
+  filter_positions:
+    values: [true, false]
+  pos_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  pos_cutoff_freq_hz:
+    distribution: uniform
+    min: 30.0
+    max: 90.0
+  vel_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  vel_cutoff_freq_hz:
+    distribution: uniform
+    min: 5.0
+    max: 30.0
+  acc_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  acc_cutoff_freq_hz:
+    distribution: uniform
+    min: 3.0
+    max: 35.0
+  ft_sensor_force_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  ft_sensor_force_cutoff_freq_hz:
+    distribution: uniform
+    min: 1.5
+    max: 15.0
+  ft_sensor_torque_order:
+    distribution: int_uniform
+    min: 2
+    max: 30
+  ft_sensor_torque_cutoff_freq_hz:
+    distribution: uniform
+    min: 1.5
+    max: 15.0
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --wandb_mode=online
+  - --process_joint_data
+  - --not_perform_eval
+  - ${args_no_boolean_flags}
