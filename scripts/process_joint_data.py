@@ -19,14 +19,6 @@ def main():
         help="The directory to save the processed joint data to.",
     )
     parser.add_argument(
-        "--num_endpoints_to_remove",
-        type=int,
-        default=1,
-        help="The number of endpoints to remove from the beginning and end of the "
-        + "trajectory. This is useful as the sample times are not always increasing "
-        + "with the same period at the beginning and end of the trajectory.",
-    )
-    parser.add_argument(
         "--compute_velocities",
         action="store_true",
         help="Whether to compute velocities from the positions rather than taking the "
@@ -103,7 +95,6 @@ def main():
 
     processed_joint_data = process_joint_data(
         joint_data=raw_joint_data,
-        num_endpoints_to_remove=args.num_endpoints_to_remove,
         compute_velocities=args.compute_velocities,
         filter_positions=args.filter_positions,
         pos_filter_order=args.pos_order,

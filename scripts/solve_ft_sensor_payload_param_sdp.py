@@ -96,15 +96,6 @@ def main():
         help="Whether to process the joint data before using it.",
     )
     parser.add_argument(
-        "--num_endpoints_to_remove",
-        type=int,
-        default=1,
-        help="The number of endpoints to remove from the beginning and end of the "
-        + "trajectory. This is useful as the sample times are not always increasing "
-        + "with the same period at the beginning and end of the trajectory. Only used "
-        + "if `--process_joint_data` is set.",
-    )
-    parser.add_argument(
         "--not_compute_velocities",
         action="store_true",
         help="Whether take the velocities in `joint_data` instead of computing them "
@@ -203,7 +194,6 @@ def main():
     payload_frame_name = args.payload_frame_name
     model_path = args.model_path
     do_process_joint_data = args.process_joint_data
-    num_endpoints_to_remove = args.num_endpoints_to_remove
     compute_velocities = not args.not_compute_velocities
     filter_positions = args.filter_positions
     pos_filter_order = args.pos_order
@@ -285,7 +275,6 @@ def main():
     if do_process_joint_data:
         joint_data = process_joint_data(
             joint_data=joint_data,
-            num_endpoints_to_remove=num_endpoints_to_remove,
             compute_velocities=compute_velocities,
             filter_positions=filter_positions,
             pos_filter_order=pos_filter_order,
