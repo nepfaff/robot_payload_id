@@ -184,6 +184,5 @@ def process_joint_data(
         ft_sensor_measurements=filtered_ft_sensor_measurements
         if joint_data.ft_sensor_measurements is not None
         else None,
-        ft_sensor_sample_times_s=joint_data.ft_sensor_sample_times_s,
     )
     return processed_joint_data
