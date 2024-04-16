@@ -78,6 +78,30 @@ def main():
         help="The cutoff frequency of the filter for the joint torques.",
     )
     parser.add_argument(
+        "--ft_sensor_force_order",
+        type=int,
+        default=10,
+        help="The order of the filter for the force from the FT sensor.",
+    )
+    parser.add_argument(
+        "--ft_sensor_force_cutoff_freq_hz",
+        type=float,
+        default=10.0,
+        help="The cutoff frequency of the filter for the force from the FT sensor.",
+    )
+    parser.add_argument(
+        "--ft_sensor_torque_order",
+        type=int,
+        default=10,
+        help="The order of the filter for the torque from the FT sensor.",
+    )
+    parser.add_argument(
+        "--ft_sensor_torque_cutoff_freq_hz",
+        type=float,
+        default=10.0,
+        help="The cutoff frequency of the filter for the torque from the FT sensor.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -105,6 +129,10 @@ def main():
         acc_cutoff_freq_hz=args.acc_cutoff_freq_hz,
         torque_filter_order=args.torque_order,
         torque_cutoff_freq_hz=args.torque_cutoff_freq_hz,
+        ft_sensor_force_order=args.ft_sensor_force_order,
+        ft_sensor_force_cutoff_freq_hz=args.ft_sensor_force_cutoff_freq_hz,
+        ft_sensor_torque_order=args.ft_sensor_torque_order,
+        ft_sensor_torque_cutoff_freq_hz=args.ft_sensor_torque_cutoff_freq_hz,
     )
 
     logging.info(f"Saving processed joint data to {output_dir}.")

@@ -149,21 +149,34 @@ def main():
         help="The cutoff frequency of the filter for the joint accelerations. Only used "
         + "if `--process_joint_data` is set.",
     )
-    # TODO: Add support for filtering F/T sensor data
-    # parser.add_argument(
-    #     "--torque_order",
-    #     type=int,
-    #     default=10,
-    #     help="The order of the filter for the joint torques. Only used if "
-    #     + "`--process_joint_data` is set.",
-    # )
-    # parser.add_argument(
-    #     "--torque_cutoff_freq_hz",
-    #     type=float,
-    #     default=10.0,
-    #     help="The cutoff frequency of the filter for the joint torques. Only used if "
-    #     + "`--process_joint_data` is set.",
-    # )
+    parser.add_argument(
+        "--ft_sensor_force_order",
+        type=int,
+        default=10,
+        help="The order of the filter for the force from the FT sensor. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--ft_sensor_force_cutoff_freq_hz",
+        type=float,
+        default=10.0,
+        help="The cutoff frequency of the filter for the force from the FT sensor. "
+        + "Only used if `--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--ft_sensor_torque_order",
+        type=int,
+        default=10,
+        help="The order of the filter for the torque from the FT sensor. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--ft_sensor_torque_cutoff_freq_hz",
+        type=float,
+        default=10.0,
+        help="The cutoff frequency of the filter for the torque from the FT sensor. "
+        + "Only used if `--process_joint_data` is set.",
+    )
     parser.add_argument(
         "--wandb_mode",
         type=str,
@@ -202,8 +215,10 @@ def main():
     vel_cutoff_freq_hz = args.vel_cutoff_freq_hz
     acc_filter_order = args.acc_order
     acc_cutoff_freq_hz = args.acc_cutoff_freq_hz
-    # torque_filter_order = args.torque_order
-    # torque_cutoff_freq_hz = args.torque_cutoff_freq_hz
+    ft_sensor_force_order = args.ft_sensor_force_order
+    ft_sensor_force_cutoff_freq_hz = args.ft_sensor_force_cutoff_freq_hz
+    ft_sensor_torque_order = args.ft_sensor_torque_order
+    ft_sensor_torque_cutoff_freq_hz = args.ft_sensor_torque_cutoff_freq_hz
     wandb_mode = args.wandb_mode
     perform_eval = not args.not_perform_eval
 
@@ -283,6 +298,10 @@ def main():
             vel_cutoff_freq_hz=vel_cutoff_freq_hz,
             acc_filter_order=acc_filter_order,
             acc_cutoff_freq_hz=acc_cutoff_freq_hz,
+            ft_sensor_force_order=ft_sensor_force_order,
+            ft_sensor_force_cutoff_freq_hz=ft_sensor_force_cutoff_freq_hz,
+            ft_sensor_torque_order=ft_sensor_torque_order,
+            ft_sensor_torque_cutoff_freq_hz=ft_sensor_torque_cutoff_freq_hz,
         )
     else:
         assert not np.isnan(np.sum(joint_data.joint_accelerations)), (
