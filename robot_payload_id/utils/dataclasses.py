@@ -45,6 +45,9 @@ class JointData:
     ft_sensor_measurements: Optional[np.ndarray] = None
     """The force-torque sensor measurements of shape (T, 6) and form
     [f_x, f_y, f_z, tau_x, tau_y, tau_z]."""
+    ft_sensor_sample_times_s: Optional[np.ndarray] = None
+    """The sample times in seconds of the force-torque sensor measurements of shape
+    (T,)."""
 
     def remove_duplicate_samples(self) -> "JointData":
         """
@@ -52,18 +55,23 @@ class JointData:
         rather than modifying the current one.
         """
         _, unique_indices = np.unique(self.sample_times_s, return_index=True)
-        return JointData(
+        joint_data = JointData(
             joint_positions=self.joint_positions[unique_indices],
             joint_velocities=self.joint_velocities[unique_indices],
             joint_accelerations=self.joint_accelerations[unique_indices],
             joint_torques=self.joint_torques[unique_indices],
             sample_times_s=self.sample_times_s[unique_indices],
-            ft_sensor_measurements=(
-                None
-                if self.ft_sensor_measurements is None
-                else self.ft_sensor_measurements[unique_indices]
-            ),
         )
+        if self.ft_sensor_sample_times_s is not None:
+            _, unique_ft_indices = np.unique(
+                self.ft_sensor_sample_times_s, return_index=True
+            )
+            joint_data.ft_sensor_measurements = self.ft_sensor_measurements[
+                unique_ft_indices
+            ]
+            joint_data.ft_sensor_sample_times_s = self.ft_sensor_sample_times_s[
+                unique_ft_indices
+            ]
 
     def save_to_disk(self, path: Path) -> None:
         """Saves the joint data to disk.
@@ -79,6 +87,10 @@ class JointData:
         np.save(path / "sample_times_s.npy", self.sample_times_s)
         if self.ft_sensor_measurements is not None:
             np.save(path / "ft_sensor_measurements.npy", self.ft_sensor_measurements)
+        if self.ft_sensor_sample_times_s is not None:
+            np.save(
+                path / "ft_sensor_sample_times_s.npy", self.ft_sensor_sample_times_s
+            )
 
     @classmethod
     def load_from_disk(cls, path: Path) -> "JointData":
@@ -91,6 +103,7 @@ class JointData:
             The joint data.
         """
         ft_sensor_measurements_path = path / "ft_sensor_measurements.npy"
+        ft_sensor_sample_times_path = path / "ft_sensor_sample_times_s.npy"
         return cls(
             joint_positions=np.load(path / "joint_positions.npy"),
             joint_velocities=np.load(path / "joint_velocities.npy"),
@@ -100,6 +113,11 @@ class JointData:
             ft_sensor_measurements=(
                 np.load(ft_sensor_measurements_path)
                 if ft_sensor_measurements_path.exists()
+                else None
+            ),
+            ft_sensor_sample_times_s=(
+                np.load(ft_sensor_sample_times_path)
+                if ft_sensor_sample_times_path.exists()
                 else None
             ),
         )

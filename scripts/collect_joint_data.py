@@ -6,10 +6,17 @@ from pathlib import Path
 
 import numpy as np
 
+# export PYTHONPATH=~/src/ft_300s_driver/bazel-bin/lcmtypes/ft_300s/:${PYTHONPATH}
+try:
+    from ft_reading_t import ft_reading_t
+except ImportError:
+    logging.warning("Failed to import `ft_reading_t`. Won't be able to log FT data.")
+
 from iiwa_setup.controllers import (
     InverseDynamicsControllerWithGravityCompensationCancellation,
 )
 from iiwa_setup.iiwa import IiwaHardwareStationDiagram
+from iiwa_setup.sensors import FTSensorDataReceiver
 from manipulation.station import LoadScenario
 from pydrake.all import (
     ApplySimulatorConfig,
@@ -18,6 +25,9 @@ from pydrake.all import (
     ConstantVectorSource,
     Demultiplexer,
     DiagramBuilder,
+    DrakeLcm,
+    LcmInterfaceSystem,
+    LcmSubscriberSystem,
     MeshcatVisualizer,
     PiecewisePolynomial,
     Simulator,
@@ -108,6 +118,11 @@ def main():
         help="The period at which to log data.",
     )
     parser.add_argument(
+        "--log_ft_data",
+        action="store_true",
+        help="Whether to log the FT sensor data.",
+    )
+    parser.add_argument(
         "--html_path",
         type=Path,
         default=None,
@@ -132,6 +147,7 @@ def main():
     duration_to_remove_at_start = args.duration_to_remove_at_start
     noise_scale = args.noise_scale
     logging_period = args.logging_period
+    log_ft_data = args.log_ft_data
     html_path = args.html_path
 
     assert not (use_hardware and noise_scale > 0.0)
@@ -251,6 +267,29 @@ def main():
             wsg_const_pos_source.get_output_port(), station.GetInputPort("wsg.position")
         )
 
+    if log_ft_data:
+        lcm = DrakeLcm()
+        lcm_system = builder.AddNamedSystem(
+            "lcm_interface_system", LcmInterfaceSystem(lcm)
+        )
+        ft_sensor_subscriber: LcmSubscriberSystem = builder.AddNamedSystem(
+            "ft_sensor_subscriber",
+            LcmSubscriberSystem.Make(
+                channel="FT300S_SENSOR_DATA",
+                lcm_type=ft_reading_t,
+                lcm=lcm_system,
+                use_cpp_serializer=False,
+                wait_for_message_on_initialization_timeout=10,
+            ),
+        )
+        ft_sensor_data_receiver: FTSensorDataReceiver = builder.AddNamedSystem(
+            "ft_sensor_data_receiver", FTSensorDataReceiver()
+        )
+        builder.Connect(
+            ft_sensor_subscriber.get_output_port(),
+            ft_sensor_data_receiver.get_input_port(),
+        )
+
     # Add data loggers
     desired_state_demux = builder.AddNamedSystem(
         "desired_state_demux", Demultiplexer(output_ports_sizes=[7, 7])
@@ -287,6 +326,12 @@ def main():
         "measured_torque_logger",
         VectorLogSink(num_positions, publish_period=logging_period),
     )
+    if log_ft_data:
+        # The FT 300-S sensor publishes at 100Hz.
+        ft_logger: VectorLogSink = builder.AddNamedSystem(
+            "ft_logger",
+            VectorLogSink(input_size=6, publish_period=np.min([1e-2, logging_period])),
+        )
     builder.Connect(
         desired_state_demux.get_output_port(0),
         commanded_position_logger.get_input_port(),
@@ -315,6 +360,11 @@ def main():
         station.GetOutputPort("iiwa.torque_measured"),
         measured_torque_logger.get_input_port(),
     )
+    if log_ft_data:
+        builder.Connect(
+            ft_sensor_data_receiver.GetOutputPort("ft_measured"),
+            ft_logger.get_input_port(),
+        )
 
     visualizer = MeshcatVisualizer.AddToBuilder(
         builder, station.GetOutputPort("query_object"), station.internal_meshcat
@@ -377,6 +427,10 @@ def main():
         simulator.get_context()
     ).sample_times()
 
+    if log_ft_data:
+        ft_data = ft_logger.FindLog(simulator.get_context()).data().T
+        ft_sample_times_s = ft_logger.FindLog(simulator.get_context()).sample_times()
+
     if only_log_excitation_traj_data:
         # Only keep data during excitation trajectory execution
         data_start_time = (
@@ -412,6 +466,14 @@ def main():
         # Shift sample times to start at 0
         sample_times_s -= sample_times_s[0]
 
+        if log_ft_data:
+            ft_start_idx = np.argmax(ft_sample_times_s >= data_start_time)
+            ft_end_idx = np.argmax(ft_sample_times_s >= excitation_traj_end_time)
+            ft_data = ft_data[ft_start_idx:ft_end_idx]
+            ft_sample_times_s = ft_sample_times_s[ft_start_idx:ft_end_idx]
+            # Shift sample times to start at 0
+            ft_sample_times_s -= ft_sample_times_s[0]
+
     # Remove duplicated samples
     _, unique_indices = np.unique(sample_times_s, return_index=True)
     commanded_position_data = commanded_position_data[unique_indices]
@@ -422,6 +484,10 @@ def main():
     commanded_torque_data = commanded_torque_data[unique_indices]
     measured_torque_data = measured_torque_data[unique_indices]
     sample_times_s = sample_times_s[unique_indices]
+    if log_ft_data:
+        _, ft_unique_indices = np.unique(ft_sample_times_s, return_index=True)
+        ft_data = ft_data[ft_unique_indices]
+        ft_sample_times_s = ft_sample_times_s[ft_unique_indices]
 
     # Add noise
     if noise_scale > 0.0:
@@ -446,6 +512,8 @@ def main():
             joint_accelerations=np.zeros_like(measured_position_data) * np.nan,
             joint_torques=measured_torque_data,
             sample_times_s=sample_times_s,
+            ft_sensor_measurements=ft_data if log_ft_data else None,
+            ft_sensor_sample_times_s=ft_sample_times_s if log_ft_data else None,
         )
         joint_data.save_to_disk(save_data_path)
 
