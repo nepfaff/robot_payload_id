@@ -322,7 +322,7 @@ def solve_ft_payload_sdp(
 
     Args:
         ft_data_matrix (np.ndarray): The spatial payload data matrix of shape
-            (N * 6, 10) where N is the number of data points.
+            (N * 6, 16) where N is the number of data points.
         ft_data (np.ndarray): The wrist F/T sensor data of shape (N * 6,) where N is the
             number of data points. Each data point has form [Fx, Fy, Fz, Tx, Ty, Tz].
         solver_kPrintToConsole (bool, optional): Whether to print solver output.
@@ -353,7 +353,8 @@ def solve_ft_payload_sdp(
         Iyz=prog.NewContinuousVariables(1, f"Iyz")[0],
         Izz=prog.NewContinuousVariables(1, f"Izz")[0],
     )
-    variable_vec = variables.get_lumped_param_list()
+    offset_vars = prog.NewContinuousVariables(6, "offset")
+    variable_vec = np.concatenate((variables.get_lumped_param_list(), offset_vars))
     variable_names = np.array([var.get_name() for var in variable_vec])
 
     # Normalize cost

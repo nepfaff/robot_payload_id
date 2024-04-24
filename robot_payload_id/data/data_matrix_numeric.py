@@ -320,10 +320,11 @@ def construct_ft_matrix(
     angular_acceleration: np.ndarray,
 ) -> np.ndarray:
     """
-    Constructs the 6x10 matrix that maps the inertial parameters to the force-torque
+    Constructs the 6x16 matrix that maps the inertial parameters to the force-torque
     sensor measurements. The equations take the form [f, tau] = mat * alpha, where f
     and tau are the force and torque measurements, and alpha are the lumped inertial
-    parameters of form [m, hx, hy, hz, Ixx, Ixy, Ixz, Iyy, Iyz, Izz].
+    parameters of form [m, hx, hy, hz, Ixx, Ixy, Ixz, Iyy, Iyz, Izz, fx, fy, fz, tx,
+    ty, tz] where fx, fy, fz, tx, ty, tz are F/T sensor offsets that can be ignored.
     All parameters and measurements should be expressed in the sensor frame S.
 
     See equation 5 in "Improving Force Control Performance by Computational Elimination
@@ -340,7 +341,7 @@ def construct_ft_matrix(
             (3,). Expressed in the sensor frame. alpha_WS_S.
 
     Returns:
-        np.ndarray: The 6x10 matrix that maps the inertial parameters to the
+        np.ndarray: The 6x16 matrix that maps the inertial parameters to the
             force-torque sensor measurements.
     """
     mat = np.zeros((6, 10))
@@ -404,7 +405,8 @@ def construct_ft_matrix(
         angular_acceleration[1] + angular_velocity[0] * angular_velocity[2],
         angular_acceleration[2],
     ]
-    return mat
+    mat_with_offsets = np.concatenate((mat, np.eye(6)), axis=1)
+    return mat_with_offsets
 
 
 def construct_ft_data_matrix(
@@ -429,7 +431,7 @@ def construct_ft_data_matrix(
         use_progress_bar (bool, optional): Whether to use a progress bar.
 
     Returns:
-        np.ndarray: The numeric data matrix of shape (num_joints * num_timesteps, 10).
+        np.ndarray: The numeric data matrix of shape (num_joints * num_timesteps, 16).
     """
     plant = plant_components.plant
     context = plant_components.plant_context
@@ -442,7 +444,7 @@ def construct_ft_data_matrix(
     X_SF = measurement_frame.CalcPose(context, ft_sensor_body_frame)
 
     num_timesteps = len(joint_data.sample_times_s)
-    data_matrix = np.zeros((num_timesteps * 6, 10))
+    data_matrix = np.zeros((num_timesteps * 6, 16))
     for i in tqdm(
         range(num_timesteps),
         desc="Extracting data matrix",
