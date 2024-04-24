@@ -50,31 +50,31 @@ def create_arm(
     )
 
     # Add Controller
-    controller_plant = MultibodyPlant(time_step)
-    controller_parser = get_parser(controller_plant)
-    controller_parser.AddModels(arm_file_path)
-    controller_plant.Finalize()
-    arm_controller = builder.AddSystem(
-        InverseDynamicsController(
-            controller_plant,
-            kp=[100] * num_joints,
-            kd=[10] * num_joints,
-            ki=[1] * num_joints,
-            has_reference_acceleration=False,
-        )
-    )
-    arm_controller.set_name("arm_controller")
-    builder.Connect(
-        plant.get_state_output_port(arm),
-        arm_controller.get_input_port_estimated_state(),
-    )
-    builder.Connect(
-        arm_controller.get_output_port_control(), plant.get_actuation_input_port(arm)
-    )
-    builder.Connect(
-        trajectory_source.get_output_port(),
-        arm_controller.get_input_port_desired_state(),
-    )
+    # controller_plant = MultibodyPlant(time_step)
+    # controller_parser = get_parser(controller_plant)
+    # controller_parser.AddModels(arm_file_path)
+    # controller_plant.Finalize()
+    # arm_controller = builder.AddSystem(
+    #     InverseDynamicsController(
+    #         controller_plant,
+    #         kp=[100] * num_joints,
+    #         kd=[10] * num_joints,
+    #         ki=[1] * num_joints,
+    #         has_reference_acceleration=False,
+    #     )
+    # )
+    # arm_controller.set_name("arm_controller")
+    # builder.Connect(
+    #     plant.get_state_output_port(arm),
+    #     arm_controller.get_input_port_estimated_state(),
+    # )
+    # builder.Connect(
+    #     arm_controller.get_output_port_control(), plant.get_actuation_input_port(arm)
+    # )
+    # builder.Connect(
+    #     trajectory_source.get_output_port(),
+    #     arm_controller.get_input_port_desired_state(),
+    # )
 
     # Meshcat
     if use_meshcat:
@@ -89,9 +89,9 @@ def create_arm(
         meshcat_visualizer = None
 
     state_logger = LogVectorOutput(plant.get_state_output_port(), builder)
-    commanded_torque_logger = LogVectorOutput(
-        arm_controller.get_output_port_control(), builder
-    )
+    # commanded_torque_logger = LogVectorOutput(
+    #     arm_controller.get_output_port_control(), builder
+    # )
 
     diagram = builder.Build()
 
@@ -101,7 +101,7 @@ def create_arm(
         plant=plant,
         trajectory_source=trajectory_source,
         state_logger=state_logger,
-        commanded_torque_logger=commanded_torque_logger,
+        commanded_torque_logger=None,
         meshcat=meshcat,
         meshcat_visualizer=meshcat_visualizer,
     )
