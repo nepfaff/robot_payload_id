@@ -122,6 +122,11 @@ def main():
         help="Whether to log the FT sensor data.",
     )
     parser.add_argument(
+        "--zero_ft_sensor",
+        action="store_true",
+        help="Whether to zero the simulated FT sensor data.",
+    )
+    parser.add_argument(
         "--html_path",
         type=Path,
         default=None,
@@ -147,6 +152,7 @@ def main():
     noise_scale = args.noise_scale
     logging_period = args.logging_period
     log_ft_data = args.log_ft_data
+    zero_ft_sensor = args.zero_ft_sensor
     html_path = args.html_path
 
     assert not (use_hardware and noise_scale > 0.0)
@@ -500,6 +506,10 @@ def main():
     sample_times_s = sample_times_s[unique_indices]
     if log_ft_data:
         ft_data = ft_data[unique_indices]
+
+    if log_ft_data and zero_ft_sensor and not use_hardware:
+        # Simulate zeroing the F/T sensor.
+        ft_data -= ft_data[0]
 
     # Add noise
     if noise_scale > 0.0:
