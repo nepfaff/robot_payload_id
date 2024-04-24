@@ -1145,10 +1145,10 @@ files = []
 develop = false
 
 [package.dependencies]
-drake = "^1.27.0"
+drake = "^1.28.0"
 hydra-core = "^1.3.2"
 ipython = "^8.15.0"
-manipulation = {git = "https://github.com/RussTedrake/manipulation.git", rev = "a2d393fdad5e6079db53b0c4e749e2a7fbc935b0"}
+manipulation = {git = "https://github.com/RussTedrake/manipulation.git", rev = "341772fa8ee4dbc121f44b1b46ad352dac5e34a0"}
 numpy = "^1.25.2"
 omegaconf = "^2.3.0"
 pyyaml = "^6.0.1"
@@ -1157,8 +1157,8 @@ tqdm = "^4.66.1"
 [package.source]
 type = "git"
 url = "https://github.com/nepfaff/iiwa_setup.git"
-reference = "f0d5bbfc8378313bb88721e13cb909928e9ff31f"
-resolved_reference = "f0d5bbfc8378313bb88721e13cb909928e9ff31f"
+reference = "67545f4269f1532c3de0b46d21bd208f313e57cf"
+resolved_reference = "67545f4269f1532c3de0b46d21bd208f313e57cf"
 
 [[package]]
 name = "imageio"
@@ -1623,7 +1623,7 @@ numpy = {version = "*", markers = "python_version < \"3.12\""}
 
 [[package]]
 name = "manipulation"
-version = "2024.04.08"
+version = "2024.04.22"
 description = "MIT 6.421 - Robotic Manipulation"
 optional = false
 python-versions = "<4.0,>=3.10"
@@ -1632,7 +1632,7 @@ develop = false
 
 [package.dependencies]
 cloudpickle = "2.2.1"
-drake = ">=1.27.0"
+drake = ">=1.28.0"
 gradescope-utils = ">=0.4.0"
 mpld3 = ">=0.5.6"
 nevergrad = ">=0.4.3"
@@ -1649,8 +1649,8 @@ vhacdx = ">=0.0.5"
 [package.source]
 type = "git"
 url = "https://github.com/RussTedrake/manipulation.git"
-reference = "a2d393fdad5e6079db53b0c4e749e2a7fbc935b0"
-resolved_reference = "a2d393fdad5e6079db53b0c4e749e2a7fbc935b0"
+reference = "341772fa8ee4dbc121f44b1b46ad352dac5e34a0"
+resolved_reference = "341772fa8ee4dbc121f44b1b46ad352dac5e34a0"
 
 [[package]]
 name = "markdown-it-py"
@@ -4060,4 +4060,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "0e4091739267b6b06394171e2083ffcadc1bd08573a8f0a280d2010a8b4f0052"
+content-hash = "216702562d0916f54ff2bca1e6e77f738527d5a1071cf162ccfd4c7fe1ad7002"
