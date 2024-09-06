@@ -755,18 +755,18 @@ six = ">=1.4.0"
 
 [[package]]
 name = "drake"
-version = "1.28.0"
+version = "1.32.0"
 description = "Model-based design and verification for robotics"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 files = [
-    {file = "drake-1.28.0-cp310-cp310-manylinux_2_35_x86_64.whl", hash = "sha256:52736b7fad15069c5c071a1bdf247c32b813cd73977e8bb690b50b129c230340"},
-    {file = "drake-1.28.0-cp311-cp311-macosx_12_0_x86_64.whl", hash = "sha256:10670b8f63d88e72da19f09598aaa5016e3e6211d186691deaeb8f9f203d32db"},
-    {file = "drake-1.28.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:31dc1aead2dbeee06c073164f76fc93b5db11f1a12d4ebaca700e9e2fb3fb319"},
-    {file = "drake-1.28.0-cp311-cp311-manylinux_2_35_x86_64.whl", hash = "sha256:d530cf37055b2058a86798c6ecde8179a3b3e0a9bb36c5703a37233f54bd7d95"},
-    {file = "drake-1.28.0-cp312-cp312-macosx_12_0_x86_64.whl", hash = "sha256:ffcdfb7c957ead6bec43766b101811a9968a44bf8f19cf5044fbe10131092d4a"},
-    {file = "drake-1.28.0-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:7bf7ecdc26450177f79f0a3816eb1ce360cffff0a2fcdfb76947a6f9dbed306b"},
-    {file = "drake-1.28.0-cp312-cp312-manylinux_2_35_x86_64.whl", hash = "sha256:81dcbf7133029dd5963a4599cfaee88169c3a0941d17e68bb23227ca5cebbea3"},
+    {file = "drake-1.32.0-cp310-cp310-manylinux_2_35_x86_64.whl", hash = "sha256:5765ac7225817dc4666a33bfd4d353c079b775f491e6fc9e729990ee9f4b09da"},
+    {file = "drake-1.32.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:01f0dcb37283cc56576b257e8bf3bdb13e75d63154d93f8c00e105be4ca80b02"},
+    {file = "drake-1.32.0-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:ee5aa8848a08a26c15f4529f51de58f3280fe243068ad9e7bfb1f6aec71eb00f"},
+    {file = "drake-1.32.0-cp311-cp311-manylinux_2_35_x86_64.whl", hash = "sha256:63f95b03777e8e513c98940c2ffba349742c584bd682dd97acc88e1a6c0af152"},
+    {file = "drake-1.32.0-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:b23b0706c0833aab5ba6da8ce1684549cdf34c473d3a9b4827b0b864ec726a7e"},
+    {file = "drake-1.32.0-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:56b031a355e91a1e67da8dedc62258272db2615202f733f439b34f7ff380850c"},
+    {file = "drake-1.32.0-cp312-cp312-manylinux_2_35_x86_64.whl", hash = "sha256:d689165d3e46461a31aacb76c818ce519adabccf505c40a0c4697ee2f7a23566"},
 ]
 
 [package.dependencies]
@@ -1157,8 +1157,8 @@ tqdm = "^4.66.1"
 [package.source]
 type = "git"
 url = "https://github.com/nepfaff/iiwa_setup.git"
-reference = "67545f4269f1532c3de0b46d21bd208f313e57cf"
-resolved_reference = "67545f4269f1532c3de0b46d21bd208f313e57cf"
+reference = "d2260c7d44f24092cbba6e9d717d71b0d6628883"
+resolved_reference = "d2260c7d44f24092cbba6e9d717d71b0d6628883"
 
 [[package]]
 name = "imageio"
@@ -4060,4 +4060,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "216702562d0916f54ff2bca1e6e77f738527d5a1071cf162ccfd4c7fe1ad7002"
+content-hash = "a387d0eb62548a458761c88b09a725b1044781dc987d2fe20c2624a9ca546982"
