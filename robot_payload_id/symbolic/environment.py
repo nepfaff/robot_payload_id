@@ -169,7 +169,6 @@ def create_symbolic_plant(
         #     [hx, hy, hz],
         #     RotationalInertia_[sym.Expression](Ixx, Iyy, Izz, Ixy, Ixz, Iyz),
         # )
-        print("Calling SetSpatialInertiaInBodyFrame with inertia:\n", inertia)
         link.SetSpatialInertiaInBodyFrame(sym_plant_context, inertia)
 
     return ArmPlantComponents(
