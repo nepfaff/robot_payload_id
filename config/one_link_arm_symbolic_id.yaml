@@ -1,5 +1,5 @@
 # Robotic arm
-urdf_path: "models/one_link_arm.urdf"
+urdf_path: "models/one_link_arm.sdf"
 time_step: 0.0
 num_joints: 1
 
@@ -14,9 +14,15 @@ gt_parameters:
   - _target_: robot_payload_id.utils.dataclasses.JointParameters
     m: 0.6
     cx: 0.0
+    cy: -1.0 # Not identifiable
     cz: -0.5
+    Gxx: -1.0 # Not identifiable
+    Gxy: -1.0 # Not identifiable
+    Gxz: -1.0 # Not identifiable
     # Transform inertia from CoM frame to origin frame (0.05 + 0.6 * (-0.5) ** 2) / 0.6)
     Gyy: 0.33333333333333337
+    Gyz: -1.0 # Not identifiable
+    Gzz: -1.0 # Not identifiable
 
 # Logging (Paths relative to Hydra log dir)
 log_dir_path: "logs/one_link_arm_symbolic_id"

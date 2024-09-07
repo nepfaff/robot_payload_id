@@ -122,19 +122,19 @@ def collect_joint_data(
             base_frequency_idx=i,
         )
 
-        arm_components.meshcat_visualizer.StartRecording()
+        # arm_components.meshcat_visualizer.StartRecording()
         data = generate_joint_data(
             arm_components=arm_components,
             joint_trajectory=q_traj,
             trajectory_duration_s=trajectory_duration_s,
         )
 
-        arm_components.meshcat_visualizer.StopRecording()
-        arm_components.meshcat_visualizer.PublishRecording()
-        if log_dir_path is not None:
-            html = arm_components.meshcat.StaticHtml()
-            with open(log_dir_path / f"meshcat_{i}.html", "w") as f:
-                f.write(html)
+        # arm_components.meshcat_visualizer.StopRecording()
+        # arm_components.meshcat_visualizer.PublishRecording()
+        # if log_dir_path is not None:
+        #     html = arm_components.meshcat.StaticHtml()
+        #     with open(log_dir_path / f"meshcat_{i}.html", "w") as f:
+        #         f.write(html)
 
         joint_datas.append(data)
 

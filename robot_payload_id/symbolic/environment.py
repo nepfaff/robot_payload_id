@@ -155,21 +155,21 @@ def create_symbolic_plant(
         # print("-----------------")
 
         # Add the symbolic parameters to the plant
-        # com = [cx, cy, cz]
-        # unit_inertia = UnitInertia_[sym.Expression](
-        #     Ixx=Gxx, Ixy=Gxy, Ixz=Gxz, Iyy=Gyy, Iyz=Gyz, Izz=Gzz
-        # )
-        # inertia = SpatialInertia_[sym.Expression](
-        #     m, com, unit_inertia, skip_validity_check=False
-        # )
-        inertia: SpatialInertia = SpatialInertia_[
-            sym.Expression
-        ]().MakeFromLumpedParameters(
-            m,
-            [hx, hy, hz],
-            RotationalInertia_[sym.Expression](Ixx, Iyy, Izz, Ixy, Ixz, Iyz),
+        com = [cx, cy, cz]
+        unit_inertia = UnitInertia_[sym.Expression](
+            Ixx=Gxx, Ixy=Gxy, Ixz=Gxz, Iyy=Gyy, Iyz=Gyz, Izz=Gzz
         )
-        # print("Calling SetSpatialInertiaInBodyFrame with inertia:\n", inertia)
+        inertia = SpatialInertia_[sym.Expression](
+            m, com, unit_inertia, skip_validity_check=False
+        )
+        # inertia: SpatialInertia = SpatialInertia_[
+        #     sym.Expression
+        # ]().MakeFromLumpedParameters(
+        #     m,
+        #     [hx, hy, hz],
+        #     RotationalInertia_[sym.Expression](Ixx, Iyy, Izz, Ixy, Ixz, Iyz),
+        # )
+        print("Calling SetSpatialInertiaInBodyFrame with inertia:\n", inertia)
         link.SetSpatialInertiaInBodyFrame(sym_plant_context, inertia)
 
     return ArmPlantComponents(
