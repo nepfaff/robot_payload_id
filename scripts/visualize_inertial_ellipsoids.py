@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import os
 
 from pathlib import Path
 
@@ -13,11 +14,10 @@ from pydrake.all import (
     BodyIndex,
     DiagramBuilder,
     Ellipsoid,
-    IllustrationProperties,
     MeshcatVisualizer,
+    MeshcatVisualizerParams,
     MultibodyPlant,
     Rgba,
-    RoleAssign,
     Simulator,
     SpatialInertia,
     StartMeshcat,
@@ -89,41 +89,19 @@ def main():
 
     plant.Finalize()
 
-    # Make existing visual geometries transparent
-    for i in range(plant.num_bodies()):
-        body = plant.get_body(BodyIndex(i))
-        visual_geometry_ids = plant.GetVisualGeometriesForBody(body)
-        for geometry_id in visual_geometry_ids:
-            old_props = scene_graph.model_inspector().GetIllustrationProperties(
-                geometry_id
-            )
-            new_props = IllustrationProperties(old_props)
-            old_rgba = old_props.GetProperty("phong", "diffuse")
-            new_props.UpdateProperty(
-                group_name="phong",
-                name="diffuse",
-                value=Rgba(
-                    r=old_rgba.r(),
-                    g=old_rgba.g(),
-                    b=old_rgba.b(),
-                    a=existing_model_alpha,
-                ),
-            )
-            scene_graph.AssignRole(
-                source_id=plant.get_source_id(),
-                geometry_id=geometry_id,
-                properties=new_props,
-                assign=RoleAssign.kReplace,
-            )
-
     # Create meshcat
     meshcat = StartMeshcat()
-    _ = MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat)
+    visualizer_params = MeshcatVisualizerParams(
+        enable_alpha_slider=False,
+        initial_alpha_slider_value=existing_model_alpha,
+    )
+    _ = MeshcatVisualizer.AddToBuilder(builder, scene_graph, meshcat, visualizer_params)
+
     diagram = builder.Build()
-    context = diagram.CreateDefaultContext()
-    plant_context = plant.GetMyMutableContextFromRoot(context)
 
     # Load parameters
+    context = diagram.CreateDefaultContext()
+    plant_context = plant.GetMyMutableContextFromRoot(context)
     if initial_param_path is not None:
         logging.info(f"Loading initial parameters from {initial_param_path}.")
         var_sol_dict = np.load(initial_param_path, allow_pickle=True).item()
@@ -199,10 +177,27 @@ def main():
         )
         meshcat.SetTransform(path=f"ellipsoid_{i}", X_ParentPath=X_WE)
 
-    # Simulate
     simulator = Simulator(diagram, context=context)
     simulator.set_target_realtime_rate(1.0)
-    simulator.AdvanceTo(5.0)
+    simulator.Initialize()
+
+    # Make existing visual geometries transparent
+    for i in range(plant.num_bodies()):
+        body = plant.get_body(BodyIndex(i))
+        if body.name() == "world":
+            continue
+        meshcat_body_path = os.path.join(
+            "visualizer", *body.scoped_name().to_string().split("::")
+        )
+        for idx in plant.GetVisualGeometriesForBody(body):
+            meshcat_path = os.path.join(
+                meshcat_body_path, str(idx.get_value()), "<object>"
+            )
+            meshcat.SetProperty(meshcat_path, "opacity", existing_model_alpha)
+
+    # Simulate
+    while True:
+        simulator.AdvanceTo(simulator.get_context().get_time() + 1.0)
 
 
 if __name__ == "__main__":
