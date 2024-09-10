@@ -10,7 +10,8 @@ model_drivers:
         lcm_bus: "default"
         hand_model_name: wsg
         control_mode: torque_only
-    wsg: !SchunkWsgDriver {}
+    wsg: !SchunkWsgDriver
+        lcm_bus: "default"
 lcm_buses:
     default:
         lcm_url: ""

@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import os
 
@@ -28,8 +29,8 @@ from pydrake.all import (
 from robot_payload_id.control import (
     ExcitationTrajectorySourceInitializer,
     FourierSeriesTrajectory,
+    WSGTrajectorySourceInitializer,
 )
-from robot_payload_id.environment import create_arm
 from robot_payload_id.utils import (
     ArmComponents,
     BsplineTrajectoryAttributes,
@@ -71,6 +72,20 @@ def main():
         "--use_hardware",
         action="store_true",
         help="Whether to use real world hardware.",
+    )
+    parser.add_argument(
+        "--q_pickup",
+        type=json.loads,
+        default=[
+            -1.433,
+            0.53,
+            0.023,
+            -1.84,
+            0.09,
+            -0.79,
+            -0.08,
+        ],
+        help="The pickup joint positions that are used when a WSG exists.",
     )
     parser.add_argument(
         "--time_horizon",
@@ -127,6 +142,7 @@ def main():
     robot_param_path = args.robot_param_path
     save_data_path = args.save_data_path
     use_hardware = args.use_hardware
+    q_pickup = args.q_pickup
     time_horizon = args.time_horizon
     only_log_excitation_traj_data = args.only_log_excitation_traj_data
     duration_to_remove_at_start = args.duration_to_remove_at_start
@@ -200,6 +216,7 @@ def main():
                 station=station,
                 excitaiton_traj=excitation_traj,
                 traj_source=traj_source,
+                q_pickup=np.array(q_pickup) if has_wsg else None,
             ),
         )
     )
@@ -241,14 +258,34 @@ def main():
     )
     builder.Connect(controller.get_output_port(), station.GetInputPort("iiwa.torque"))
 
-    # TODO: Decide what to do there. Do we want to open for 5s and then grip tightly?
-    # If yes, then force control would be better than position control.
     if has_wsg:
-        wsg_const_pos_source: ConstantVectorSource = builder.AddNamedSystem(
-            "wsg_position_source", ConstantVectorSource(source_value=0.05 * np.ones(1))
+        # Add a placeholder traj.
+        wsg_traj_source: TrajectorySource = builder.AddNamedSystem(
+            "wsg_trajectory_source",
+            TrajectorySource(
+                trajectory=PiecewisePolynomial.ZeroOrderHold(
+                    [0.0, 1.0], np.zeros((1, 2))
+                ),
+            ),
         )
         builder.Connect(
-            wsg_const_pos_source.get_output_port(), station.GetInputPort("wsg.position")
+            wsg_traj_source.get_output_port(), station.GetInputPort("wsg.position")
+        )
+
+        builder.AddNamedSystem(
+            "wsg_trajectory_source_initializer",
+            WSGTrajectorySourceInitializer(
+                traj_source=wsg_traj_source,
+                traj_source_initializer=traj_source_initializer,
+            ),
+        )
+
+        # Increase max force.
+        wsg_force_source = builder.AddNamedSystem(
+            "wsg_force_source", ConstantVectorSource([80.0])
+        )
+        builder.Connect(
+            wsg_force_source.get_output_port(), station.GetInputPort("wsg.force_limit")
         )
 
     # Add data loggers
