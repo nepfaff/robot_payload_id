@@ -163,6 +163,13 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
         iiwa_controller_plant = self._station.get_iiwa_controller_plant()
         q_current = self._iiwa_position_measured_input_port.Eval(context)
 
+        # Stay at the current pose for 5s before moving.
+        pause_traj_end_time = 5.0
+        initial_pause_traj = PiecewisePolynomial.ZeroOrderHold(
+            breaks=[0.0, pause_traj_end_time],
+            samples=np.stack([q_current, q_current], axis=1),
+        )
+
         start_traj = plan_unconstrained_gcs_path_start_to_goal(
             plant=iiwa_controller_plant,
             q_start=q_current,
@@ -188,9 +195,19 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
             )
             * self._start_traj_limit_fraction,
         )
-        self._excitation_traj_start_time = start_traj_retimed.end_time()
 
-        # Delay the excitation trajectory to start after the start trajectory ends
+        # Delay the start trajectory to start after the pause trajectory ends.
+        start_traj_time = PiecewisePolynomial().FirstOrderHold(
+            [0.0, start_traj_retimed.end_time()],
+            [[0.0, start_traj_retimed.end_time()]],
+        )
+        start_traj_time.shiftRight(pause_traj_end_time)
+        start_traj_delayed = PathParameterizedTrajectory(
+            path=start_traj_retimed, time_scaling=start_traj_time
+        )
+
+        # Delay the excitation trajectory to start after the start trajectory ends.
+        self._excitation_traj_start_time = start_traj_delayed.end_time()
         excitation_traj_time = PiecewisePolynomial().FirstOrderHold(
             [0.0, self._excitation_traj.end_time()],
             [[0.0, self._excitation_traj.end_time()]],
@@ -201,7 +218,7 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
         )
 
         self._combined_traj = CompositeTrajectory(
-            [start_traj_retimed, excitation_traj_delayed]
+            [initial_pause_traj, start_traj_delayed, excitation_traj_delayed]
         )
         self._traj_source.UpdateTrajectory(self._combined_traj)
 
