@@ -274,6 +274,9 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
             [0.0, self._excitation_traj.end_time()],
             [[0.0, self._excitation_traj.end_time()]],
         )
+        self._excitation_traj_end_time = (
+            self._excitation_traj.end_time() + self._excitation_traj_start_time
+        )
         excitation_traj_time.shiftRight(self._excitation_traj_start_time)
         excitation_traj_delayed = PathParameterizedTrajectory(
             path=self._excitation_traj, time_scaling=excitation_traj_time
@@ -339,6 +342,9 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
 
     def get_excitation_traj_start_time(self) -> float:
         return self._excitation_traj_start_time
+
+    def get_excitation_traj_end_time(self) -> float:
+        return self._excitation_traj_end_time
 
     def get_pickup_pause_end_time(self) -> Union[float, None]:
         return self._pickup_pause_end_time

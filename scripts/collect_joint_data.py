@@ -419,7 +419,9 @@ def main():
         data_start_time = (
             traj_source_initializer.get_excitation_traj_start_time()
         ) + duration_to_remove_at_start
-        excitation_traj_end_time = traj_source_initializer.get_end_time()
+        excitation_traj_end_time = (
+            traj_source_initializer.get_excitation_traj_end_time()
+        )
         excitation_traj_start_idx = np.argmax(sample_times_s >= data_start_time)
         excitation_traj_end_idx = np.argmax(sample_times_s >= excitation_traj_end_time)
         commanded_position_data = commanded_position_data[
@@ -498,6 +500,7 @@ def main():
             commanded_acceleration_data,
         )
         np.save(save_data_path / "commanded_joint_torques.npy", commanded_torque_data)
+        print(f"Collected {len(sample_times_s)} data samples.")
 
     # Print tracking statistics
     print(
