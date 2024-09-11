@@ -76,16 +76,14 @@ def main():
     parser.add_argument(
         "--q_pickup",
         type=json.loads,
-        default=[
-            -1.433,
-            0.53,
-            0.023,
-            -1.84,
-            0.09,
-            -0.79,
-            -0.08,
-        ],
+        default=[-1.433, 0.53, 0.023, -1.84, 0.09, -0.79, -0.08],
         help="The pickup joint positions that are used when a WSG exists.",
+    )
+    parser.add_argument(
+        "--q_dropoff",
+        type=json.loads,
+        default=[0.01, 0.34, -0.39, -1.84, 0.05, 0.97, -0.03],
+        help="The drop off joint positions that are used when a WSG exists.",
     )
     parser.add_argument(
         "--time_horizon",
@@ -143,6 +141,7 @@ def main():
     save_data_path = args.save_data_path
     use_hardware = args.use_hardware
     q_pickup = args.q_pickup
+    q_dropoff = args.q_dropoff
     time_horizon = args.time_horizon
     only_log_excitation_traj_data = args.only_log_excitation_traj_data
     duration_to_remove_at_start = args.duration_to_remove_at_start
@@ -217,6 +216,7 @@ def main():
                 excitaiton_traj=excitation_traj,
                 traj_source=traj_source,
                 q_pickup=np.array(q_pickup) if has_wsg else None,
+                q_dropoff=np.array(q_dropoff) if has_wsg else None,
             ),
         )
     )

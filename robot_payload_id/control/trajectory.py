@@ -137,6 +137,7 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
         excitaiton_traj: Trajectory,
         traj_source: TrajectorySource,
         q_pickup: Optional[np.ndarray] = None,
+        q_dropoff: Optional[np.ndarray] = None,
         start_traj_limit_fraction: float = 0.2,
     ):
         """
@@ -145,6 +146,7 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
             excitaiton_traj: The excitation trajectory.
             traj_source: The trajectory source to initialize.
             q_pickup: The joint positions to pick up an object at. Can be None.
+            q_dropoff: The joint positions to drop off an object at. Can be None.
             start_traj_limit_fraction: The fraction of the velocity and acceleration
                 limits to use when retiming the start trajectory with Toppra.
         """
@@ -154,6 +156,7 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
         self._excitation_traj = excitaiton_traj
         self._traj_source = traj_source
         self._q_pickup = q_pickup
+        self._q_dropoff = q_dropoff
         self._start_traj_limit_fraction = start_traj_limit_fraction
 
         num_joint_positions = station.get_iiwa_controller_plant().num_positions()
@@ -162,6 +165,7 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
         )
 
         self._pickup_pause_end_time = None
+        self._dropoff_time = None
         self.DeclareInitializationDiscreteUpdateEvent(self._initialize_discrete_state)
 
     def _initialize_discrete_state(
@@ -276,6 +280,60 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
         )
         trajs.append(excitation_traj_delayed)
 
+        if self._q_dropoff is not None:
+            # Add traj to dropoff position.
+            dropoff_traj = plan_unconstrained_gcs_path_start_to_goal(
+                plant=iiwa_controller_plant,
+                q_start=excitation_traj_delayed.value(
+                    excitation_traj_delayed.end_time()
+                ),
+                q_goal=self._q_dropoff,
+            )
+            dropoff_traj_retimed = reparameterize_with_toppra(
+                trajectory=dropoff_traj,
+                plant=iiwa_controller_plant,
+                velocity_limits=np.min(
+                    [
+                        np.abs(iiwa_controller_plant.GetVelocityLowerLimits()),
+                        np.abs(iiwa_controller_plant.GetVelocityUpperLimits()),
+                    ],
+                    axis=0,
+                )
+                * self._start_traj_limit_fraction,
+                acceleration_limits=np.min(
+                    [
+                        np.abs(iiwa_controller_plant.GetAccelerationLowerLimits()),
+                        np.abs(iiwa_controller_plant.GetAccelerationUpperLimits()),
+                    ],
+                    axis=0,
+                )
+                * self._start_traj_limit_fraction,
+            )
+
+            dropoff_traj_time = PiecewisePolynomial().FirstOrderHold(
+                [0.0, dropoff_traj_retimed.end_time()],
+                [[0.0, dropoff_traj_retimed.end_time()]],
+            )
+            dropoff_traj_time.shiftRight(excitation_traj_delayed.end_time())
+            dropoff_traj_delayed = PathParameterizedTrajectory(
+                path=dropoff_traj_retimed, time_scaling=dropoff_traj_time
+            )
+            self._dropoff_time = dropoff_traj_delayed.end_time()
+            trajs.append(dropoff_traj_delayed)
+
+            # Stay at the current pose for 5s before moving.
+            pause_after_dropoff_traj = PiecewisePolynomial.ZeroOrderHold(
+                breaks=[
+                    dropoff_traj_delayed.end_time(),
+                    dropoff_traj_delayed.end_time() + 5.0,
+                ],
+                samples=np.stack([self._q_dropoff, self._q_dropoff], axis=1),
+            )
+            trajs.append(pause_after_dropoff_traj)
+
+            self._pickup_pause_end_time = pause_before_start_traj.end_time()
+            start_traj_start_time = pause_before_start_traj.end_time()
+
         self._combined_traj = CompositeTrajectory(trajs)
         self._traj_source.UpdateTrajectory(self._combined_traj)
 
@@ -284,6 +342,9 @@ class ExcitationTrajectorySourceInitializer(LeafSystem):
 
     def get_pickup_pause_end_time(self) -> Union[float, None]:
         return self._pickup_pause_end_time
+
+    def get_dropoff_time(self) -> Union[float, None]:
+        return self._dropoff_time
 
     def get_end_time(self) -> float:
         return self._combined_traj.end_time()
@@ -326,9 +387,19 @@ class WSGTrajectorySourceInitializer(LeafSystem):
             [
                 0.0,
                 self._traj_source_initializer.get_pickup_pause_end_time() - 1.0,
+                self._traj_source_initializer.get_dropoff_time(),
                 self._traj_source_initializer.get_end_time(),
             ],
-            np.array([[self._open_value, self._closed_value, self._closed_value]]),
+            np.array(
+                [
+                    [
+                        self._open_value,
+                        self._closed_value,
+                        self._open_value,
+                        self._open_value,
+                    ]
+                ]
+            ),
         )
 
         self._traj_source.UpdateTrajectory(traj)
