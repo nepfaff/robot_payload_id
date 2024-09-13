@@ -787,6 +787,20 @@ def main():
             for params in params_guess:
                 params.perturb(perturb_scale)
 
+    inital_last_link_params = (
+        get_plant_joint_params(
+            arm_plant_components.plant,
+            arm_plant_components.plant_context,
+            add_rotor_inertia=identify_rotor_inertia,
+            add_reflected_inertia=identify_reflected_inertia,
+            add_viscous_friction=identify_viscous_friction,
+            add_dynamic_dry_friction=identify_dynamic_dry_friction,
+            payload_only=payload_only,
+        )[-1]
+        if payload_only
+        else None
+    )
+
     (
         _,
         result,
@@ -807,6 +821,7 @@ def main():
         identify_dynamic_dry_friction=identify_dynamic_dry_friction,
         payload_only=payload_only,
         known_max_mass=known_max_mass,
+        initial_last_link_params=inital_last_link_params,
         solver_kPrintToConsole=args.kPrintToConsole,
     )
     if result.is_success():
@@ -841,15 +856,7 @@ def main():
                 # Compute the difference in the last link's parameters. This corresponds
                 # to the payload parameters if `initial_param_path` are the parameters
                 # without payload.
-                inital_last_link_params = get_plant_joint_params(
-                    arm_plant_components.plant,
-                    arm_plant_components.plant_context,
-                    add_rotor_inertia=identify_rotor_inertia,
-                    add_reflected_inertia=identify_reflected_inertia,
-                    add_viscous_friction=identify_viscous_friction,
-                    add_dynamic_dry_friction=identify_dynamic_dry_friction,
-                    payload_only=payload_only,
-                )[-1]
+
                 # We can subtract the lumped parameters as they are all in the last
                 # link's frame.
                 last_link_idx = num_joints - 1

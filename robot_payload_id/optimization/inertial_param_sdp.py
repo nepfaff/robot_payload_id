@@ -69,6 +69,7 @@ def solve_inertial_param_sdp(
     identify_dynamic_dry_friction: bool = True,
     payload_only=False,
     known_max_mass: Optional[float] = None,
+    initial_last_link_params: Optional[JointParameters] = None,
     solver_kPrintToConsole: bool = False,
 ) -> Tuple[
     MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray, np.ndarray
@@ -107,6 +108,10 @@ def solve_inertial_param_sdp(
             for payload identification.
         known_max_mass (float, optional): The known maximum mass of the robot. This is
             used as an upper bound on the sum of the identified masses.
+        initial_last_link_params (JointParameters, optional): The inertial parameters
+            of the last link without the payload. This is used to enforce that the
+            payload parameters = these parameters - the identified parameters are
+            physically feasible. If None, no constraint is added.
         solver_kPrintToConsole (bool, optional): Whether to print solver output.
 
     Returns:
@@ -269,6 +274,25 @@ def solve_inertial_param_sdp(
     # Inertial parameter feasibility constraints
     for pseudo_inertia in pseudo_inertias:
         prog.AddPositiveSemidefiniteConstraint(pseudo_inertia - 1e-6 * np.identity(4))
+
+    if initial_last_link_params is not None:
+        # Payload inertial parameter feasibility constraint.
+        payload_params = JointParameters(
+            m=variables[0].m - initial_last_link_params.m,
+            hx=variables[0].hx - initial_last_link_params.hx,
+            hy=variables[0].hy - initial_last_link_params.hy,
+            hz=variables[0].hz - initial_last_link_params.hz,
+            Ixx=variables[0].Ixx - initial_last_link_params.Ixx,
+            Ixy=variables[0].Ixy - initial_last_link_params.Ixy,
+            Ixz=variables[0].Ixz - initial_last_link_params.Ixz,
+            Iyy=variables[0].Iyy - initial_last_link_params.Iyy,
+            Iyz=variables[0].Iyz - initial_last_link_params.Iyz,
+            Izz=variables[0].Izz - initial_last_link_params.Izz,
+        )
+        payload_pseudo_inertia = payload_params.get_pseudo_inertia_matrix()
+        prog.AddPositiveSemidefiniteConstraint(
+            payload_pseudo_inertia - 1e-6 * np.identity(4)
+        )
 
     # Reflected rotor inertia feasibility constraints
     if identify_rotor_inertia and not payload_only:
