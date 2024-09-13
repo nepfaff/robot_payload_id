@@ -15,7 +15,6 @@ from pydrake.all import (
     MultibodyPlant,
     RevoluteJoint,
     RigidBody,
-    RigidTransform,
     SpatialInertia,
 )
 
@@ -146,7 +145,10 @@ def extract_inertial_param(
 def get_body_inertial_param(
     body: RigidBody, context: Context
 ) -> Tuple[float, np.ndarray, np.ndarray]:
-    """Returns mass, center of mass, and rotational inertia of a body."""
+    """
+    Returns mass, center of mass, and rotational inertia of a body in the body frame:
+    M_BBo_B spatial inertia of this rigid body B about Bo (B's origin), expressed in B.
+    """
     spatial_inertia = body.CalcSpatialInertiaInBodyFrame(context)
     mass, com, rot_inertia = extract_inertial_param(spatial_inertia)
     return mass, com, rot_inertia
@@ -199,6 +201,7 @@ def get_plant_joint_params(
     for subgraph, joint, joint_actuator in zip(subgraphs, joints, joint_actuators):
         # Combine inertial parameters of all bodies in subgraph
         if len(subgraph) == 1:
+            # Parameters in the body frame.
             combined_mass, combined_com, combined_rot_inertia = get_body_inertial_param(
                 subgraph[0], context
             )
