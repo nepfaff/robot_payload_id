@@ -1,0 +1,80 @@
+directives:
+- add_model:
+    name: iiwa_base_metal_plate
+    file: package://robot_payload_id/iiwa_base_metal_plate.sdf
+- add_weld:
+    parent: world
+    child: iiwa_base_metal_plate::iiwa_base_metal_plate_base_link
+    X_PC:
+        translation: [-0.005, 0.0, 0.00635]
+
+- add_model:
+    name: floor
+    file: package://robot_payload_id/floor.sdf
+- add_weld:
+    parent: world
+    child: floor::floor_base_link
+    X_PC:
+        translation: [0.0, 0.0, -0.05]
+
+- add_model:
+    name: left_wall
+    file: package://robot_payload_id/wall.sdf
+- add_weld:
+    parent: world
+    child: left_wall::wall_link
+    X_PC:
+      translation: [0.0, -0.5, 0.75]
+
+- add_model:
+    name: right_wall
+    file: package://robot_payload_id/wall.sdf
+- add_weld:
+    parent: world
+    child: right_wall::wall_link
+    X_PC:
+      translation: [0.0, 0.5, 0.75]
+
+- add_model:
+    name: back_wall
+    file: package://robot_payload_id/wall.sdf
+- add_weld:
+    parent: world
+    child: back_wall::wall_link
+    X_PC:
+      translation: [-1.0, 0.0, 0.75]
+      rotation: !Rpy { deg: [0.0, 0.0, 90.0]}
+
+- add_model:
+    name: iiwa
+    file: package://drake_models/iiwa_description/sdf/iiwa7_no_collision.sdf
+    default_joint_positions:
+        iiwa_joint_1: [0]
+        iiwa_joint_2: [0.1]
+        iiwa_joint_3: [0]
+        iiwa_joint_4: [-1.2]
+        iiwa_joint_5: [0]
+        iiwa_joint_6: [1.6]
+        iiwa_joint_7: [0]
+- add_weld:
+    parent: world
+    child: iiwa::iiwa_link_0
+    X_PC:
+        translation: [0.0, 0.0, 0.0127]
+
+- add_model:
+    name: test_object
+    file: package://robot_payload_id/test_object.sdf
+- add_weld:
+    parent: iiwa::iiwa_link_7
+    child: test_object::test_object_link
+    X_PC:
+        translation: [0.0, -0.125, 0.045]
+        rotation: !Rpy { deg: [0.0, 0.0, 0.0]}
+
+- add_frame:
+    name: payload_frame
+    X_PF:
+        base_frame: test_object::test_object_link
+        translation: [0.0, 0.0, 0.0]
+        rotation: !Rpy { deg: [0.0, 0.0, 0.0]}

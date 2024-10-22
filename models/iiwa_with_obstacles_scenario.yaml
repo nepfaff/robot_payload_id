@@ -1,6 +1,6 @@
 directives:
 - add_directives:
-    file: package://robot_payload_id/iiwa_with_box_payload.dmd.yaml
+    file: package://robot_payload_id/iiwa_with_obstacles.dmd.yaml
 plant_config:
     time_step: 1e-3 # 1e-3 for torque_only mode and 5e-3 otherwise
     contact_model: "hydroelastic_with_fallback"
