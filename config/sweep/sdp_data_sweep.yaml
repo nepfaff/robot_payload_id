@@ -10,51 +10,56 @@ metric:
 parameters:
   joint_data_path:
     values: [
-      "joint_data/sim/iiwa_only/bspline",
-      "joint_data/sim/iiwa_only/bspline_jerkBounds",
-      "joint_data/sim/iiwa_only/fourier",
+      # joint_data/real/excitation_only/iiwa_only/fourier_10s_40k_averaged,
+      # joint_data/real/excitation_only/iiwa_only/fourier_10s_40k_averaged20,
+      # joint_data/real/excitation_only/iiwa_only/fourier_10s_40k_averaged30,
+      joint_data/real/excitation_only/iiwa_only/fourier_10s_40k_averaged50,
     ]
-  filter_positions:
+  not_filter_positions:
     values: [true, false]
   pos_order:
-    distribution: int_uniform
-    min: 2
-    max: 30
+    values: [10]
+    # distribution: int_uniform
+    # min: 2
+    # max: 30
   pos_cutoff_freq_hz:
     distribution: uniform
     min: 30.0
     max: 90.0
   vel_order:
-    distribution: int_uniform
-    min: 2
-    max: 30
+    values: [10]
+    # distribution: int_uniform
+    # min: 2
+    # max: 30
   vel_cutoff_freq_hz:
     distribution: uniform
     min: 5.0
     max: 30.0
   acc_order:
-    distribution: int_uniform
-    min: 2
-    max: 30
+    values: [10]
+    # distribution: int_uniform
+    # min: 2
+    # max: 30
   acc_cutoff_freq_hz:
     distribution: uniform
     min: 3.0
-    max: 35.0
+    max: 60.0
   torque_order:
-    distribution: int_uniform
-    min: 2
-    max: 30
+    values: [10]
+    # distribution: int_uniform
+    # min: 2
+    # max: 30
   torque_cutoff_freq_hz:
     distribution: uniform
     min: 1.5
-    max: 15.0
+    max: 25.0
 
 command:
   - ${env}
   - python
   - ${program}
   - --wandb_mode=online
-  - --regularization_weight=0.0
+  - --regularization_weight=0.001
   - --process_joint_data
   - --not_perform_eval
   # Providing a pre-computed base parameter mapping leads to a massive speedup
