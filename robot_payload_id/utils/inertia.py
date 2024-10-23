@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 
 
@@ -73,3 +75,66 @@ def change_inertia_reference_points_with_parallel_axis_theorem(
     if single_matrix:
         return I_BBb_B[0]
     return I_BBb_B
+
+
+def inertia_to_pseudo_inertia(
+    m: float, com: np.ndarray, inertia: np.ndarray
+) -> np.ndarray:
+    """
+    Converts mass, center of mass (com), and inertia matrix to the pseudo-inertia
+    matrix.
+
+    Parameters:
+    - m (float): Mass of the body.
+    - com (np.ndarray): Center of mass vector of shape (3,).
+    - inertia (np.ndarray): 3x3 rotational inertia matrix.
+
+    Returns:
+    - np.ndarray: The 4x4 pseudo-inertia matrix.
+    """
+    # Ensure com is a column vector
+    com = np.array(com).reshape(3, 1)
+
+    # Density weighted 2nd moment (Σ)
+    sigma = 0.5 * np.trace(inertia) * np.eye(3) - inertia
+
+    # Density weighted 1st moment (h)
+    h = m * com  # h = m * com (center of mass)
+
+    # Construct the pseudo-inertia matrix
+    pseudo_inertia = np.block([[sigma, h], [h.T, np.array([[m]])]])
+
+    return pseudo_inertia
+
+
+def pseudo_inertia_to_inertia(
+    pseudo_inertia: np.ndarray,
+) -> Tuple[float, np.ndarray, np.ndarray]:
+    """
+    Converts a pseudo-inertia matrix back to mass, center of mass, and rotational
+    inertia matrix.
+
+    Parameters:
+    - pseudo_inertia (np.ndarray): 4x4 pseudo-inertia matrix.
+
+    Returns:
+    - m (float): Mass of the body.
+    - com (np.ndarray): Center of mass vector of shape (3,).
+    - inertia (np.ndarray): 3x3 rotational inertia matrix.
+    """
+    # Extract mass (m)
+    m = pseudo_inertia[3, 3]
+
+    # Extract density weighted 1st moment (h)
+    h = pseudo_inertia[:3, 3]
+
+    # Center of mass (com)
+    com = h / m
+
+    # Extract density weighted 2nd moment (Σ)
+    sigma = pseudo_inertia[:3, :3]
+
+    # Rotational inertia (inertia) from Σ
+    inertia = np.trace(sigma) * np.eye(3) - sigma
+
+    return m, com, inertia

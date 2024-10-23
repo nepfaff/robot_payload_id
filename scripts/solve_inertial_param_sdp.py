@@ -39,7 +39,9 @@ from robot_payload_id.utils import (
     FourierSeriesTrajectoryAttributes,
     JointData,
     get_plant_joint_params,
+    inertia_to_pseudo_inertia,
     process_joint_data,
+    pseudo_inertia_to_inertia,
     write_parameters_to_plant,
 )
 
@@ -946,12 +948,25 @@ def main():
                         "Difference in the last link's parameters (payload parameters). "
                         + "Note that these are in specified payload frame:"
                     )
-                    logging.info(f"Payload mass: {M_PPayload_Payload.get_mass()}")
-                    logging.info(f"Payload CoM: {M_PPayload_Payload.get_com()}")
-                    logging.info(
-                        "Payload inertia (w.r.t CoM):\n"
-                        + f"{M_PPayloadcom_Payload.CalcRotationalInertia().CopyToFullMatrix3()}"
+                    payload_mass = M_PPayload_Payload.get_mass()
+                    logging.info(f"Payload mass: {payload_mass}")
+                    com_PPayload_Payload = M_PPayload_Payload.get_com()
+                    logging.info(f"Payload CoM: {com_PPayload_Payload}")
+                    I_PPayload_Payload = (
+                        M_PPayload_Payload.CalcRotationalInertia().CopyToFullMatrix3()
                     )
+                    logging.info(
+                        "Payload inertia (w.r.t CoM):\n" + f"{I_PPayload_Payload}\n"
+                    )
+
+                    # Pseudo inertia of payload about the payload frame origin,
+                    # expressed in the payload frame.
+                    # pseudo_inertia = inertia_to_pseudo_inertia(
+                    #     m=payload_mass,
+                    #     com=com_PPayload_Payload,
+                    #     inertia=I_PPayload_Payload,
+                    # )
+                    # logging.info(f"Pseudo inertia of payload:\n{pseudo_inertia}")
 
         if output_param_path is not None:
             logging.info(f"Saving parameters to {output_param_path}")
