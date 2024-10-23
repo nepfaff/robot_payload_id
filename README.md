@@ -186,13 +186,6 @@ wandb sweep config/sweep/iiwa_id_sweep.yaml
 ```
 Individual agents for the sweep can be started using the printed `wandb agent` command.
 
-A parallel sweep can be started with
-```bash
-bash scripts/parallel_sweep.sh config/sweep/iiwa_id_sweep.yaml ${NUM_PARALLEL}
-```
-where `NUM_PARALLEL` is a variable containing the number of parallel runs. By default,
-the maximum number of cores is used.
-
 ### SDP data processing
 
 The SDP results are very sensitive to the data processing. It can make sense to
@@ -204,6 +197,15 @@ A sweep can be started with
 wandb sweep config/sweep/sdp_data_sweep.yaml
 ```
 Individual agents for the sweep can be started using the printed `wandb agent` command.
+
+### Parallel sweeps
+
+A parallel sweep can be started with
+```bash
+bash scripts/parallel_sweep.sh config/sweep/sdp_data_sweep.yaml ${NUM_PARALLEL}
+```
+where `NUM_PARALLEL` is a variable containing the number of parallel runs. By default,
+the maximum number of cores is used.
 
 ## Evaluation
 

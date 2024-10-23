@@ -6,7 +6,7 @@ NUM_PARALLEL=${2:-$NUM_CORES}
 echo "Number of cores: $NUM_CORES, Number of parallel sweep runs: $NUM_PARALLEL"
 
 # Start sweep
-output=$(wandb sweep config/sweep/iiwa_id_sweep.yaml 2>&1)
+output=$(wandb sweep $CONFIG_PATH 2>&1)
 
 # Get sweep URL
 url=$(echo $output | grep -oE "https:\/\/wandb\.ai\/[a-zA-Z0-9_\/-]+")
