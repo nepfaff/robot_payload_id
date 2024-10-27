@@ -58,6 +58,20 @@ The `--payload_only` flag enables designing trajectories that only optimize the
 excitation of the payload parameters. These are the 10 inertial parameters of the last
 link.
 
+We found the following to be decent parameters:
+```bash
+python design_optimal_excitation_trajectories.py --optimizer black_box \
+--cost_function condition_number_and_e_optimality --nevergrad_method NGOpt \
+--num_fourier_terms 5 --max_al_iterations 20 --budget 40000 --mu_initial 5 \
+--time_horizon 20 --num_timesteps 1000 --num_workers 32 --log_level ERROR \
+--mu_multiplier 1.5 --omega 0.6283 \
+--logging_path logs/gripper_payload_box/iiwa_eoptimality_10s_5Fterm_1000timesteps_20_40000
+```
+We achieved a condition number of `191.9`, a e-optimality of `-1930`, equality
+constraint violations of `3e-5`, and inequality constraint violations of `5e-6` Note
+that in practice the condition number of real-world data obtained with this trajectory
+is much lower.
+
 ### Use a Fourier series trajectory as an initial guess for BSpline trajectory optimization
 
 First, convert the optimized Fourier series trajectory into a BSpline trajectory:
