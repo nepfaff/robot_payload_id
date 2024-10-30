@@ -32,3 +32,10 @@ directives:
         base_frame: iiwa::iiwa_link_7
         translation: [0.0, 0.0, 0.1]
         rotation: !Rpy { deg: [90.0, 0.0, 90.0]}
+
+- add_frame:
+    name: payload_frame
+    X_PF:
+        base_frame: iiwa::iiwa_link_7
+        translation: [0.0, 0.0, 0.045]
+        rotation: !Rpy { deg: [0.0, 0.0, 0.0]}
