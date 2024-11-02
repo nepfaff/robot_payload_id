@@ -940,7 +940,7 @@ def main():
                             body_indexes=[last_link.index()],
                         )
                     )
-                    # Express inerita w.r.t. CoM to match SDFormat convention
+                    # Express inerita about CoM to match SDFormat convention
                     M_PPayloadcom_Payload = M_PPayload_Payload.Shift(
                         M_PPayload_Payload.get_com()
                     )
@@ -948,15 +948,15 @@ def main():
                         "Difference in the last link's parameters (payload parameters). "
                         + "Note that these are in specified payload frame:"
                     )
-                    payload_mass = M_PPayload_Payload.get_mass()
+                    payload_mass = M_PPayloadcom_Payload.get_mass()
                     logging.info(f"Payload mass: {payload_mass}")
-                    com_PPayload_Payload = M_PPayload_Payload.get_com()
+                    com_PPayload_Payload = M_PPayloadcom_Payload.get_com()
                     logging.info(f"Payload CoM: {com_PPayload_Payload}")
-                    I_PPayload_Payload = (
-                        M_PPayload_Payload.CalcRotationalInertia().CopyToFullMatrix3()
+                    I_PPayloadcom_Payload = (
+                        M_PPayloadcom_Payload.CalcRotationalInertia().CopyToFullMatrix3()
                     )
                     logging.info(
-                        "Payload inertia (w.r.t CoM):\n" + f"{I_PPayload_Payload}\n"
+                        "Payload inertia (about CoM):\n" + f"{I_PPayloadcom_Payload}\n"
                     )
 
                     # Pseudo inertia of payload about the payload frame origin,
