@@ -60,11 +60,11 @@ link.
 
 We found the following to be decent parameters:
 ```bash
-python design_optimal_excitation_trajectories.py --optimizer black_box \
+python scripts/design_optimal_excitation_trajectories.py --optimizer black_box \
 --cost_function condition_number_and_e_optimality --nevergrad_method NGOpt \
 --num_fourier_terms 5 --max_al_iterations 20 --budget 40000 --mu_initial 5 \
---time_horizon 20 --num_timesteps 1000 --num_workers 32 --log_level ERROR \
---mu_multiplier 1.5 --omega 0.6283 \
+--min_time_horizon 10 --max_time_horizon 10 --num_timesteps 1000 --num_workers 32 \
+--mu_multiplier 1.5 --omega 0.6283 --log_level ERROR \
 --logging_path logs/gripper_payload_box/iiwa_eoptimality_10s_5Fterm_1000timesteps_20_40000
 ```
 We achieved a condition number of `191.9`, a e-optimality of `-1930`, equality

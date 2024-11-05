@@ -141,9 +141,13 @@ class NevergradAugmentedLagrangian:
                 wandb.run.summary["clipped_initial_guess"] = True
                 x_init = np.clip(x_init, lower_bound, upper_bound)
                 x_array.value = x_init
+            else:
+                wandb.run.summary["clipped_initial_guess"] = False
 
             x_array.set_bounds(lower_bound, upper_bound)
             wandb.run.summary["nevergrad_set_bounds"] = True
+        else:
+            wandb.run.summary["nevergrad_set_bounds"] = False
 
         # Select optimizer and set initial guess
         optimizer = ng.optimizers.registry[self._method](
@@ -209,6 +213,9 @@ class NevergradAugmentedLagrangian:
                 "Max absolute lambda": np.max(np.abs(lambda_val)),
             }
         )
+        info = optimizer._info()
+        if "sub-optim" in info:
+            wandb.run.summary["sub-optim"] = info["sub-optim"]
         wandb.run.summary["optimizer_name"] = optimizer.name
         return recommendation.value, constraint_residue, al_loss
 
