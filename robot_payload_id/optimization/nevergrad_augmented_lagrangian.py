@@ -53,7 +53,7 @@ class NevergradAugmentedLagrangian:
     the max iterations is reached.
 
     For more details, refer to section 17.4 of Numerical Optimization by Jorge Nocedal
-    and Stephen Wright, Edition 1, 1999. NOTE that Drake uses μ/2 as the coefficient of
+    and Stephen Wright, Edition 1, 1999 [1]. NOTE that Drake uses μ/2 as the coefficient of
     the quadratic penalty term instead of 1/(2μ) in Edition 1.
     """
 
@@ -419,9 +419,11 @@ class NevergradAugmentedLagrangian:
                 inequality_constraint_error = 0.0
                 for j in range(lagrangian_size):
                     if is_equality_mask[j]:
+                        # See [1], equation 17.49.
                         lambda_val[j] -= constraint_residue[j] * mu
                         equality_constraint_error += constraint_residue[j] ** 2
                     else:
+                        # See [1], equation 17.58.
                         lambda_val[j] = np.maximum(
                             lambda_val[j] - constraint_residue[j] * mu, 0
                         )
