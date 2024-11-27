@@ -22,6 +22,7 @@ from pydrake.all import (
     MinimumDistanceLowerBoundConstraint,
     ModelInstanceIndex,
     MultibodyPlant,
+    Simulator,
     SnoptSolver,
 )
 
@@ -974,7 +975,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         self._payload_only = payload_only
 
         self._arm_components = create_arm(
-            arm_file_path=model_path, num_joints=num_joints, time_step=0.0
+            arm_file_path=model_path,
+            num_joints=num_joints,
+            time_step=0.0,
+            use_meshcat=True,
         )
         self._ad_plant_components = create_autodiff_plant(
             plant_components=ArmPlantComponents(plant=self._arm_components.plant),
@@ -1349,6 +1353,33 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 f"collisionAvoidance_time_{i}",
             )
 
+    def _simulate_traj_and_log_recording(
+        self, name: str, var_values: np.ndarray
+    ) -> None:
+        joint_data = self._compute_joint_data(var_values)
+
+        simulator = Simulator(self._arm_components.diagram)
+        simulator.set_target_realtime_rate(1.0)
+
+        context = simulator.get_mutable_context()
+        plant_context = self._arm_components.plant.GetMyContextFromRoot(context)
+
+        self._arm_components.meshcat_visualizer.StartRecording()
+        for q, q_dot, t in zip(
+            joint_data.joint_positions,
+            joint_data.joint_velocities,
+            joint_data.sample_times_s,
+        ):
+            self._arm_components.plant.SetPositions(plant_context, q)
+            self._arm_components.plant.SetVelocities(plant_context, q_dot)
+            simulator.AdvanceTo(t)
+
+        self._arm_components.meshcat_visualizer.StopRecording()
+        self._arm_components.meshcat_visualizer.PublishRecording()
+
+        html = self._arm_components.meshcat.StaticHtml()
+        wandb.log({name: wandb.Html(html)})
+
     def _extract_and_log_optimization_result(
         self,
         var_values: np.ndarray,
@@ -1370,6 +1401,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
 
         traj_attrs = self._extract_fourier_trajectory_attributes(var_values)
         traj_attrs.log(logging_path=logging_path)
+
+        self._simulate_traj_and_log_recording(
+            name="al_iter" + str(al_idx), var_values=var_values
+        )
 
         logging.info(f"Logged results for augmented Lagrangian iteration {al_idx}.")
 
