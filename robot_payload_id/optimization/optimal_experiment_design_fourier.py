@@ -390,6 +390,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
         budget: int,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
+        initial_guess_scaling: float = 1.0,
         use_optimization_progress_bar: bool = True,
         logging_path: Optional[Path] = None,
     ):
@@ -414,6 +415,9 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
                 trajectory parameters. If a path is provided, then the trajectory
                 parameters are loaded from the path. If None, then the initial guess is
                 randomly generated.
+            initial_guess_scaling (float): The scaling factor to use for the initial
+                guess. The initial guess is randomly generated between -0.5 and 0.5 and
+                then multiplied by this scaling factor.
             use_optimization_progress_bar (bool): Whether to show a progress bar for the
                 optimization. This might lead to a small performance hit.
             logging_path (Path): The path to write the optimization logs to. If None,
@@ -450,11 +454,12 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
             # Empirically, setting any terms after the first 5 to small values results
             # in a decent initial data matrix condition number
             self._initial_guess = (
-                np.random.rand(len(self._symbolic_vars)) - 0.5
+                (np.random.rand(len(self._symbolic_vars)) - 0.5) * initial_guess_scaling
                 if self._num_fourier_terms < 6
                 else np.concatenate(
                     [
-                        np.random.rand(5 * self._num_joints) - 0.5,
+                        (np.random.rand(len(self._symbolic_vars)) - 0.5)
+                        * initial_guess_scaling,
                         (
                             np.random.rand(
                                 (self._num_fourier_terms - 5) * self._num_joints
@@ -462,7 +467,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
                             - 0.5
                         )
                         * 0.01,
-                        np.random.rand(5 * self._num_joints) - 0.5,
+                        (np.random.rand(len(self._symbolic_vars)) - 0.5)
+                        * initial_guess_scaling,
                         (
                             np.random.rand(
                                 (self._num_fourier_terms - 5) * self._num_joints
@@ -909,6 +915,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         payload_only: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
+        initial_guess_scaling: float = 1.0,
         use_optimization_progress_bar: bool = True,
         logging_path: Optional[Path] = None,
     ):
@@ -943,6 +950,9 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
                 trajectory parameters. If a path is provided, then the trajectory
                 parameters are loaded from the path. If None, then the initial guess is
                 randomly generated.
+            initial_guess_scaling (float): The scaling factor to use for the initial
+                guess. The initial guess is randomly generated between -0.5 and 0.5 and
+                then multiplied by this scaling factor.
             use_optimization_progress_bar (bool): Whether to show a progress bar for the
                 optimization. This might lead to a small performance hit.
             logging_path (Path): The path to write the optimization logs to. If None,
@@ -965,6 +975,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
             budget=budget,
             nevergrad_method=nevergrad_method,
             traj_initial=traj_initial,
+            initial_guess_scaling=initial_guess_scaling,
             use_optimization_progress_bar=use_optimization_progress_bar,
             logging_path=logging_path,
         )
@@ -1115,6 +1126,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         include_endpoint_constraints: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
+        initial_guess_scaling: float = 1.0,
         logging_path: Optional[Path] = None,
     ):
         """
@@ -1157,6 +1169,9 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 trajectory parameters. If a path is provided, then the trajectory
                 parameters are loaded from the path. If None, then the initial guess is
                 randomly generated.
+            initial_guess_scaling (float): The scaling factor to use for the initial
+                guess. The initial guess is randomly generated between -0.5 and 0.5 and
+                then multiplied by this scaling factor.
             logging_path (Path): The path to write the optimization logs to. If None,
                 then no logs are written.
         """
@@ -1178,6 +1193,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
             payload_only=payload_only,
             nevergrad_method=nevergrad_method,
             traj_initial=traj_initial,
+            initial_guess_scaling=initial_guess_scaling,
             use_optimization_progress_bar=False,
             logging_path=logging_path,
         )
@@ -1451,6 +1467,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
         include_endpoint_constraints: bool,
         nevergrad_method: str = "NGOpt",
         traj_initial: Optional[Union[FourierSeriesTrajectoryAttributes, Path]] = None,
+        initial_guess_scaling: float = 1.0,
         logging_path: Optional[Path] = None,
     ) -> FourierSeriesTrajectoryAttributes:
         """Optimizes the trajectory parameters in parallel.
@@ -1495,6 +1512,9 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 trajectory parameters. If a path is provided, then the trajectory
                 parameters are loaded from the path. If None, then the initial guess is
                 randomly generated.
+            initial_guess_scaling (float): The scaling factor to use for the initial
+                guess. The initial guess is randomly generated between -0.5 and 0.5 and
+                then multiplied by this scaling factor.
             logging_path (Path): The path to write the optimization logs to. If None,
                 then no logs are written.
 
@@ -1538,6 +1558,7 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
                 include_endpoint_constraints=include_endpoint_constraints,
                 nevergrad_method=nevergrad_method,
                 traj_initial=traj_initial,
+                initial_guess_scaling=initial_guess_scaling,
                 logging_path=logging_path,
             )
 

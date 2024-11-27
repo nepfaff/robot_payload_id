@@ -230,6 +230,14 @@ def main():
         help="Whether to not include obstacles in the optimization.",
     )
     parser.add_argument(
+        "--initial_guess_scaling",
+        type=float,
+        default=1.0,
+        help="The scaling factor to use for the initial guess. The initial guess is "
+        "randomly generated between -0.5 and 0.5 and then multiplied by this scaling "
+        "factor.",
+    )
+    parser.add_argument(
         "--wandb_mode",
         type=str,
         default="online",
@@ -314,6 +322,10 @@ def main():
     add_endpoint_constraints = not args.not_add_endpoint_constraints
     constrain_position_endpoints = args.constrain_position_endpoints
     payload_only = args.payload_only
+    initial_guess_scaling = args.initial_guess_scaling
+
+    # Set seed.
+    np.random.seed(42)
 
     if args.use_bspline:
         assert (
@@ -412,6 +424,7 @@ def main():
                             include_endpoint_constraints=add_endpoint_constraints,
                             nevergrad_method=nevergrad_method,
                             traj_initial=traj_initial,
+                            initial_guess_scaling=initial_guess_scaling,
                             logging_path=logging_path,
                         )
                     )
@@ -440,6 +453,7 @@ def main():
                         include_endpoint_constraints=add_endpoint_constraints,
                         nevergrad_method=nevergrad_method,
                         traj_initial=traj_initial,
+                        initial_guess_scaling=initial_guess_scaling,
                         logging_path=logging_path,
                     )
                 )
@@ -481,7 +495,6 @@ def main():
                         robot_model_instance_idx=robot_model_instance_idx,
                         budget=budget,
                         nevergrad_method=nevergrad_method,
-                        traj_initial=traj_initial,
                         logging_path=logging_path,
                         data_matrix_dir_path=data_matrix_dir_path,
                         model_path=model_path,
@@ -503,8 +516,10 @@ def main():
                         add_reflected_inertia=add_reflected_inertia,
                         add_viscous_friction=add_viscous_friction,
                         add_dynamic_dry_friction=add_dynamic_dry_friction,
+                        payload_only=payload_only,
                         nevergrad_method=nevergrad_method,
                         traj_initial=traj_initial,
+                        initial_guess_scaling=initial_guess_scaling,
                         logging_path=logging_path,
                         model_path=model_path,
                     )
