@@ -19,14 +19,6 @@ def main():
         help="The directory to save the processed joint data to.",
     )
     parser.add_argument(
-        "--num_endpoints_to_remove",
-        type=int,
-        default=1,
-        help="The number of endpoints to remove from the beginning and end of the "
-        + "trajectory. This is useful as the sample times are not always increasing "
-        + "with the same period at the beginning and end of the trajectory.",
-    )
-    parser.add_argument(
         "--compute_velocities",
         action="store_true",
         help="Whether to compute velocities from the positions rather than taking the "
@@ -86,6 +78,30 @@ def main():
         help="The cutoff frequency of the filter for the joint torques.",
     )
     parser.add_argument(
+        "--ft_sensor_force_order",
+        type=int,
+        default=10,
+        help="The order of the filter for the force from the FT sensor.",
+    )
+    parser.add_argument(
+        "--ft_sensor_force_cutoff_freq_hz",
+        type=float,
+        default=10.0,
+        help="The cutoff frequency of the filter for the force from the FT sensor.",
+    )
+    parser.add_argument(
+        "--ft_sensor_torque_order",
+        type=int,
+        default=10,
+        help="The order of the filter for the torque from the FT sensor.",
+    )
+    parser.add_argument(
+        "--ft_sensor_torque_cutoff_freq_hz",
+        type=float,
+        default=10.0,
+        help="The cutoff frequency of the filter for the torque from the FT sensor.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -103,7 +119,6 @@ def main():
 
     processed_joint_data = process_joint_data(
         joint_data=raw_joint_data,
-        num_endpoints_to_remove=args.num_endpoints_to_remove,
         compute_velocities=args.compute_velocities,
         filter_positions=args.filter_positions,
         pos_filter_order=args.pos_order,
@@ -114,6 +129,10 @@ def main():
         acc_cutoff_freq_hz=args.acc_cutoff_freq_hz,
         torque_filter_order=args.torque_order,
         torque_cutoff_freq_hz=args.torque_cutoff_freq_hz,
+        ft_sensor_force_order=args.ft_sensor_force_order,
+        ft_sensor_force_cutoff_freq_hz=args.ft_sensor_force_cutoff_freq_hz,
+        ft_sensor_torque_order=args.ft_sensor_torque_order,
+        ft_sensor_torque_cutoff_freq_hz=args.ft_sensor_torque_cutoff_freq_hz,
     )
 
     logging.info(f"Saving processed joint data to {output_dir}.")

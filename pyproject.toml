@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.11"
-# drake = {version = ">=0.0.20240409", source = "drake-nightly"}
+# drake = {version = ">=0.0.20240302", source = "drake-nightly"}
 drake = "^1.28.0"
 numpy = "^1.25.2"
 manipulation = {git = "https://github.com/RussTedrake/manipulation.git", rev = "341772fa8ee4dbc121f44b1b46ad352dac5e34a0"}

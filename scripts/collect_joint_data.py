@@ -7,10 +7,17 @@ from pathlib import Path
 
 import numpy as np
 
+# export PYTHONPATH=~/src/ft_300s_driver/bazel-bin/lcmtypes/ft_300s/:${PYTHONPATH}
+try:
+    from ft_reading_t import ft_reading_t
+except ImportError:
+    logging.warning("Failed to import `ft_reading_t`. Won't be able to log FT data.")
+
 from iiwa_setup.controllers import (
     InverseDynamicsControllerWithGravityCompensationCancellation,
 )
 from iiwa_setup.iiwa import IiwaHardwareStationDiagram
+from iiwa_setup.sensors import ForceSensorEvaluator, FTSensorDataReceiver
 from manipulation.station import LoadScenario
 from pydrake.all import (
     ApplySimulatorConfig,
@@ -19,6 +26,9 @@ from pydrake.all import (
     ConstantVectorSource,
     Demultiplexer,
     DiagramBuilder,
+    DrakeLcm,
+    LcmInterfaceSystem,
+    LcmSubscriberSystem,
     MeshcatVisualizer,
     PiecewisePolynomial,
     Simulator,
@@ -121,6 +131,16 @@ def main():
         help="The period at which to log data.",
     )
     parser.add_argument(
+        "--log_ft_data",
+        action="store_true",
+        help="Whether to log the FT sensor data.",
+    )
+    parser.add_argument(
+        "--zero_ft_sensor",
+        action="store_true",
+        help="Whether to zero the simulated FT sensor data.",
+    )
+    parser.add_argument(
         "--html_path",
         type=Path,
         default=None,
@@ -147,9 +167,17 @@ def main():
     duration_to_remove_at_start = args.duration_to_remove_at_start
     noise_scale = args.noise_scale
     logging_period = args.logging_period
+    log_ft_data = args.log_ft_data
+    zero_ft_sensor = args.zero_ft_sensor
     html_path = args.html_path
 
     assert not (use_hardware and noise_scale > 0.0)
+
+    if log_ft_data and logging_period < 1e-2:
+        logging_period = 1e-2
+        logging.warning(
+            "Logging period is too high for FT sensor data. Reducing it to 10ms."
+        )
 
     builder = DiagramBuilder()
     scenario = LoadScenario(filename=scenario_path)
@@ -288,6 +316,42 @@ def main():
             wsg_force_source.get_output_port(), station.GetInputPort("wsg.force_limit")
         )
 
+    if log_ft_data:
+        if use_hardware:
+            lcm = DrakeLcm()
+            lcm_system = builder.AddNamedSystem(
+                "lcm_interface_system", LcmInterfaceSystem(lcm)
+            )
+            ft_sensor_subscriber: LcmSubscriberSystem = builder.AddNamedSystem(
+                "ft_sensor_subscriber",
+                LcmSubscriberSystem.Make(
+                    channel="FT300S_SENSOR_DATA",
+                    lcm_type=ft_reading_t,
+                    lcm=lcm_system,
+                    use_cpp_serializer=False,
+                    wait_for_message_on_initialization_timeout=10,
+                ),
+            )
+            ft_sensor_data_receiver: FTSensorDataReceiver = builder.AddNamedSystem(
+                "ft_sensor_data_receiver", FTSensorDataReceiver()
+            )
+            builder.Connect(
+                ft_sensor_subscriber.get_output_port(),
+                ft_sensor_data_receiver.get_input_port(),
+            )
+        else:
+            ft_sensor_evaluator: ForceSensorEvaluator = builder.AddNamedSystem(
+                "ft_sensor_evaluator",
+                ForceSensorEvaluator(
+                    plant=station.get_internal_plant(),
+                    weldjoint_name="ft_sensor_weldjoint",
+                ),
+            )
+            builder.Connect(
+                station.GetOutputPort("reaction_forces"),
+                ft_sensor_evaluator.get_input_port(),
+            )
+
     # Add data loggers
     desired_state_demux = builder.AddNamedSystem(
         "desired_state_demux", Demultiplexer(output_ports_sizes=[7, 7])
@@ -324,6 +388,12 @@ def main():
         "measured_torque_logger",
         VectorLogSink(num_positions, publish_period=logging_period),
     )
+    if log_ft_data:
+        # The FT 300-S sensor publishes at 100Hz.
+        ft_logger: VectorLogSink = builder.AddNamedSystem(
+            "ft_logger",
+            VectorLogSink(input_size=6, publish_period=logging_period),
+        )
     builder.Connect(
         desired_state_demux.get_output_port(0),
         commanded_position_logger.get_input_port(),
@@ -352,6 +422,17 @@ def main():
         station.GetOutputPort("iiwa.torque_measured"),
         measured_torque_logger.get_input_port(),
     )
+    if log_ft_data:
+        if use_hardware:
+            builder.Connect(
+                ft_sensor_data_receiver.GetOutputPort("ft_measured"),
+                ft_logger.get_input_port(),
+            )
+        else:
+            builder.Connect(
+                ft_sensor_evaluator.get_output_port(),
+                ft_logger.get_input_port(),
+            )
 
     visualizer = MeshcatVisualizer.AddToBuilder(
         builder, station.GetOutputPort("query_object"), station.internal_meshcat
@@ -413,6 +494,8 @@ def main():
     sample_times_s = measured_position_logger.FindLog(
         simulator.get_context()
     ).sample_times()
+    if log_ft_data:
+        ft_data = ft_logger.FindLog(simulator.get_context()).data().T
 
     if only_log_excitation_traj_data:
         # Only keep data during excitation trajectory execution
@@ -461,6 +544,12 @@ def main():
     commanded_torque_data = commanded_torque_data[unique_indices]
     measured_torque_data = measured_torque_data[unique_indices]
     sample_times_s = sample_times_s[unique_indices]
+    if log_ft_data:
+        ft_data = ft_data[unique_indices]
+
+    if log_ft_data and zero_ft_sensor and not use_hardware:
+        # Simulate zeroing the F/T sensor.
+        ft_data -= ft_data[0]
 
     # Add noise
     if noise_scale > 0.0:
@@ -485,6 +574,7 @@ def main():
             joint_accelerations=np.zeros_like(measured_position_data) * np.nan,
             joint_torques=measured_torque_data,
             sample_times_s=sample_times_s,
+            ft_sensor_measurements=ft_data if log_ft_data else None,
         )
         joint_data.save_to_disk(save_data_path)
 

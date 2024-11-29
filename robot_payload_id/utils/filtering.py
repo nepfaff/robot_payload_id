@@ -60,7 +60,6 @@ def filter_time_series_data(
 
 def process_joint_data(
     joint_data: JointData,
-    num_endpoints_to_remove: int = 1,
     compute_velocities: bool = True,
     filter_positions: bool = False,
     pos_filter_order: int = 20,
@@ -71,6 +70,10 @@ def process_joint_data(
     acc_cutoff_freq_hz: float = 2.0,
     torque_filter_order: int = 12,
     torque_cutoff_freq_hz: float = 1.6,
+    ft_sensor_force_order: int = 10,
+    ft_sensor_force_cutoff_freq_hz: float = 10.0,
+    ft_sensor_torque_order: int = 10,
+    ft_sensor_torque_cutoff_freq_hz: float = 10.0,
 ) -> JointData:
     """
     Process joint data by removing endpoints, filtering velocities, estimating
@@ -78,10 +81,6 @@ def process_joint_data(
 
     Args:
         joint_data (JointData): The joint data to process.
-        num_endpoints_to_remove (int, optional): The number of endpoints to remove from
-            the beginning and end of the trajectory. This is useful as the sample times
-            are not always increasing with the same period at the beginning and end of
-            the trajectory.
         compute_velocities (bool, optional): Whether to compute velocities from the
             positions rather than taking the ones in `joint_data`.
         filter_positions (bool, optional): Whether to filter the joint positions.
@@ -101,45 +100,39 @@ def process_joint_data(
             torques.
         torque_cutoff_freq_hz (float, optional): The cutoff frequency of the filter for
             the joint torques.
+        ft_sensor_force_order (int, optional): The order of the filter for the force
+            data from the force-torque sensor.
+        ft_sensor_force_cutoff_freq_hz (float, optional): The cutoff frequency of the
+            filter for the force data from the force-torque sensor.
+        ft_sensor_torque_order (int, optional): The order of the filter for the torque
+            data from the force-torque sensor.
+        ft_sensor_torque_cutoff_freq_hz (float, optional): The cutoff frequency of the
+            filter for the torque data from the force-torque sensor.
 
     Returns:
         JointData: The processed joint data.
     """
-    # Remove beginning and end points to ensure sample times are increasing with the
-    # same period throughout to enable differentiation
-    joint_positions = joint_data.joint_positions[
-        num_endpoints_to_remove:-num_endpoints_to_remove
-    ]
-    if not compute_velocities:
-        joint_velocities = joint_data.joint_velocities[
-            num_endpoints_to_remove:-num_endpoints_to_remove
-        ]
-    joint_torques = joint_data.joint_torques[
-        num_endpoints_to_remove:-num_endpoints_to_remove
-    ]
-    sample_times_s = joint_data.sample_times_s[
-        num_endpoints_to_remove:-num_endpoints_to_remove
-    ]
-
     # Process the joint data
-    sample_period = sample_times_s[1] - sample_times_s[0]
+    sample_period = joint_data.sample_times_s[1] - joint_data.sample_times_s[0]
     logging.info(f"Sample period: {sample_period} seconds.")
     sample_freq = 1.0 / sample_period
 
     if filter_positions:
         # Filter position data
         filtered_joint_positions = filter_time_series_data(
-            data=joint_positions,
+            data=joint_data.joint_positions,
             order=pos_filter_order,
             cutoff_freq_hz=pos_cutoff_freq_hz,
             fs_hz=sample_freq,
         )
     else:
-        filtered_joint_positions = joint_positions
+        filtered_joint_positions = joint_data.joint_positions
 
     if compute_velocities:
         # Estimate velocities using finite differences
         joint_velocities = np.gradient(filtered_joint_positions, sample_period, axis=0)
+    else:
+        joint_velocities = joint_data.joint_velocities
 
     # Filter velocity data
     filtered_velocity_data = filter_time_series_data(
@@ -160,17 +153,38 @@ def process_joint_data(
 
     # Filter torque data
     filtered_joint_torques = filter_time_series_data(
-        data=joint_torques,
+        data=joint_data.joint_torques,
         order=torque_filter_order,
         cutoff_freq_hz=torque_cutoff_freq_hz,
         fs_hz=sample_freq,
     )
 
+    if joint_data.ft_sensor_measurements is not None:
+        # Filter F/T sensor data
+        filtered_ft_sensor_force = filter_time_series_data(
+            data=joint_data.ft_sensor_measurements[:, :3],
+            order=ft_sensor_force_order,
+            cutoff_freq_hz=ft_sensor_force_cutoff_freq_hz,
+            fs_hz=sample_freq,
+        )
+        filtered_ft_sensor_torque = filter_time_series_data(
+            data=joint_data.ft_sensor_measurements[:, 3:],
+            order=ft_sensor_torque_order,
+            cutoff_freq_hz=ft_sensor_torque_cutoff_freq_hz,
+            fs_hz=sample_freq,
+        )
+        filtered_ft_sensor_measurements = np.hstack(
+            [filtered_ft_sensor_force, filtered_ft_sensor_torque]
+        )
+
     processed_joint_data = JointData(
-        joint_positions=joint_positions,
+        joint_positions=joint_data.joint_positions,
         joint_velocities=filtered_velocity_data,
         joint_accelerations=filtered_joint_accelerations,
         joint_torques=filtered_joint_torques,
-        sample_times_s=sample_times_s,
+        sample_times_s=joint_data.sample_times_s,
+        ft_sensor_measurements=filtered_ft_sensor_measurements
+        if joint_data.ft_sensor_measurements is not None
+        else None,
     )
     return processed_joint_data

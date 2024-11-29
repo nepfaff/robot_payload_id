@@ -42,6 +42,9 @@ class JointData:
     """The measured joint torques of shape (T, N)."""
     sample_times_s: np.ndarray
     """The sample times in seconds of shape (T,)."""
+    ft_sensor_measurements: Optional[np.ndarray] = None
+    """The force-torque sensor measurements of shape (T, 6) and form
+    [f_x, f_y, f_z, tau_x, tau_y, tau_z]."""
 
     def remove_duplicate_samples(self) -> "JointData":
         """
@@ -49,12 +52,17 @@ class JointData:
         rather than modifying the current one.
         """
         _, unique_indices = np.unique(self.sample_times_s, return_index=True)
-        return JointData(
+        joint_data = JointData(
             joint_positions=self.joint_positions[unique_indices],
             joint_velocities=self.joint_velocities[unique_indices],
             joint_accelerations=self.joint_accelerations[unique_indices],
             joint_torques=self.joint_torques[unique_indices],
             sample_times_s=self.sample_times_s[unique_indices],
+            ft_sensor_measurements=(
+                self.ft_sensor_measurements[unique_indices]
+                if self.ft_sensor_measurements is not None
+                else None
+            ),
         )
 
     def save_to_disk(self, path: Path) -> None:
@@ -69,6 +77,8 @@ class JointData:
         np.save(path / "joint_accelerations.npy", self.joint_accelerations)
         np.save(path / "joint_torques.npy", self.joint_torques)
         np.save(path / "sample_times_s.npy", self.sample_times_s)
+        if self.ft_sensor_measurements is not None:
+            np.save(path / "ft_sensor_measurements.npy", self.ft_sensor_measurements)
 
     @classmethod
     def load_from_disk(cls, path: Path) -> "JointData":
@@ -80,12 +90,18 @@ class JointData:
         Returns:
             The joint data.
         """
+        ft_sensor_measurements_path = path / "ft_sensor_measurements.npy"
         return cls(
             joint_positions=np.load(path / "joint_positions.npy"),
             joint_velocities=np.load(path / "joint_velocities.npy"),
             joint_accelerations=np.load(path / "joint_accelerations.npy"),
             joint_torques=np.load(path / "joint_torques.npy"),
             sample_times_s=np.load(path / "sample_times_s.npy"),
+            ft_sensor_measurements=(
+                np.load(ft_sensor_measurements_path)
+                if ft_sensor_measurements_path.exists()
+                else None
+            ),
         )
 
     @classmethod

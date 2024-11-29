@@ -2,10 +2,20 @@ from typing import Optional
 
 import numpy as np
 
-from pydrake.all import AutoDiffXd, MultibodyForces_, MultibodyPlant
+from pydrake.all import (
+    AutoDiffXd,
+    JacobianWrtVariable,
+    MultibodyForces_,
+    MultibodyPlant,
+    SpatialForce,
+)
 from tqdm import tqdm
 
-from robot_payload_id.utils import FourierSeriesTrajectoryAttributes, JointData
+from robot_payload_id.utils import (
+    ArmPlantComponents,
+    FourierSeriesTrajectoryAttributes,
+    JointData,
+)
 
 
 def generate_random_joint_data(
@@ -332,3 +342,58 @@ def compute_autodiff_joint_data_from_fourier_series_traj_params1(
         sample_times_s=np.arange(num_timesteps) * sample_delta,
     )
     return joint_data
+
+
+def compute_ft_sensor_measurements(
+    arm_plant_components: ArmPlantComponents,
+    joint_data: JointData,
+    ft_sensor_frame_name: str,
+) -> JointData:
+    """TODO"""
+    plant = arm_plant_components.plant
+    context = arm_plant_components.plant_context
+
+    measurement_frame = plant.GetFrameByName(ft_sensor_frame_name)
+    X_WF = measurement_frame.CalcPoseInWorld(context)
+    X_FW = X_WF.inverse()
+
+    ft_sensor_weldjoint = plant.GetJointByName("ft_sensor_weldjoint")
+    ft_sensor_weldjoint_idx = ft_sensor_weldjoint.index()
+
+    # Compute transform from frame Jc on child body C to measurement frame F.
+    Jc_frame = ft_sensor_weldjoint.frame_on_child()
+    X_WJc = Jc_frame.CalcPoseInWorld(context)
+    X_FJc = X_FW @ X_WJc
+    R_FJc = X_FJc.rotation()
+
+    ft_sensor_measurements = np.empty((joint_data.joint_positions.shape[0], 6))
+    for i in range(joint_data.joint_positions.shape[0]):
+        # Set joint data
+        plant.SetPositions(context, joint_data.joint_positions[i])
+        plant.SetVelocities(context, joint_data.joint_velocities[i])
+
+        # Compute the reaction force F_CJc_Jc on the child body C at the last joint's
+        # child frame Jc.
+        F_CJc_Jc: SpatialForce = plant.get_reaction_forces_output_port().Eval(context)[
+            ft_sensor_weldjoint_idx
+        ]
+
+        # Invert using action-reaction principle.
+        f_CJc_Jc = -F_CJc_Jc.translational()
+        tau_CJc_Jc = -F_CJc_Jc.rotational()
+
+        # Express in sensor frame.
+        f_CJc_F = R_FJc @ f_CJc_Jc
+        tau_CJc_F = R_FJc @ tau_CJc_Jc
+
+        ft_sensor_measurement = np.concatenate([f_CJc_F, tau_CJc_F])
+        ft_sensor_measurements[i] = ft_sensor_measurement
+
+    return JointData(
+        joint_positions=joint_data.joint_positions,
+        joint_velocities=joint_data.joint_velocities,
+        joint_accelerations=joint_data.joint_accelerations,
+        joint_torques=joint_data.joint_torques,
+        ft_sensor_measurements=ft_sensor_measurements,
+        sample_times_s=joint_data.sample_times_s,
+    )
