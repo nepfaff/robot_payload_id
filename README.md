@@ -62,15 +62,18 @@ We found the following to be decent parameters:
 ```bash
 python scripts/design_optimal_excitation_trajectories.py --optimizer black_box \
 --cost_function condition_number_and_e_optimality --nevergrad_method NGOpt \
---num_fourier_terms 5 --max_al_iterations 20 --budget 40000 --mu_initial 5 \
+--num_fourier_terms 5 --max_al_iterations 20 --budget 100000 --mu_initial 5 \
 --min_time_horizon 10 --max_time_horizon 10 --num_timesteps 1000 --num_workers 32 \
---mu_multiplier 1.5 --omega 0.6283 --log_level ERROR \
---logging_path logs/gripper_payload_box/iiwa_eoptimality_10s_5Fterm_1000timesteps_20_40000
+--mu_multiplier 1.5 --omega 0.6283 --log_level ERROR --initial_guess_scaling 0.1 \
+--logging_path logs/gripper_payload_box/iiwa_eoptimality_10s_5Fterm_1000timesteps_20_100000
 ```
-We achieved a condition number of `191.9`, a e-optimality of `-1930`, equality
-constraint violations of `3e-5`, and inequality constraint violations of `5e-6` Note
-that in practice the condition number of real-world data obtained with this trajectory
+We achieved a condition number of `116.7`, a e-optimality of `-2883`, equality
+constraint violations of `1e-5`, and inequality constraint violations of `1e-6` Note
+that in practice, the condition number of real-world data obtained with this trajectory
 is much lower.
+
+It is recommended to pick the biggest value of `--initial_guess_scaling` that results in
+an initial guess without collisions.
 
 ### Use a Fourier series trajectory as an initial guess for BSpline trajectory optimization
 
