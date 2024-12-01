@@ -455,28 +455,16 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
             # in a decent initial data matrix condition number
             self._initial_guess = (
                 (np.random.rand(len(self._symbolic_vars)) - 0.5) * initial_guess_scaling
-                if self._num_fourier_terms < 6
+                if num_fourier_terms < 6
                 else np.concatenate(
                     [
-                        (np.random.rand(len(self._symbolic_vars)) - 0.5)
-                        * initial_guess_scaling,
-                        (
-                            np.random.rand(
-                                (self._num_fourier_terms - 5) * self._num_joints
-                            )
-                            - 0.5
-                        )
+                        (np.random.rand(5 * num_joints) - 0.5) * initial_guess_scaling,
+                        (np.random.rand((num_fourier_terms - 5) * num_joints) - 0.5)
                         * 0.01,
-                        (np.random.rand(len(self._symbolic_vars)) - 0.5)
-                        * initial_guess_scaling,
-                        (
-                            np.random.rand(
-                                (self._num_fourier_terms - 5) * self._num_joints
-                            )
-                            - 0.5
-                        )
+                        (np.random.rand(5 * num_joints) - 0.5) * initial_guess_scaling,
+                        (np.random.rand((num_fourier_terms - 5) * num_joints) - 0.5)
                         * 0.01,
-                        np.random.rand(self._num_joints) - 0.5,
+                        np.random.rand(num_joints) - 0.5,
                     ]
                 )
             )
@@ -488,6 +476,10 @@ class ExcitationTrajectoryOptimizerFourierBlackBox(
                 traj_attrs = traj_initial
             a_flattened, b_flattened, q0_values, _ = traj_attrs.to_flattened_data()
             self._initial_guess = np.concatenate([a_flattened, b_flattened, q0_values])
+        assert len(self._initial_guess) == len(self._symbolic_vars), (
+            f"Initial guess length {len(self._initial_guess)} does not match "
+            + f"symbolic vars length {len(self._symbolic_vars)}"
+        )
 
         parameterization = ng.p.Array(init=self._initial_guess)
 
