@@ -1069,10 +1069,14 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxNumeric(
         W_dataTW_data = W_data.T @ W_data
         return W_dataTW_data
 
-    def _compute_joint_data(self, var_values: np.ndarray) -> JointData:
+    def _compute_joint_data(
+        self, var_values: np.ndarray, num_timesteps: int | None = None
+    ) -> JointData:
         traj_attrs = self._extract_fourier_trajectory_attributes(var_values)
         joint_data = compute_autodiff_joint_data_from_fourier_series_traj_params1(
-            num_timesteps=self._num_timesteps,
+            num_timesteps=self._num_timesteps
+            if num_timesteps is None
+            else num_timesteps,
             time_horizon=self._time_horizon,
             traj_attrs=traj_attrs,
             use_progress_bar=False,
@@ -1364,7 +1368,8 @@ class ExcitationTrajectoryOptimizerFourierBlackBoxALNumeric(
     def _simulate_traj_and_log_recording(
         self, name: str, var_values: np.ndarray
     ) -> None:
-        joint_data = self._compute_joint_data(var_values)
+        num_timesteps = int(self._time_horizon * 1000)
+        joint_data = self._compute_joint_data(var_values, num_timesteps=num_timesteps)
 
         simulator = Simulator(self._arm_components.diagram)
         simulator.set_target_realtime_rate(1.0)
