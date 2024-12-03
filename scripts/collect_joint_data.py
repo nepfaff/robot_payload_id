@@ -205,7 +205,7 @@ def main():
             trajectory=PiecewisePolynomial.ZeroOrderHold(
                 [0.0, 1.0], np.zeros((len(excitation_traj.value(0.0)), 2))
             ),
-            output_derivative_order=2,
+            output_derivative_order=0,
         ),
     )
     traj_source_initializer: ExcitationTrajectorySourceInitializer = (
@@ -227,36 +227,39 @@ def main():
 
     # Add controller
     # NOTE: These gains are tuned for an iiwa7 without payload
-    controller = builder.AddNamedSystem(
-        "controller",
-        InverseDynamicsControllerWithGravityCompensationCancellation(
-            scenario=scenario,
-            controller_plant=controller_plant,
-            controller_plant_context=controller_plant_context,
-            kp_gains=np.full(7, 600),
-            damping_ratios=np.full(7, 0.2),
-        ),
-    )
+    # controller = builder.AddNamedSystem(
+    #     "controller",
+    #     InverseDynamicsControllerWithGravityCompensationCancellation(
+    #         scenario=scenario,
+    #         controller_plant=controller_plant,
+    #         controller_plant_context=controller_plant_context,
+    #         kp_gains=np.full(7, 600),
+    #         damping_ratios=np.full(7, 0.2),
+    #     ),
+    # )
+    # builder.Connect(
+    #     station.GetOutputPort("iiwa.state_estimated"),
+    #     controller.GetInputPort("iiwa.state_estimated"),
+    # )
+    # desired_state_acceleration_demux: Demultiplexer = builder.AddNamedSystem(
+    #     "desired_state_acceleration_demux",
+    #     Demultiplexer(output_ports_sizes=[num_positions * 2, num_positions]),
+    # )
+    # builder.Connect(
+    #     traj_source.get_output_port(), desired_state_acceleration_demux.get_input_port()
+    # )
+    # builder.Connect(
+    #     desired_state_acceleration_demux.get_output_port(0),
+    #     controller.GetInputPort("iiwa.desired_state"),
+    # )
+    # builder.Connect(
+    #     desired_state_acceleration_demux.get_output_port(1),
+    #     controller.GetInputPort("iiwa.desired_accelerations"),
+    # )
+    # builder.Connect(controller.get_output_port(), station.GetInputPort("iiwa.torque"))
     builder.Connect(
-        station.GetOutputPort("iiwa.state_estimated"),
-        controller.GetInputPort("iiwa.state_estimated"),
+        traj_source.get_output_port(), station.GetInputPort("iiwa.position")
     )
-    desired_state_acceleration_demux: Demultiplexer = builder.AddNamedSystem(
-        "desired_state_acceleration_demux",
-        Demultiplexer(output_ports_sizes=[num_positions * 2, num_positions]),
-    )
-    builder.Connect(
-        traj_source.get_output_port(), desired_state_acceleration_demux.get_input_port()
-    )
-    builder.Connect(
-        desired_state_acceleration_demux.get_output_port(0),
-        controller.GetInputPort("iiwa.desired_state"),
-    )
-    builder.Connect(
-        desired_state_acceleration_demux.get_output_port(1),
-        controller.GetInputPort("iiwa.desired_accelerations"),
-    )
-    builder.Connect(controller.get_output_port(), station.GetInputPort("iiwa.torque"))
 
     if has_wsg:
         # Add a placeholder traj.
@@ -289,65 +292,65 @@ def main():
         )
 
     # Add data loggers
-    desired_state_demux = builder.AddNamedSystem(
-        "desired_state_demux", Demultiplexer(output_ports_sizes=[7, 7])
-    )
-    builder.Connect(
-        desired_state_acceleration_demux.get_output_port(0),
-        desired_state_demux.get_input_port(),
-    )
-    commanded_position_logger: VectorLogSink = builder.AddNamedSystem(
-        "commanded_position_logger",
-        VectorLogSink(num_positions, publish_period=logging_period),
-    )
+    # desired_state_demux = builder.AddNamedSystem(
+    #     "desired_state_demux", Demultiplexer(output_ports_sizes=[7, 7])
+    # )
+    # builder.Connect(
+    #     desired_state_acceleration_demux.get_output_port(0),
+    #     desired_state_demux.get_input_port(),
+    # )
+    # commanded_position_logger: VectorLogSink = builder.AddNamedSystem(
+    #     "commanded_position_logger",
+    #     VectorLogSink(num_positions, publish_period=logging_period),
+    # )
     measured_position_logger: VectorLogSink = builder.AddNamedSystem(
         "measured_position_logger",
         VectorLogSink(num_positions, publish_period=logging_period),
     )
-    commanded_velocity_logger: VectorLogSink = builder.AddNamedSystem(
-        "commanded_velocity_logger",
-        VectorLogSink(num_positions, publish_period=logging_period),
-    )
+    # commanded_velocity_logger: VectorLogSink = builder.AddNamedSystem(
+    #     "commanded_velocity_logger",
+    #     VectorLogSink(num_positions, publish_period=logging_period),
+    # )
     measured_velocity_logger: VectorLogSink = builder.AddNamedSystem(
         "measured_velocity_logger",
         VectorLogSink(num_positions, publish_period=logging_period),
     )
-    commanded_acceleration_logger: VectorLogSink = builder.AddNamedSystem(
-        "commanded_acceleration_logger",
-        VectorLogSink(num_positions, publish_period=logging_period),
-    )
-    commanded_torque_logger: VectorLogSink = builder.AddNamedSystem(
-        "commanded_torque_logger",
-        VectorLogSink(num_positions, publish_period=logging_period),
-    )
+    # commanded_acceleration_logger: VectorLogSink = builder.AddNamedSystem(
+    #     "commanded_acceleration_logger",
+    #     VectorLogSink(num_positions, publish_period=logging_period),
+    # )
+    # commanded_torque_logger: VectorLogSink = builder.AddNamedSystem(
+    #     "commanded_torque_logger",
+    #     VectorLogSink(num_positions, publish_period=logging_period),
+    # )
     measured_torque_logger: VectorLogSink = builder.AddNamedSystem(
         "measured_torque_logger",
         VectorLogSink(num_positions, publish_period=logging_period),
     )
-    builder.Connect(
-        desired_state_demux.get_output_port(0),
-        commanded_position_logger.get_input_port(),
-    )
+    # builder.Connect(
+    #     desired_state_demux.get_output_port(0),
+    #     commanded_position_logger.get_input_port(),
+    # )
     builder.Connect(
         station.GetOutputPort("iiwa.position_measured"),
         measured_position_logger.get_input_port(),
     )
-    builder.Connect(
-        desired_state_demux.get_output_port(1),
-        commanded_velocity_logger.get_input_port(),
-    )
+    # builder.Connect(
+    #     desired_state_demux.get_output_port(1),
+    #     commanded_velocity_logger.get_input_port(),
+    # )
     builder.Connect(
         station.GetOutputPort("iiwa.velocity_estimated"),
         measured_velocity_logger.get_input_port(),
     )
-    builder.Connect(
-        desired_state_acceleration_demux.get_output_port(1),
-        commanded_acceleration_logger.get_input_port(),
-    )
-    builder.Connect(
-        controller.get_output_port(),
-        commanded_torque_logger.get_input_port(),
-    )
+    # builder.Connect(
+    #     desired_state_acceleration_demux.get_output_port(1),
+    #     commanded_acceleration_logger.get_input_port(),
+    # )
+    # builder.Connect(
+    #     controller.get_output_port(),
+    #     commanded_torque_logger.get_input_port(),
+    # )
     builder.Connect(
         station.GetOutputPort("iiwa.torque_measured"),
         measured_torque_logger.get_input_port(),
@@ -389,24 +392,24 @@ def main():
         with open(html_path, "w") as f:
             f.write(html)
 
-    commanded_position_data = (
-        commanded_position_logger.FindLog(simulator.get_context()).data().T
-    )
+    # commanded_position_data = (
+    #     commanded_position_logger.FindLog(simulator.get_context()).data().T
+    # )
     measured_position_data = (
         measured_position_logger.FindLog(simulator.get_context()).data().T
     )
-    commanded_velocity_data = (
-        commanded_velocity_logger.FindLog(simulator.get_context()).data().T
-    )
+    # commanded_velocity_data = (
+    #     commanded_velocity_logger.FindLog(simulator.get_context()).data().T
+    # )
     measured_velocity_data = (
         measured_velocity_logger.FindLog(simulator.get_context()).data().T
     )
-    commanded_acceleration_data = (
-        commanded_acceleration_logger.FindLog(simulator.get_context()).data().T
-    )
-    commanded_torque_data = (
-        commanded_torque_logger.FindLog(simulator.get_context()).data().T
-    )
+    # commanded_acceleration_data = (
+    #     commanded_acceleration_logger.FindLog(simulator.get_context()).data().T
+    # )
+    # commanded_torque_data = (
+    #     commanded_torque_logger.FindLog(simulator.get_context()).data().T
+    # )
     measured_torque_data = (
         measured_torque_logger.FindLog(simulator.get_context()).data().T
     )
@@ -424,24 +427,24 @@ def main():
         )
         excitation_traj_start_idx = np.argmax(sample_times_s >= data_start_time)
         excitation_traj_end_idx = np.argmax(sample_times_s >= excitation_traj_end_time)
-        commanded_position_data = commanded_position_data[
-            excitation_traj_start_idx:excitation_traj_end_idx
-        ]
+        # commanded_position_data = commanded_position_data[
+        #     excitation_traj_start_idx:excitation_traj_end_idx
+        # ]
         measured_position_data = measured_position_data[
             excitation_traj_start_idx:excitation_traj_end_idx
         ]
-        commanded_velocity_data = commanded_velocity_data[
-            excitation_traj_start_idx:excitation_traj_end_idx
-        ]
+        # commanded_velocity_data = commanded_velocity_data[
+        #     excitation_traj_start_idx:excitation_traj_end_idx
+        # ]
         measured_velocity_data = measured_velocity_data[
             excitation_traj_start_idx:excitation_traj_end_idx
         ]
-        commanded_torque_data = commanded_torque_data[
-            excitation_traj_start_idx:excitation_traj_end_idx
-        ]
-        commanded_acceleration_data = commanded_acceleration_data[
-            excitation_traj_start_idx:excitation_traj_end_idx
-        ]
+        # commanded_torque_data = commanded_torque_data[
+        #     excitation_traj_start_idx:excitation_traj_end_idx
+        # ]
+        # commanded_acceleration_data = commanded_acceleration_data[
+        #     excitation_traj_start_idx:excitation_traj_end_idx
+        # ]
         measured_torque_data = measured_torque_data[
             excitation_traj_start_idx:excitation_traj_end_idx
         ]
@@ -453,12 +456,12 @@ def main():
 
     # Remove duplicated samples
     _, unique_indices = np.unique(sample_times_s, return_index=True)
-    commanded_position_data = commanded_position_data[unique_indices]
+    # commanded_position_data = commanded_position_data[unique_indices]
     measured_position_data = measured_position_data[unique_indices]
-    commanded_velocity_data = commanded_velocity_data[unique_indices]
+    # commanded_velocity_data = commanded_velocity_data[unique_indices]
     measured_velocity_data = measured_velocity_data[unique_indices]
-    commanded_acceleration_data = commanded_acceleration_data[unique_indices]
-    commanded_torque_data = commanded_torque_data[unique_indices]
+    # commanded_acceleration_data = commanded_acceleration_data[unique_indices]
+    # commanded_torque_data = commanded_torque_data[unique_indices]
     measured_torque_data = measured_torque_data[unique_indices]
     sample_times_s = sample_times_s[unique_indices]
 
@@ -489,28 +492,28 @@ def main():
         joint_data.save_to_disk(save_data_path)
 
         # Also save commanded data
-        np.save(
-            save_data_path / "commanded_joint_positions.npy", commanded_position_data
-        )
-        np.save(
-            save_data_path / "commanded_joint_velocities.npy", commanded_velocity_data
-        )
-        np.save(
-            save_data_path / "commanded_joint_accelerations.npy",
-            commanded_acceleration_data,
-        )
-        np.save(save_data_path / "commanded_joint_torques.npy", commanded_torque_data)
+        # np.save(
+        #     save_data_path / "commanded_joint_positions.npy", commanded_position_data
+        # )
+        # np.save(
+        #     save_data_path / "commanded_joint_velocities.npy", commanded_velocity_data
+        # )
+        # np.save(
+        #     save_data_path / "commanded_joint_accelerations.npy",
+        #     commanded_acceleration_data,
+        # )
+        # np.save(save_data_path / "commanded_joint_torques.npy", commanded_torque_data)
         print(f"Collected {len(sample_times_s)} data samples.")
 
     # Print tracking statistics
-    print(
-        "Mean absolute position tracking error per joint:",
-        np.mean(np.abs(commanded_position_data - measured_position_data), axis=0),
-    )
-    print(
-        "Max absolute position tracking error per joint:",
-        np.max(np.abs(commanded_position_data - measured_position_data), axis=0),
-    )
+    # print(
+    #     "Mean absolute position tracking error per joint:",
+    #     np.mean(np.abs(commanded_position_data - measured_position_data), axis=0),
+    # )
+    # print(
+    #     "Max absolute position tracking error per joint:",
+    #     np.max(np.abs(commanded_position_data - measured_position_data), axis=0),
+    # )
 
 
 if __name__ == "__main__":

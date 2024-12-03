@@ -13,10 +13,10 @@ parameters:
       # joint_data/real/excitation_only/iiwa_only/fourier_10s_40k_averaged,
       # joint_data/real/excitation_only/iiwa_only/fourier_10s_40k_averaged20,
       # joint_data/real/excitation_only/iiwa_only/fourier_10s_40k_averaged30,
-      joint_data/real/excitation_only/iiwa_only/fourier_10s_40k_averaged50,
+      joint_data/real/excitation_only/iiwa_only/fourier_10s_100k_20al_averaged,
     ]
   not_filter_positions:
-    values: [true, false]
+    values: [false]
   pos_order:
     values: [10]
     # distribution: int_uniform
