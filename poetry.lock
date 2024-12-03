@@ -1157,8 +1157,8 @@ tqdm = "^4.66.1"
 [package.source]
 type = "git"
 url = "https://github.com/nepfaff/iiwa_setup.git"
-reference = "d2260c7d44f24092cbba6e9d717d71b0d6628883"
-resolved_reference = "d2260c7d44f24092cbba6e9d717d71b0d6628883"
+reference = "ee9f4bf078173bf1719d6063ea73573216d9fe62"
+resolved_reference = "ee9f4bf078173bf1719d6063ea73573216d9fe62"
 
 [[package]]
 name = "imageio"
@@ -2020,6 +2020,9 @@ files = [
     {file = "nlopt-2.7.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:7a12fe3cbfb36a6a18f84a1ac23ed3dda323860235381b3d2d182d8b771783ef"},
     {file = "nlopt-2.7.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3e1653de0060a42d6709423e6160888893bb688f4ff79aa0f1def4701ea25dd8"},
     {file = "nlopt-2.7.1-cp311-cp311-win_amd64.whl", hash = "sha256:88ec7cf491da150d497ecc61889bc7adb0af0ad05a67e925a4f5ac88e20f1b9c"},
+    {file = "nlopt-2.7.1-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:da0ac81b10f838afe7c1b99a2f895c31e05ca68328571fe430f382ce08cbfb07"},
+    {file = "nlopt-2.7.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:592ded3b34bb888cd99c5da3fb1c3c9269ddd996dade578a8ec325cd8b6be752"},
+    {file = "nlopt-2.7.1-cp312-cp312-win_amd64.whl", hash = "sha256:1647131d53302e72f5c4851ab04a92401a342c3e0fcfaac0eda316f5e8f3b283"},
     {file = "nlopt-2.7.1-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:79791a2179d1cf708622eaeea76c88acbadc6af0d2f198df21a74473838686c3"},
     {file = "nlopt-2.7.1-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:aad38bab99348f6c3bbf0d5f339b3fd77465b27ef44c330f4ba512a40b87b373"},
     {file = "nlopt-2.7.1-cp37-cp37m-win_amd64.whl", hash = "sha256:479a415f522051f6d728a3279c013aab96a6eaf3c323a89582dcb07eb636f15f"},
@@ -2759,6 +2762,7 @@ files = [
     {file = "PyYAML-6.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:bf07ee2fef7014951eeb99f56f39c9bb4af143d8aa3c21b1677805985307da34"},
     {file = "PyYAML-6.0.1-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:855fb52b0dc35af121542a76b9a84f8d1cd886ea97c84703eaa6d88e37a2ad28"},
     {file = "PyYAML-6.0.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:40df9b996c2b73138957fe23a16a4f0ba614f4c0efce1e9406a184b6d07fa3a9"},
+    {file = "PyYAML-6.0.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:a08c6f0fe150303c1c6b71ebcd7213c2858041a7e01975da3a99aed1e7a378ef"},
     {file = "PyYAML-6.0.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6c22bec3fbe2524cde73d7ada88f6566758a8f7227bfbf93a408a9d86bcc12a0"},
     {file = "PyYAML-6.0.1-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:8d4e9c88387b0f5c7d5f281e55304de64cf7f9c0021a3525bd3b1c542da3b0e4"},
     {file = "PyYAML-6.0.1-cp312-cp312-win32.whl", hash = "sha256:d483d2cdf104e7c9fa60c544d92981f12ad66a457afae824d146093b8c294c54"},
@@ -3714,15 +3718,6 @@ files = [
     {file = "triton-2.0.0-1-pp37-pypy37_pp73-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:9618815a8da1d9157514f08f855d9e9ff92e329cd81c0305003eb9ec25cc5add"},
     {file = "triton-2.0.0-1-pp38-pypy38_pp73-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:1aca3303629cd3136375b82cb9921727f804e47ebee27b2677fef23005c3851a"},
     {file = "triton-2.0.0-1-pp39-pypy39_pp73-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:e3e13aa8b527c9b642e3a9defcc0fbd8ffbe1c80d8ac8c15a01692478dc64d8a"},
-    {file = "triton-2.0.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8f05a7e64e4ca0565535e3d5d3405d7e49f9d308505bb7773d21fb26a4c008c2"},
-    {file = "triton-2.0.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bb4b99ca3c6844066e516658541d876c28a5f6e3a852286bbc97ad57134827fd"},
-    {file = "triton-2.0.0-cp36-cp36m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:47b4d70dc92fb40af553b4460492c31dc7d3a114a979ffb7a5cdedb7eb546c08"},
-    {file = "triton-2.0.0-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fedce6a381901b1547e0e7e1f2546e4f65dca6d91e2d8a7305a2d1f5551895be"},
-    {file = "triton-2.0.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:75834f27926eab6c7f00ce73aaf1ab5bfb9bec6eb57ab7c0bfc0a23fac803b4c"},
-    {file = "triton-2.0.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0117722f8c2b579cd429e0bee80f7731ae05f63fe8e9414acd9a679885fcbf42"},
-    {file = "triton-2.0.0-pp37-pypy37_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bcd9be5d0c2e45d2b7e6ddc6da20112b6862d69741576f9c3dbaf941d745ecae"},
-    {file = "triton-2.0.0-pp38-pypy38_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:42a0d2c3fc2eab4ba71384f2e785fbfd47aa41ae05fa58bf12cb31dcbd0aeceb"},
-    {file = "triton-2.0.0-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:52c47b72c72693198163ece9d90a721299e4fb3b8e24fd13141e384ad952724f"},
 ]
 
 [package.dependencies]
@@ -4058,4 +4053,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.11"
-content-hash = "a387d0eb62548a458761c88b09a725b1044781dc987d2fe20c2624a9ca546982"
+content-hash = "22f25e7a4edfb21064a62564c80d62f195254654723ed4a63ffee3b4b2a383dc"
