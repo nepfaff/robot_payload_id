@@ -9,6 +9,7 @@ from typing import Dict
 
 import numpy as np
 import sympy
+import wandb
 
 from pydrake.all import (
     DecomposeAffineExpressions,
@@ -19,8 +20,6 @@ from pydrake.all import (
     to_sympy,
 )
 from scipy.linalg import lu
-
-import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
@@ -950,7 +949,7 @@ def main():
                     )
                     payload_mass = M_PPayloadcom_Payload.get_mass()
                     logging.info(f"Payload mass: {payload_mass}")
-                    com_PPayload_Payload = M_PPayloadcom_Payload.get_com()
+                    com_PPayload_Payload = M_PPayload_Payload.get_com()
                     logging.info(f"Payload CoM: {com_PPayload_Payload}")
                     I_PPayloadcom_Payload = (
                         M_PPayloadcom_Payload.CalcRotationalInertia().CopyToFullMatrix3()
