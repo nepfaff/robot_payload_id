@@ -1,5 +1,8 @@
-## Similar to `InertiaVisualizer` in drake but allows editing the plant's inertial
-## parameters.
+"""
+Similar to `InertiaVisualizer` in drake but allows editing the plant's inertial
+parameters.
+Visualizes the inertial ellipsoids for a robot arm.
+"""
 
 import argparse
 import logging
