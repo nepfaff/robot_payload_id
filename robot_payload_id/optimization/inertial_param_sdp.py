@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 import numpy as np
 
 from pydrake.all import (
+    AffineBall,
     CommonSolverOption,
     DecomposeAffineExpressions,
     MathematicalProgram,
@@ -14,6 +15,7 @@ from pydrake.all import (
 )
 
 from robot_payload_id.utils import JointParameters
+from robot_payload_id.utils.utils import extract_quadratic_form
 
 
 def add_entropic_divergence_regularization(
@@ -70,6 +72,7 @@ def solve_inertial_param_sdp(
     payload_only=False,
     known_max_mass: Optional[float] = None,
     initial_last_link_params: Optional[JointParameters] = None,
+    payload_bounding_ellipsoid: AffineBall | None = None,
     solver_kPrintToConsole: bool = False,
 ) -> Tuple[
     MathematicalProgram, MathematicalProgramResult, np.ndarray, np.ndarray, np.ndarray
@@ -112,6 +115,9 @@ def solve_inertial_param_sdp(
             of the last link without the payload. This is used to enforce that the
             payload parameters = these parameters - the identified parameters are
             physically feasible. If None, no constraint is added.
+        payload_bounding_ellipsoid (AffineBall | None): A bounding ellipsoid for the
+            payload in the last link's frame. If provided, this is used to add an
+            additional constraint.
         solver_kPrintToConsole (bool, optional): Whether to print solver output.
 
     Returns:
@@ -152,24 +158,26 @@ def solve_inertial_param_sdp(
                 Iyy=prog.NewContinuousVariables(1, f"Iyy{i}")[0],
                 Iyz=prog.NewContinuousVariables(1, f"Iyz{i}")[0],
                 Izz=prog.NewContinuousVariables(1, f"Izz{i}")[0],
-                rotor_inertia=prog.NewContinuousVariables(1, f"rotor_inertia{i}")[0]
-                if identify_rotor_inertia and not payload_only
-                else None,
-                reflected_inertia=prog.NewContinuousVariables(
-                    1, f"reflected_inertia{i}"
-                )[0]
-                if identify_reflected_inertia and not payload_only
-                else None,
-                viscous_friction=prog.NewContinuousVariables(1, f"viscous_friction{i}")[
-                    0
-                ]
-                if identify_viscous_friction and not payload_only
-                else None,
-                dynamic_dry_friction=prog.NewContinuousVariables(
-                    1, f"dynamic_dry_friction{i}"
-                )[0]
-                if identify_dynamic_dry_friction and not payload_only
-                else None,
+                rotor_inertia=(
+                    prog.NewContinuousVariables(1, f"rotor_inertia{i}")[0]
+                    if identify_rotor_inertia and not payload_only
+                    else None
+                ),
+                reflected_inertia=(
+                    prog.NewContinuousVariables(1, f"reflected_inertia{i}")[0]
+                    if identify_reflected_inertia and not payload_only
+                    else None
+                ),
+                viscous_friction=(
+                    prog.NewContinuousVariables(1, f"viscous_friction{i}")[0]
+                    if identify_viscous_friction and not payload_only
+                    else None
+                ),
+                dynamic_dry_friction=(
+                    prog.NewContinuousVariables(1, f"dynamic_dry_friction{i}")[0]
+                    if identify_dynamic_dry_friction and not payload_only
+                    else None
+                ),
             )
         )
 
@@ -275,7 +283,7 @@ def solve_inertial_param_sdp(
     for pseudo_inertia in pseudo_inertias:
         prog.AddPositiveSemidefiniteConstraint(pseudo_inertia - 1e-6 * np.identity(4))
 
-    if initial_last_link_params is not None:
+    if payload_only and initial_last_link_params is not None:
         # Payload inertial parameter feasibility constraint.
         payload_params = JointParameters(
             m=variables[0].m - initial_last_link_params.m,
@@ -293,6 +301,11 @@ def solve_inertial_param_sdp(
         prog.AddPositiveSemidefiniteConstraint(
             payload_pseudo_inertia - 1e-6 * np.identity(4)
         )
+
+        # Bounding ellipsoid constraint
+        if payload_bounding_ellipsoid is not None:
+            Q = extract_quadratic_form(payload_bounding_ellipsoid)
+            prog.AddConstraint(np.trace(payload_pseudo_inertia @ Q) >= 0)
 
     # Reflected rotor inertia feasibility constraints
     if identify_rotor_inertia and not payload_only:
