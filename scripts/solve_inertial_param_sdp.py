@@ -1,5 +1,6 @@
 import argparse
 import copy
+import json
 import logging
 import os
 
@@ -9,7 +10,6 @@ from typing import Dict
 
 import numpy as np
 import sympy
-import wandb
 
 from pydrake.all import (
     DecomposeAffineExpressions,
@@ -20,6 +20,8 @@ from pydrake.all import (
     to_sympy,
 )
 from scipy.linalg import lu
+
+import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
@@ -43,6 +45,7 @@ from robot_payload_id.utils import (
     pseudo_inertia_to_inertia,
     write_parameters_to_plant,
 )
+from robot_payload_id.utils.utils import compute_min_ellipsoid
 
 
 def compute_entropic_divergence_to_gt_params(
@@ -476,6 +479,22 @@ def main():
         help="The mode to use for Weights & Biases logging.",
     )
     parser.add_argument(
+        "--payload_mesh_path",
+        type=str,
+        default=None,
+        help="Path to the payload mesh file. This is used to add the bounding "
+        "ellipsoid constraint for payload identification. No constraint is added if "
+        "not provided.",
+    )
+    parser.add_argument(
+        "--payload_mesh_pose",
+        type=json.loads,
+        default=None,
+        help="The homogenous rigid transform matrix from the last link frame to the "
+        "mesh frame, expressed in the last link's frame. Required and only used if "
+        "`payload_mesh_path` is provided.",
+    )
+    parser.add_argument(
         "--not_perform_eval",
         action="store_true",
         help="Whether to not perform evaluation after solving the SDP.",
@@ -522,6 +541,8 @@ def main():
     torque_filter_order = args.torque_order
     torque_cutoff_freq_hz = args.torque_cutoff_freq_hz
     wandb_mode = args.wandb_mode
+    payload_mesh_path = args.payload_mesh_path
+    payload_mesh_pose = args.payload_mesh_pose
     perform_eval = not args.not_perform_eval
 
     assert (traj_parameter_path is not None) != (joint_data_path is not None), (
@@ -534,6 +555,19 @@ def main():
             "Regularization is not recommended when identifying only the payload "
             + "parameters as these are fully identifiable."
         )
+
+    if payload_mesh_path is not None:
+        assert payload_mesh_pose is not None, (
+            "The payload_mesh_pose must be provided if the payload_mesh_path is "
+            + "provided."
+        )
+
+    if payload_mesh_pose is not None:
+        payload_mesh_pose = np.array(payload_mesh_pose)
+        assert payload_mesh_pose.shape == (
+            4,
+            4,
+        ), "The payload_mesh_pose must be a 4x4 matrix."
 
     logging.basicConfig(level=args.log_level)
     wandb.init(
@@ -802,6 +836,14 @@ def main():
         else None
     )
 
+    if payload_only and payload_mesh_path is not None:
+        # Compute the bounding ellipsoid in the payload obejct's frame
+        payload_bounding_ellipsoid = compute_min_ellipsoid(
+            payload_mesh_path, transform=payload_mesh_pose
+        )
+    else:
+        payload_bounding_ellipsoid = None
+
     (
         _,
         result,
@@ -823,6 +865,7 @@ def main():
         payload_only=payload_only,
         known_max_mass=known_max_mass,
         initial_last_link_params=inital_last_link_params,
+        payload_bounding_ellipsoid=payload_bounding_ellipsoid,
         solver_kPrintToConsole=args.kPrintToConsole,
     )
     if result.is_success():
