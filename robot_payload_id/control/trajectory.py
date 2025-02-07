@@ -123,6 +123,31 @@ class FourierSeriesTrajectory(Trajectory):
             traj_start_time=self._traj_start_time,
         )
 
+    def __getstate__(self):
+        """Return state values to be pickled."""
+        state = {
+            "_num_positions": self._num_positions,
+            "_traj_attrs": self._traj_attrs,
+            "_time_horizon": self._time_horizon,
+            "_traj_start_time": self._traj_start_time,
+            "_omega_l": self._omega_l,
+            "_a": self._a,
+            "_b": self._b,
+            "_q0": self._q0,
+        }
+        return state
+
+    def __setstate__(self, state):
+        """Restore state from the unpickled state values."""
+        self._num_positions = state["_num_positions"]
+        self._traj_attrs = state["_traj_attrs"]
+        self._time_horizon = state["_time_horizon"]
+        self._traj_start_time = state["_traj_start_time"]
+        self._omega_l = state["_omega_l"]
+        self._a = state["_a"]
+        self._b = state["_b"]
+        self._q0 = state["_q0"]
+
 
 class ExcitationTrajectorySourceInitializer(LeafSystem):
     """
