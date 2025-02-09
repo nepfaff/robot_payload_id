@@ -6,7 +6,7 @@
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <box>
-            <size>.1 .1 .26</size>
+            <size>.15 .15 .26</size>
           </box>
         </geometry>
         <material>
