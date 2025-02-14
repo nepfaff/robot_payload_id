@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pydrake.symbolic as sym
+import wandb
 
 from pydrake.all import (
     BsplineBasis,
@@ -19,8 +20,6 @@ from pydrake.all import (
     TrajectorySource,
     VectorLogSink,
 )
-
-import wandb
 
 from .inertia import change_inertia_reference_points_with_parallel_axis_theorem
 
@@ -89,6 +88,34 @@ class JointData:
         )
 
     @classmethod
+    def load_from_disk_allow_missing(cls, path: Path) -> "JointData":
+        """Loads the joint data from disk. Allows missing velocities and accelerations.
+
+        Args:
+            path: The path to load the joint data from.
+
+        Returns:
+            The joint data.
+        """
+        joint_velocities = (
+            np.load(path / "joint_velocities.npy")
+            if (path / "joint_velocities.npy").exists()
+            else None
+        )
+        joint_accelerations = (
+            np.load(path / "joint_accelerations.npy")
+            if (path / "joint_accelerations.npy").exists()
+            else None
+        )
+        return cls(
+            joint_positions=np.load(path / "joint_positions.npy"),
+            joint_velocities=joint_velocities,
+            joint_accelerations=joint_accelerations,
+            joint_torques=np.load(path / "joint_torques.npy"),
+            sample_times_s=np.load(path / "sample_times_s.npy"),
+        )
+
+    @classmethod
     def from_trajectory(
         cls, trajectory: Trajectory, sample_times_s: np.ndarray
     ) -> "JointData":
@@ -115,6 +142,50 @@ class JointData:
             joint_torques=np.nan * np.ones_like(sample_times_s),
             sample_times_s=sample_times_s,
         )
+
+    @classmethod
+    def average_joint_datas(cls, joint_datas: List["JointData"]) -> "JointData":
+        """Averages a list of JointData objects over time."""
+        # Handle missing velocities and accelerations.
+        for jd in joint_datas:
+            if jd.joint_velocities is None:
+                jd.joint_velocities = np.zeros_like(jd.joint_positions)
+            if jd.joint_accelerations is None:
+                jd.joint_accelerations = np.zeros_like(jd.joint_positions)
+
+        # Remove duplicate samples
+        joint_datas = [jd.remove_duplicate_samples() for jd in joint_datas]
+
+        # Remove all non-common samples
+        min_length = min([len(jd.sample_times_s) for jd in joint_datas])
+        for jd in joint_datas:
+            jd.joint_positions = jd.joint_positions[:min_length]
+            jd.joint_velocities = jd.joint_velocities[:min_length]
+            jd.joint_accelerations = jd.joint_accelerations[:min_length]
+            jd.joint_torques = jd.joint_torques[:min_length]
+            jd.sample_times_s = jd.sample_times_s[:min_length]
+
+        # Validate that all samples are equally spaced
+        sample_period = (
+            joint_datas[0].sample_times_s[1] - joint_datas[0].sample_times_s[0]
+        )
+        for jd in joint_datas:
+            assert np.allclose(
+                jd.sample_times_s[1:] - jd.sample_times_s[:-1], sample_period
+            ), "Sample times are not equally spaced."
+
+        averaged_joint_data = JointData(
+            joint_positions=np.mean([jd.joint_positions for jd in joint_datas], axis=0),
+            joint_velocities=np.mean(
+                [jd.joint_velocities for jd in joint_datas], axis=0
+            ),
+            joint_accelerations=np.mean(
+                [jd.joint_accelerations for jd in joint_datas], axis=0
+            ),
+            joint_torques=np.mean([jd.joint_torques for jd in joint_datas], axis=0),
+            sample_times_s=joint_datas[0].sample_times_s,
+        )
+        return averaged_joint_data
 
 
 @dataclass
