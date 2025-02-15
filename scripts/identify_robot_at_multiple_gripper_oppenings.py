@@ -123,9 +123,6 @@ def main():
 
     args = parser.parse_args()
     regularization_weight = args.regularization_weight
-    num_endpoints_to_remove = args.num_endpoints_to_remove
-    compute_velocities = not args.not_compute_velocities
-    filter_positions = not args.not_filter_positions
     pos_filter_order = args.pos_order
     pos_cutoff_freq_hz = args.pos_cutoff_freq_hz
     vel_filter_order = args.vel_order
@@ -150,24 +147,48 @@ def main():
         plant_context=arm_components.plant.CreateDefaultContext(),
     )
 
-    subdirs = list(args.joint_data_path.iterdir())
+    # Compute the base parameter mapping
+    num_random_points = 2000
+    joint_data_random = JointData(
+        joint_positions=np.random.rand(num_random_points, num_joints) - 0.5,
+        joint_velocities=np.random.rand(num_random_points, num_joints) - 0.5,
+        joint_accelerations=np.random.rand(num_random_points, num_joints) - 0.5,
+        joint_torques=np.zeros((num_random_points, num_joints)),
+        sample_times_s=np.zeros(num_random_points),
+    )
+    W_data_random, _, _ = extract_numeric_data_matrix_autodiff(
+        plant_components=arm_plant_components,
+        joint_data=joint_data_random,
+        add_rotor_inertia=False,
+        add_reflected_inertia=True,
+        add_viscous_friction=True,
+        add_dynamic_dry_friction=True,
+        payload_only=False,
+    )
+    base_param_mapping = compute_base_param_mapping(W_data_random)
+    logging.info(
+        f"{base_param_mapping.shape[1]} out of {base_param_mapping.shape[0]} "
+        + "parameters are identifiable."
+    )
+
+    subdirs = [d for d in args.joint_data_path.iterdir() if d.is_dir()]
     for subdir in subdirs:
         logging.info(f"Processing {subdir}")
 
         # Load all runs and average data over time.
-        run_dirs = list(subdir.iterdir())
-        joint_datas = []
-        for run_dir in run_dirs:
-            joint_data = JointData.load_from_disk_allow_missing(run_dir)
-            joint_datas.append(joint_data)
-        joint_data = JointData.average_joint_datas(joint_datas)
+        joint_datas = [
+            JointData.load_from_disk_allow_missing(run_dir)
+            for run_dir in subdir.iterdir()
+            if run_dir.is_dir()
+        ]
+        raw_joint_data = JointData.average_joint_datas(joint_datas)
 
         # Process joint data
         joint_data = process_joint_data(
-            joint_data=joint_data,
-            num_endpoints_to_remove=num_endpoints_to_remove,
-            compute_velocities=compute_velocities,
-            filter_positions=filter_positions,
+            joint_data=raw_joint_data,
+            num_endpoints_to_remove=0,
+            compute_velocities=True,
+            filter_positions=False,
             pos_filter_order=pos_filter_order,
             pos_cutoff_freq_hz=pos_cutoff_freq_hz,
             vel_filter_order=vel_filter_order,
@@ -179,11 +200,7 @@ def main():
         )
 
         # Generate data matrix
-        (
-            W_data_raw,
-            w0_data,
-            _,
-        ) = extract_numeric_data_matrix_autodiff(
+        (W_data_raw, w0_data, _) = extract_numeric_data_matrix_autodiff(
             plant_components=arm_plant_components,
             joint_data=joint_data,
             add_rotor_inertia=False,
@@ -195,30 +212,6 @@ def main():
         tau_data = joint_data.joint_torques.flatten()
         # Transform from affine `tau = W * params + w0` into linear `(tau - w0) = W * params`
         tau_data -= w0_data
-
-        # Compute the base parameter mapping
-        num_random_points = 2000
-        joint_data_random = JointData(
-            joint_positions=np.random.rand(num_random_points, num_joints) - 0.5,
-            joint_velocities=np.random.rand(num_random_points, num_joints) - 0.5,
-            joint_accelerations=np.random.rand(num_random_points, num_joints) - 0.5,
-            joint_torques=np.zeros((num_random_points, num_joints)),
-            sample_times_s=np.zeros(num_random_points),
-        )
-        W_data_random, _, _ = extract_numeric_data_matrix_autodiff(
-            plant_components=arm_plant_components,
-            joint_data=joint_data_random,
-            add_rotor_inertia=False,
-            add_reflected_inertia=True,
-            add_viscous_friction=True,
-            add_dynamic_dry_friction=True,
-            payload_only=False,
-        )
-        base_param_mapping = compute_base_param_mapping(W_data_random)
-        logging.info(
-            f"{base_param_mapping.shape[1]} out of {base_param_mapping.shape[0]} "
-            + "parameters are identifiable."
-        )
 
         # Remove structurally unidentifiable columns to prevent SolutionResult.kUnbounded
         W_data = np.empty((W_data_raw.shape[0], base_param_mapping.shape[1]))
@@ -239,7 +232,8 @@ def main():
             payload_only=False,
         )
 
-        (_, result, variable_names, variable_vec, _) = solve_inertial_param_sdp(
+        # Solve the SDP
+        _, result, variable_names, variable_vec, _ = solve_inertial_param_sdp(
             num_links=num_joints,
             W_data=W_data,
             tau_data=tau_data,
@@ -247,10 +241,10 @@ def main():
             regularization_weight=regularization_weight,
             params_guess=params_guess,
             use_euclidean_regularization=False,
-            add_rotor_inertia=False,
-            add_reflected_inertia=True,
-            add_viscous_friction=True,
-            add_dynamic_dry_friction=True,
+            identify_rotor_inertia=False,
+            identify_reflected_inertia=True,
+            identify_viscous_friction=True,
+            identify_dynamic_dry_friction=True,
             payload_only=False,
         )
         if result.is_success():

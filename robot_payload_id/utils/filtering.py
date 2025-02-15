@@ -107,19 +107,26 @@ def process_joint_data(
     """
     # Remove beginning and end points to ensure sample times are increasing with the
     # same period throughout to enable differentiation
-    joint_positions = joint_data.joint_positions[
-        num_endpoints_to_remove:-num_endpoints_to_remove
-    ]
-    if not compute_velocities:
-        joint_velocities = joint_data.joint_velocities[
+    if num_endpoints_to_remove > 0:
+        joint_positions = joint_data.joint_positions[
             num_endpoints_to_remove:-num_endpoints_to_remove
         ]
-    joint_torques = joint_data.joint_torques[
-        num_endpoints_to_remove:-num_endpoints_to_remove
-    ]
-    sample_times_s = joint_data.sample_times_s[
-        num_endpoints_to_remove:-num_endpoints_to_remove
-    ]
+        if not compute_velocities:
+            joint_velocities = joint_data.joint_velocities[
+                num_endpoints_to_remove:-num_endpoints_to_remove
+            ]
+        joint_torques = joint_data.joint_torques[
+            num_endpoints_to_remove:-num_endpoints_to_remove
+        ]
+        sample_times_s = joint_data.sample_times_s[
+            num_endpoints_to_remove:-num_endpoints_to_remove
+        ]
+    else:
+        joint_positions = joint_data.joint_positions
+        if not compute_velocities:
+            joint_velocities = joint_data.joint_velocities
+        joint_torques = joint_data.joint_torques
+        sample_times_s = joint_data.sample_times_s
 
     # Process the joint data
     sample_period = sample_times_s[1] - sample_times_s[0]
