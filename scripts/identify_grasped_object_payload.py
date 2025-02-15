@@ -26,6 +26,7 @@ T is the number of timesteps and N is the number of points in the point cloud.
 import argparse
 import copy
 import logging
+import os
 
 from pathlib import Path
 
@@ -33,15 +34,21 @@ import numpy as np
 import open3d as o3d
 
 from pydrake.all import (
+    AddMultibodyPlantSceneGraph,
+    DiagramBuilder,
+    Ellipsoid,
     FixedOffsetFrame,
+    MeshcatVisualizer,
     MultibodyPlant,
+    Rgba,
     RigidTransform,
+    Simulator,
     SpatialInertia,
+    StartMeshcat,
     UnitInertia,
 )
 
 from robot_payload_id.data import extract_numeric_data_matrix_autodiff
-from robot_payload_id.environment import create_arm
 from robot_payload_id.optimization import solve_inertial_param_sdp
 from robot_payload_id.utils import (
     ArmComponents,
@@ -225,6 +232,75 @@ def get_object_pose_in_link_frame(
     X_LO = reg_p2p.transformation
 
     return X_LO
+
+
+def visualize_object_inertia(
+    object_mesh_path: Path,
+    spatial_inertia: SpatialInertia,
+    com: np.ndarray,
+) -> None:
+    """Visualizes the object mesh and its spatial inertia ellipsoid.
+
+    Args:
+        object_mesh_path: Path to the object mesh file.
+        spatial_inertia: The spatial inertia of the object about its CoM, expressed in
+            the object frame.
+        com: The center of mass position in the object frame.
+    """
+    # Load the object mesh
+    mesh = o3d.io.read_triangle_mesh(str(object_mesh_path))
+    mesh.paint_uniform_color([0.7, 0.7, 0.7])  # Gray color
+
+    # Create coordinate frames
+    origin_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.1)
+    com_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.05)
+
+    # Move COM frame to COM position
+    com_frame_transform = np.eye(4)
+    com_frame_transform[:3, 3] = com  # Use passed-in CoM
+    com_frame.transform(com_frame_transform)
+
+    # Calculate ellipsoid parameters
+    radii, X_BE = spatial_inertia.CalcPrincipalSemiDiametersAndPoseForSolidEllipsoid()
+
+    # Clip for improved visualization
+    new_radii = np.clip(radii, a_min=1e-2 * radii.max(), a_max=None)
+    if np.any(new_radii != radii):
+        logging.warning(f"Radii were clipped to {new_radii}")
+
+    # Scale ellipsoid to match mass
+    density = 1000.0  # kg/m^3 (water density)
+    unit_inertia_ellipsoid_mass = density * 4.0 / 3.0 * np.pi * np.prod(new_radii)
+    volume_scale = spatial_inertia.get_mass() / unit_inertia_ellipsoid_mass
+    abc = new_radii * np.cbrt(volume_scale)
+
+    # Create sphere and scale it to ellipsoid
+    sphere = o3d.geometry.TriangleMesh.create_sphere(radius=1.0)
+
+    # Scale vertices to create ellipsoid
+    vertices = np.asarray(sphere.vertices)
+    vertices[:, 0] *= abc[0]
+    vertices[:, 1] *= abc[1]
+    vertices[:, 2] *= abc[2]
+
+    # Apply rotation from X_BE
+    R_BE = X_BE.rotation().matrix()
+    vertices = vertices @ R_BE.T
+
+    # Translate vertices to COM
+    vertices += com
+
+    # Update sphere vertices to create ellipsoid
+    sphere.vertices = o3d.utility.Vector3dVector(vertices)
+    sphere.paint_uniform_color([1, 0, 0])  # Red color
+
+    # Visualize
+    o3d.visualization.draw_geometries(
+        [mesh, sphere, origin_frame, com_frame],
+        window_name="Object Inertia Visualization",
+        mesh_show_wireframe=True,
+        mesh_show_back_face=True,
+    )
 
 
 def main():
@@ -533,7 +609,6 @@ def main():
             frame_F=payload_frame,
             body_indexes=[last_link.index()],
         )
-        print("after calc spatial inertia")
         # Express inerita about CoM to match SDFormat convention
         M_PPayloadcom_Payload = M_PPayload_Payload.Shift(M_PPayload_Payload.get_com())
         logging.info(
@@ -548,6 +623,13 @@ def main():
             M_PPayloadcom_Payload.CalcRotationalInertia().CopyToFullMatrix3()
         )
         logging.info("Payload inertia (about CoM):\n" + f"{I_PPayloadcom_Payload}\n")
+
+        if visualize:
+            visualize_object_inertia(
+                object_mesh_path=object_mesh_path,
+                spatial_inertia=M_PPayloadcom_Payload,
+                com=com_PPayload_Payload,  # Pass the original CoM
+            )
 
         if output_param_path is not None:
             logging.info(f"Saving parameters to {output_param_path}")
