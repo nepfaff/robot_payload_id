@@ -58,6 +58,7 @@ from robot_payload_id.utils import (
     process_joint_data,
     write_parameters_to_plant,
 )
+from robot_payload_id.utils.utils import compute_min_ellipsoid
 
 
 def get_object_pose_in_link_frame(
@@ -229,7 +230,7 @@ def get_object_pose_in_link_frame(
         print(f"ICP inlier_rmse: {reg_p2p.inlier_rmse}")
 
     # The transformation matrix from link frame to object frame
-    X_LO = reg_p2p.transformation
+    X_LO = np.linalg.inv(reg_p2p.transformation)
 
     return X_LO
 
@@ -389,6 +390,11 @@ def main():
         help="Whether to display debug visualizations.",
     )
     parser.add_argument(
+        "--use_bounding_ellipsoid",
+        action="store_true",
+        help="Whether to use a bounding ellipsoid constraint for the payload inertia.",
+    )
+    parser.add_argument(
         "--log_level",
         type=str,
         default="INFO",
@@ -410,6 +416,7 @@ def main():
     torque_filter_order = args.torque_order
     torque_cutoff_freq_hz = args.torque_cutoff_freq_hz
     visualize = args.visualize
+    use_bounding_ellipsoid = args.use_bounding_ellipsoid
     logging.basicConfig(level=args.log_level)
 
     # Get the payload/ object frame transform
@@ -520,6 +527,12 @@ def main():
         payload_only=True,
     )[-1]
 
+    if use_bounding_ellipsoid:
+        # Compute the minimum bounding ellipsoid for the object
+        bounding_ellipsoid = compute_min_ellipsoid(object_mesh_path, transform=X_LO)
+    else:
+        bounding_ellipsoid = None
+
     # Solve the SDP
     _, result, variable_names, variable_vec, _ = solve_inertial_param_sdp(
         num_links=num_joints,
@@ -535,6 +548,7 @@ def main():
         identify_dynamic_dry_friction=True,
         payload_only=True,
         initial_last_link_params=initial_last_link_params,
+        payload_bounding_ellipsoid=bounding_ellipsoid,
     )
 
     if result.is_success():
