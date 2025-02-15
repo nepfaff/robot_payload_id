@@ -223,8 +223,9 @@ def create_autodiff_plant(
     # Create an autodiff plant
     ad_plant: MultibodyPlant = plant_components.plant.ToAutoDiffXd()
     ad_plant_context = ad_plant.CreateDefaultContext()
-    if plant_components.plant_context is not None:
-        ad_plant_context.SetTimeStateAndParametersFrom(plant_components.plant_context)
+    # Settings the params here might create weird derivatives...
+    # if plant_components.plant_context is not None:
+    #     ad_plant_context.SetTimeStateAndParametersFrom(plant_components.plant_context)
 
     # Create the autodiff parameters
     ad_parameters: List[JointParameters] = []

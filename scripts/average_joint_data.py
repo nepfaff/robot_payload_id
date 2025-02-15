@@ -41,7 +41,7 @@ def main():
         if not dir.is_dir():
             continue
         logging.info(f"Loading joint data from {dir}.")
-        joint_data_raw = JointData.load_from_disk(dir)
+        joint_data_raw = JointData.load_from_disk_allow_missing(dir)
         joint_data_raw.joint_accelerations = (
             np.zeros_like(joint_data_raw.joint_positions) * np.nan
         )
@@ -52,8 +52,10 @@ def main():
     min_length = min([len(jd.sample_times_s) for jd in joint_datas])
     for jd in joint_datas:
         jd.joint_positions = jd.joint_positions[:min_length]
-        jd.joint_velocities = jd.joint_velocities[:min_length]
-        jd.joint_accelerations = jd.joint_accelerations[:min_length]
+        if jd.joint_velocities is not None:
+            jd.joint_velocities = jd.joint_velocities[:min_length]
+        if jd.joint_accelerations is not None:
+            jd.joint_accelerations = jd.joint_accelerations[:min_length]
         jd.joint_torques = jd.joint_torques[:min_length]
         jd.sample_times_s = jd.sample_times_s[:min_length]
 
@@ -65,15 +67,7 @@ def main():
         ), "Sample times are not equally spaced."
     logging.info(f"Sample period: {sample_period} seconds.")
 
-    averaged_joint_data = JointData(
-        joint_positions=np.mean([jd.joint_positions for jd in joint_datas], axis=0),
-        joint_velocities=np.mean([jd.joint_velocities for jd in joint_datas], axis=0),
-        joint_accelerations=np.mean(
-            [jd.joint_accelerations for jd in joint_datas], axis=0
-        ),
-        joint_torques=np.mean([jd.joint_torques for jd in joint_datas], axis=0),
-        sample_times_s=joint_datas[0].sample_times_s,
-    )
+    averaged_joint_data = JointData.average_joint_datas(joint_datas)
 
     # Compute average joint position variance across data sets
     joint_positions_list = [jd.joint_positions for jd in joint_datas]
@@ -83,13 +77,14 @@ def main():
         f"Mean position variance across time for each joint: {mean_variance_across_time}"
     )
 
-    # Compute average joint velocity variance across data sets
-    joint_velocities_list = [jd.joint_velocities for jd in joint_datas]
-    variances = np.var(joint_velocities_list, axis=0)
-    mean_variance_across_time = np.mean(variances, axis=0)
-    logging.info(
-        f"Mean velocity variance across time for each joint: {mean_variance_across_time}"
-    )
+    if joint_datas[0].joint_velocities is not None:
+        # Compute average joint velocity variance across data sets
+        joint_velocities_list = [jd.joint_velocities for jd in joint_datas]
+        variances = np.var(joint_velocities_list, axis=0)
+        mean_variance_across_time = np.mean(variances, axis=0)
+        logging.info(
+            f"Mean velocity variance across time for each joint: {mean_variance_across_time}"
+        )
 
     # Compute average joint torque variance across data sets
     joint_torques_list = [jd.joint_torques for jd in joint_datas]
@@ -137,43 +132,44 @@ def main():
     )
     plt.show()
 
-    # Plot all joint velocities and averaged velocities on the same plot
-    fig, axes = plt.subplots(
-        nrows=num_joints, ncols=1, figsize=(num_joints * 7, 15), sharex=True
-    )
-    for i in range(num_joints):
-        ax = axes[i]
-        for joint_data_raw in joint_datas:
-            ax.plot(
-                joint_data_raw.sample_times_s, joint_data_raw.joint_velocities[:, i]
-            )
-        ax.plot(
-            averaged_joint_data.sample_times_s,
-            averaged_joint_data.joint_velocities[:, i],
-            color="red",
-            label="Averaged",
+    if joint_datas[0].joint_velocities is not None:
+        # Plot all joint velocities and averaged velocities on the same plot
+        fig, axes = plt.subplots(
+            nrows=num_joints, ncols=1, figsize=(num_joints * 7, 15), sharex=True
         )
-        ax.set_title(f"Joint {i+1}")
-        if i == 0:  # Add a legend to the first subplot
-            ax.legend()
-    # Set a common x-label
-    fig.text(
-        0.5,
-        0.04,
-        "Sample Times (s)",
-        ha="center",
-        fontsize=12,
-    )
-    # Set a common y-label
-    fig.text(
-        0.04,
-        0.5,
-        "Joint velocities (rad/s)",
-        va="center",
-        rotation="vertical",
-        fontsize=12,
-    )
-    plt.show()
+        for i in range(num_joints):
+            ax = axes[i]
+            for joint_data_raw in joint_datas:
+                ax.plot(
+                    joint_data_raw.sample_times_s, joint_data_raw.joint_velocities[:, i]
+                )
+            ax.plot(
+                averaged_joint_data.sample_times_s,
+                averaged_joint_data.joint_velocities[:, i],
+                color="red",
+                label="Averaged",
+            )
+            ax.set_title(f"Joint {i+1}")
+            if i == 0:  # Add a legend to the first subplot
+                ax.legend()
+        # Set a common x-label
+        fig.text(
+            0.5,
+            0.04,
+            "Sample Times (s)",
+            ha="center",
+            fontsize=12,
+        )
+        # Set a common y-label
+        fig.text(
+            0.04,
+            0.5,
+            "Joint velocities (rad/s)",
+            va="center",
+            rotation="vertical",
+            fontsize=12,
+        )
+        plt.show()
 
     # Plot all joint torques and averaged torques on the same plot
     fig, axes = plt.subplots(

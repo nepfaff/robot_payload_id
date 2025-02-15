@@ -352,7 +352,7 @@ def main():
     parser.add_argument(
         "--vel_cutoff_freq_hz",
         type=float,
-        default=10.0,
+        default=6.0,
         help="The cutoff frequency of the filter for the joint velocities. Only used if "
         + "`--process_joint_data` is set.",
     )
@@ -380,7 +380,7 @@ def main():
     parser.add_argument(
         "--torque_cutoff_freq_hz",
         type=float,
-        default=10.0,
+        default=5.5,
         help="The cutoff frequency of the filter for the joint torques. Only used if "
         + "`--process_joint_data` is set.",
     )
@@ -393,6 +393,12 @@ def main():
         "--use_bounding_ellipsoid",
         action="store_true",
         help="Whether to use a bounding ellipsoid constraint for the payload inertia.",
+    )
+    parser.add_argument(
+        "--time_to_cutoff_at_beginning_s",
+        type=float,
+        default=2.0,
+        help="The time to cutoff at the beginning of the data.",
     )
     parser.add_argument(
         "--log_level",
@@ -417,6 +423,7 @@ def main():
     torque_cutoff_freq_hz = args.torque_cutoff_freq_hz
     visualize = args.visualize
     use_bounding_ellipsoid = args.use_bounding_ellipsoid
+    time_to_cutoff_at_beginning_s = args.time_to_cutoff_at_beginning_s
     logging.basicConfig(level=args.log_level)
 
     # Get the payload/ object frame transform
@@ -481,6 +488,9 @@ def main():
 
     # Load and process object joint data.
     raw_joint_data = JointData.load_from_disk_allow_missing(object_joint_data_path)
+    raw_joint_data = JointData.cut_off_at_beginning(
+        raw_joint_data, time_to_cutoff_at_beginning_s
+    )
     joint_data = process_joint_data(
         joint_data=raw_joint_data,
         num_endpoints_to_remove=0,
@@ -497,7 +507,7 @@ def main():
     )
 
     # Generate data matrix
-    (W_data, w0_data, _) = extract_numeric_data_matrix_autodiff(
+    W_data, w0_data, _ = extract_numeric_data_matrix_autodiff(
         plant_components=arm_plant_components,
         joint_data=joint_data,
         add_rotor_inertia=False,
@@ -510,16 +520,7 @@ def main():
     # Transform from affine `tau = W * params + w0` into linear `(tau - w0) = W * params`
     tau_data -= w0_data
 
-    # Construct initial parameter guess
-    params_guess = get_plant_joint_params(
-        arm_components.plant,
-        arm_components.plant.CreateDefaultContext(),
-        add_rotor_inertia=False,
-        add_reflected_inertia=True,
-        add_viscous_friction=True,
-        add_dynamic_dry_friction=True,
-        payload_only=True,
-    )
+    # Construct the identified robot parameters without payload
     initial_last_link_params = get_plant_joint_params(
         arm_plant_components.plant,
         arm_plant_components.plant_context,
@@ -543,7 +544,7 @@ def main():
         tau_data=tau_data,
         base_param_mapping=None,
         regularization_weight=0.0,
-        params_guess=params_guess,
+        params_guess=None,
         use_euclidean_regularization=False,
         identify_rotor_inertia=False,
         identify_reflected_inertia=True,

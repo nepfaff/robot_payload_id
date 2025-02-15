@@ -9,7 +9,6 @@ from typing import Dict
 
 import numpy as np
 import sympy
-import wandb
 
 from pydrake.all import (
     DecomposeAffineExpressions,
@@ -20,6 +19,8 @@ from pydrake.all import (
     to_sympy,
 )
 from scipy.linalg import lu
+
+import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,
@@ -436,7 +437,7 @@ def main():
     parser.add_argument(
         "--vel_cutoff_freq_hz",
         type=float,
-        default=10.0,
+        default=6.0,
         help="The cutoff frequency of the filter for the joint velocities. Only used if "
         + "`--process_joint_data` is set.",
     )
@@ -464,7 +465,7 @@ def main():
     parser.add_argument(
         "--torque_cutoff_freq_hz",
         type=float,
-        default=10.0,
+        default=5.5,
         help="The cutoff frequency of the filter for the joint torques. Only used if "
         + "`--process_joint_data` is set.",
     )
@@ -613,7 +614,7 @@ def main():
                 sample_times_s=sample_times_s,
             )
     else:
-        joint_data = JointData.load_from_disk(joint_data_path)
+        joint_data = JointData.load_from_disk_allow_missing(joint_data_path)
         if use_commanded_torques:
             joint_data.joint_torques = np.load(
                 joint_data_path / "commanded_joint_torques.npy"

@@ -81,7 +81,7 @@ def main():
     parser.add_argument(
         "--vel_cutoff_freq_hz",
         type=float,
-        default=10.0,
+        default=6.0,
         help="The cutoff frequency of the filter for the joint velocities. Only used if "
         + "`--process_joint_data` is set.",
     )
@@ -95,7 +95,7 @@ def main():
     parser.add_argument(
         "--acc_cutoff_freq_hz",
         type=float,
-        default=30.0,
+        default=15.0,
         help="The cutoff frequency of the filter for the joint accelerations. Only used "
         + "if `--process_joint_data` is set.",
     )
@@ -109,9 +109,21 @@ def main():
     parser.add_argument(
         "--torque_cutoff_freq_hz",
         type=float,
-        default=10.0,
+        default=5.5,
         help="The cutoff frequency of the filter for the joint torques. Only used if "
         + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--only_save_averaged_joint_data",
+        action="store_true",
+        help="Whether to only save the averaged joint data and not identify the "
+        + "robot parameters.",
+    )
+    parser.add_argument(
+        "--time_to_cutoff_at_beginning_s",
+        type=float,
+        default=2.0,
+        help="The time to cutoff at the beginning of the data.",
     )
     parser.add_argument(
         "--log_level",
@@ -131,6 +143,8 @@ def main():
     acc_cutoff_freq_hz = args.acc_cutoff_freq_hz
     torque_filter_order = args.torque_order
     torque_cutoff_freq_hz = args.torque_cutoff_freq_hz
+    only_save_averaged_joint_data = args.only_save_averaged_joint_data
+    time_to_cutoff_at_beginning_s = args.time_to_cutoff_at_beginning_s
 
     logging.basicConfig(level=args.log_level)
 
@@ -179,9 +193,20 @@ def main():
         joint_datas = [
             JointData.load_from_disk_allow_missing(run_dir)
             for run_dir in subdir.iterdir()
-            if run_dir.is_dir()
+            if run_dir.is_dir() and run_dir.name.startswith("run_")
         ]
         raw_joint_data = JointData.average_joint_datas(joint_datas)
+        raw_joint_data = JointData.cut_off_at_beginning(
+            raw_joint_data, time_to_cutoff_at_beginning_s
+        )
+
+        # Save the averaged joint data.
+        out_path = subdir / "averaged_joint_data"
+        logging.info(f"Saving averaged joint data to {out_path}")
+        raw_joint_data.save_to_disk(out_path)
+
+        if only_save_averaged_joint_data:
+            continue
 
         # Process joint data
         joint_data = process_joint_data(

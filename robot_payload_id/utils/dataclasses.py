@@ -6,7 +6,6 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pydrake.symbolic as sym
-import wandb
 
 from pydrake.all import (
     BsplineBasis,
@@ -20,6 +19,8 @@ from pydrake.all import (
     TrajectorySource,
     VectorLogSink,
 )
+
+import wandb
 
 from .inertia import change_inertia_reference_points_with_parallel_axis_theorem
 
@@ -50,8 +51,16 @@ class JointData:
         _, unique_indices = np.unique(self.sample_times_s, return_index=True)
         return JointData(
             joint_positions=self.joint_positions[unique_indices],
-            joint_velocities=self.joint_velocities[unique_indices],
-            joint_accelerations=self.joint_accelerations[unique_indices],
+            joint_velocities=(
+                self.joint_velocities[unique_indices]
+                if self.joint_velocities is not None
+                else None
+            ),
+            joint_accelerations=(
+                self.joint_accelerations[unique_indices]
+                if self.joint_accelerations is not None
+                else None
+            ),
             joint_torques=self.joint_torques[unique_indices],
             sample_times_s=self.sample_times_s[unique_indices],
         )
@@ -139,6 +148,31 @@ class JointData:
             ).squeeze(),
             joint_torques=np.nan * np.ones_like(sample_times_s),
             sample_times_s=sample_times_s,
+        )
+
+    @classmethod
+    def cut_off_at_beginning(
+        cls, joint_data: "JointData", time_to_cutoff_s: float
+    ) -> "JointData":
+        assert time_to_cutoff_s >= 0, "time_to_cutoff_s must be non-negative."
+        index = np.searchsorted(joint_data.sample_times_s, time_to_cutoff_s)
+        shifted_sample_times = (
+            joint_data.sample_times_s[index:] - joint_data.sample_times_s[index]
+        )
+        return cls(
+            joint_positions=joint_data.joint_positions[index:],
+            joint_velocities=(
+                joint_data.joint_velocities[index:]
+                if joint_data.joint_velocities is not None
+                else None
+            ),
+            joint_accelerations=(
+                joint_data.joint_accelerations[index:]
+                if joint_data.joint_accelerations is not None
+                else None
+            ),
+            joint_torques=joint_data.joint_torques[index:],
+            sample_times_s=shifted_sample_times,
         )
 
     @classmethod

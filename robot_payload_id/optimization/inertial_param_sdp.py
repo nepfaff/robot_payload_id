@@ -220,64 +220,70 @@ def solve_inertial_param_sdp(
         np.concatenate([z, x]),
     )
 
-    # Regularization towards initial parameter guess
     pseudo_inertias = [var.get_pseudo_inertia_matrix() for var in variables]
-    if use_euclidean_regularization:
-        variables_guess = np.concatenate(
-            [var.get_lumped_param_list() for var in params_guess]
-        )
-        prog.AddQuadraticCost(
-            regularization_weight
-            * (variables_guess - variable_vec).T
-            @ (variables_guess - variable_vec),
-            is_convex=True,
-        )
-    else:
-        pseudo_inertias_guess = [
-            var.get_pseudo_inertia_matrix() for var in params_guess
-        ]
-        add_entropic_divergence_regularization(
-            prog=prog,
-            pseudo_inertias=pseudo_inertias,
-            pseudo_inertias_guess=pseudo_inertias_guess,
-            regularization_weight=regularization_weight,
-        )
 
-        # Use euclidean regularization for the non-inertia parameters.
-        # "Geometric Robot Dynamic Identification: A Convex Programming Approach"
-        # suggests to use 1D entropic divergence regularization for non-inertial
-        # parameters. However, this is empirically equivalent to euclidean
-        # regularization and slightly less clean to implement.
-        non_inertia_params = []
-        non_inertia_params_guess = []
-        if not payload_only:
-            if identify_rotor_inertia:
-                non_inertia_params += [var.rotor_inertia for var in variables]
-                non_inertia_params_guess += [var.rotor_inertia for var in params_guess]
-            if identify_reflected_inertia:
-                non_inertia_params += [var.reflected_inertia for var in variables]
-                non_inertia_params_guess += [
-                    var.reflected_inertia for var in params_guess
-                ]
-            if identify_viscous_friction:
-                non_inertia_params += [var.viscous_friction for var in variables]
-                non_inertia_params_guess += [
-                    var.viscous_friction for var in params_guess
-                ]
-            if identify_dynamic_dry_friction:
-                non_inertia_params += [var.dynamic_dry_friction for var in variables]
-                non_inertia_params_guess += [
-                    var.dynamic_dry_friction for var in params_guess
-                ]
-            if len(non_inertia_params) > 0:
-                non_inertia_params = np.asarray(non_inertia_params)
-                non_inertia_params_guess = np.asarray(non_inertia_params_guess)
-                prog.AddQuadraticCost(
-                    regularization_weight
-                    * (non_inertia_params_guess - non_inertia_params).T
-                    @ (non_inertia_params_guess - non_inertia_params),
-                    is_convex=True,
-                )
+    if params_guess is not None or regularization_weight > 0.0:
+        # Regularization towards initial parameter guess
+        if use_euclidean_regularization:
+            variables_guess = np.concatenate(
+                [var.get_lumped_param_list() for var in params_guess]
+            )
+            prog.AddQuadraticCost(
+                regularization_weight
+                * (variables_guess - variable_vec).T
+                @ (variables_guess - variable_vec),
+                is_convex=True,
+            )
+        else:
+            pseudo_inertias_guess = [
+                var.get_pseudo_inertia_matrix() for var in params_guess
+            ]
+            add_entropic_divergence_regularization(
+                prog=prog,
+                pseudo_inertias=pseudo_inertias,
+                pseudo_inertias_guess=pseudo_inertias_guess,
+                regularization_weight=regularization_weight,
+            )
+
+            # Use euclidean regularization for the non-inertia parameters.
+            # "Geometric Robot Dynamic Identification: A Convex Programming Approach"
+            # suggests to use 1D entropic divergence regularization for non-inertial
+            # parameters. However, this is empirically equivalent to euclidean
+            # regularization and slightly less clean to implement.
+            non_inertia_params = []
+            non_inertia_params_guess = []
+            if not payload_only:
+                if identify_rotor_inertia:
+                    non_inertia_params += [var.rotor_inertia for var in variables]
+                    non_inertia_params_guess += [
+                        var.rotor_inertia for var in params_guess
+                    ]
+                if identify_reflected_inertia:
+                    non_inertia_params += [var.reflected_inertia for var in variables]
+                    non_inertia_params_guess += [
+                        var.reflected_inertia for var in params_guess
+                    ]
+                if identify_viscous_friction:
+                    non_inertia_params += [var.viscous_friction for var in variables]
+                    non_inertia_params_guess += [
+                        var.viscous_friction for var in params_guess
+                    ]
+                if identify_dynamic_dry_friction:
+                    non_inertia_params += [
+                        var.dynamic_dry_friction for var in variables
+                    ]
+                    non_inertia_params_guess += [
+                        var.dynamic_dry_friction for var in params_guess
+                    ]
+                if len(non_inertia_params) > 0:
+                    non_inertia_params = np.asarray(non_inertia_params)
+                    non_inertia_params_guess = np.asarray(non_inertia_params_guess)
+                    prog.AddQuadraticCost(
+                        regularization_weight
+                        * (non_inertia_params_guess - non_inertia_params).T
+                        @ (non_inertia_params_guess - non_inertia_params),
+                        is_convex=True,
+                    )
 
     # Inertial parameter feasibility constraints
     for pseudo_inertia in pseudo_inertias:
