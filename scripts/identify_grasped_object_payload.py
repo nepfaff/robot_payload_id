@@ -465,7 +465,10 @@ def main():
     closest_gripper_position = min(
         available_gripper_positions, key=lambda x: abs(x - mean_gripper_position)
     )
-    logging.info(f"Using gripper position {closest_gripper_position}.")
+    logging.info(
+        f"Mean gripper position: {mean_gripper_position}. Using gripper position "
+        f"{closest_gripper_position}."
+    )
 
     # Load robot parameters.
     var_sol_dict = np.load(
