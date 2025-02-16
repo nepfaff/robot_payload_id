@@ -176,6 +176,30 @@ class JointData:
         )
 
     @classmethod
+    def cut_off_at_end(
+        cls, joint_data: "JointData", time_to_cutoff_s: float
+    ) -> "JointData":
+        assert time_to_cutoff_s >= 0, "time_to_cutoff_s must be non-negative."
+        index = np.searchsorted(
+            joint_data.sample_times_s, joint_data.sample_times_s[-1] - time_to_cutoff_s
+        )
+        return cls(
+            joint_positions=joint_data.joint_positions[:index],
+            joint_velocities=(
+                joint_data.joint_velocities[:index]
+                if joint_data.joint_velocities is not None
+                else None
+            ),
+            joint_accelerations=(
+                joint_data.joint_accelerations[:index]
+                if joint_data.joint_accelerations is not None
+                else None
+            ),
+            joint_torques=joint_data.joint_torques[:index],
+            sample_times_s=joint_data.sample_times_s[:index],
+        )
+
+    @classmethod
     def average_joint_datas(cls, joint_datas: List["JointData"]) -> "JointData":
         """Averages a list of JointData objects over time."""
         # Handle missing velocities and accelerations.
