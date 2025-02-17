@@ -352,7 +352,7 @@ def main():
     parser.add_argument(
         "--vel_cutoff_freq_hz",
         type=float,
-        default=6.0,
+        default=5.6,
         help="The cutoff frequency of the filter for the joint velocities. Only used if "
         + "`--process_joint_data` is set.",
     )
@@ -366,7 +366,7 @@ def main():
     parser.add_argument(
         "--acc_cutoff_freq_hz",
         type=float,
-        default=30.0,
+        default=4.2,
         help="The cutoff frequency of the filter for the joint accelerations. Only used "
         + "if `--process_joint_data` is set.",
     )
@@ -380,7 +380,7 @@ def main():
     parser.add_argument(
         "--torque_cutoff_freq_hz",
         type=float,
-        default=5.5,
+        default=4.0,
         help="The cutoff frequency of the filter for the joint torques. Only used if "
         + "`--process_joint_data` is set.",
     )
@@ -397,7 +397,7 @@ def main():
     parser.add_argument(
         "--time_to_cutoff_at_beginning_s",
         type=float,
-        default=2.0,
+        default=0.0,
         help="The time to cutoff at the beginning of the data.",
     )
     parser.add_argument(
@@ -631,7 +631,7 @@ def main():
         M_PPayloadcom_Payload = M_PPayload_Payload.Shift(M_PPayload_Payload.get_com())
         logging.info(
             "Difference in the last link's parameters (payload parameters). "
-            + "Note that these are in specified payload frame:"
+            + "Note that these are in identified object frame:"
         )
         payload_mass = M_PPayloadcom_Payload.get_mass()
         logging.info(f"Payload mass: {payload_mass}")

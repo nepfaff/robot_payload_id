@@ -81,7 +81,7 @@ def main():
     parser.add_argument(
         "--vel_cutoff_freq_hz",
         type=float,
-        default=6.0,
+        default=5.6,
         help="The cutoff frequency of the filter for the joint velocities. Only used if "
         + "`--process_joint_data` is set.",
     )
@@ -95,7 +95,7 @@ def main():
     parser.add_argument(
         "--acc_cutoff_freq_hz",
         type=float,
-        default=15.0,
+        default=4.2,
         help="The cutoff frequency of the filter for the joint accelerations. Only used "
         + "if `--process_joint_data` is set.",
     )
@@ -109,7 +109,7 @@ def main():
     parser.add_argument(
         "--torque_cutoff_freq_hz",
         type=float,
-        default=5.5,
+        default=4.0,
         help="The cutoff frequency of the filter for the joint torques. Only used if "
         + "`--process_joint_data` is set.",
     )
@@ -122,7 +122,7 @@ def main():
     parser.add_argument(
         "--time_to_cutoff_at_beginning_s",
         type=float,
-        default=2.0,
+        default=0.0,
         help="The time to cutoff at the beginning of the data.",
     )
     parser.add_argument(
