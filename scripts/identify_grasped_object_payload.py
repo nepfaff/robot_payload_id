@@ -25,8 +25,8 @@ T is the number of timesteps and N is the number of points in the point cloud.
 
 import argparse
 import copy
+import json
 import logging
-import os
 
 from pathlib import Path
 
@@ -34,17 +34,10 @@ import numpy as np
 import open3d as o3d
 
 from pydrake.all import (
-    AddMultibodyPlantSceneGraph,
-    DiagramBuilder,
-    Ellipsoid,
     FixedOffsetFrame,
-    MeshcatVisualizer,
     MultibodyPlant,
-    Rgba,
     RigidTransform,
-    Simulator,
     SpatialInertia,
-    StartMeshcat,
     UnitInertia,
 )
 
@@ -327,7 +320,6 @@ def main():
     )
     parser.add_argument(
         "--output_param_path",
-        required=True,
         type=Path,
         help="Path to the output parameter `.npy` file. If not provided, the parameters "
         + "are not saved to disk.",
@@ -631,7 +623,7 @@ def main():
             frame_F=payload_frame,
             body_indexes=[last_link.index()],
         )
-        # Express inerita about CoM to match SDFormat convention
+        # Express inerita about CoM to match SDFormat convention.
         M_PPayloadcom_Payload = M_PPayload_Payload.Shift(M_PPayload_Payload.get_com())
         logging.info(
             "Difference in the last link's parameters (payload parameters). "
@@ -645,6 +637,17 @@ def main():
             M_PPayloadcom_Payload.CalcRotationalInertia().CopyToFullMatrix3()
         )
         logging.info("Payload inertia (about CoM):\n" + f"{I_PPayloadcom_Payload}\n")
+
+        # Save inertial parameters to JSON.
+        inertial_params = {
+            "mass": float(payload_mass),
+            "center_of_mass": com_PPayload_Payload.tolist(),
+            "inertia_matrix": I_PPayloadcom_Payload.tolist(),
+        }
+        json_path = object_joint_data_path.parent / "inertial_params.json"
+        with open(json_path, "w") as f:
+            json.dump(inertial_params, f, indent=2)
+        logging.info(f"Saved inertial parameters to {json_path}")
 
         if visualize:
             visualize_object_inertia(
