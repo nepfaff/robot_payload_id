@@ -308,22 +308,26 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--robot_joint_data_path",
+        required=True,
         type=Path,
         help="See main file docstring.",
     )
     parser.add_argument(
         "--object_joint_data_path",
+        required=True,
         type=Path,
         help="See main file docstring.",
     )
     parser.add_argument(
         "--object_mesh_path",
+        required=True,
         type=Path,
         help="Path to the object mesh file. The identified params are expressed in the "
         + "object frame.",
     )
     parser.add_argument(
         "--output_param_path",
+        required=True,
         type=Path,
         help="Path to the output parameter `.npy` file. If not provided, the parameters "
         + "are not saved to disk.",
