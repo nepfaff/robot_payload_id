@@ -297,130 +297,48 @@ def visualize_object_inertia(
     )
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--robot_joint_data_path",
-        required=True,
-        type=Path,
-        help="See main file docstring.",
-    )
-    parser.add_argument(
-        "--object_joint_data_path",
-        required=True,
-        type=Path,
-        help="See main file docstring.",
-    )
-    parser.add_argument(
-        "--object_mesh_path",
-        required=True,
-        type=Path,
-        help="Path to the object mesh file. The identified params are expressed in the "
-        + "object frame.",
-    )
-    parser.add_argument(
-        "--output_param_path",
-        type=Path,
-        help="Path to the output parameter `.npy` file. If not provided, the parameters "
-        + "are not saved to disk.",
-    )
-    parser.add_argument(
-        "--pos_order",
-        type=int,
-        default=10,
-        help="The order of the filter for the joint positions. Only used if "
-        + "`--process_joint_data` is set.",
-    )
-    parser.add_argument(
-        "--pos_cutoff_freq_hz",
-        type=float,
-        default=60.0,
-        help="The cutoff frequency of the filter for the joint positions. Only used if "
-        + "`--process_joint_data` is set.",
-    )
-    parser.add_argument(
-        "--vel_order",
-        type=int,
-        default=10,
-        help="The order of the filter for the joint velocities. Only used if "
-        + "`--process_joint_data` is set.",
-    )
-    parser.add_argument(
-        "--vel_cutoff_freq_hz",
-        type=float,
-        default=5.6,
-        help="The cutoff frequency of the filter for the joint velocities. Only used if "
-        + "`--process_joint_data` is set.",
-    )
-    parser.add_argument(
-        "--acc_order",
-        type=int,
-        default=10,
-        help="The order of the filter for the joint accelerations. Only used if "
-        + "`--process_joint_data` is set.",
-    )
-    parser.add_argument(
-        "--acc_cutoff_freq_hz",
-        type=float,
-        default=4.2,
-        help="The cutoff frequency of the filter for the joint accelerations. Only used "
-        + "if `--process_joint_data` is set.",
-    )
-    parser.add_argument(
-        "--torque_order",
-        type=int,
-        default=10,
-        help="The order of the filter for the joint torques. Only used if "
-        + "`--process_joint_data` is set.",
-    )
-    parser.add_argument(
-        "--torque_cutoff_freq_hz",
-        type=float,
-        default=4.0,
-        help="The cutoff frequency of the filter for the joint torques. Only used if "
-        + "`--process_joint_data` is set.",
-    )
-    parser.add_argument(
-        "--visualize",
-        action="store_true",
-        help="Whether to display debug visualizations.",
-    )
-    parser.add_argument(
-        "--use_bounding_ellipsoid",
-        action="store_true",
-        help="Whether to use a bounding ellipsoid constraint for the payload inertia.",
-    )
-    parser.add_argument(
-        "--time_to_cutoff_at_beginning_s",
-        type=float,
-        default=0.0,
-        help="The time to cutoff at the beginning of the data.",
-    )
-    parser.add_argument(
-        "--log_level",
-        type=str,
-        default="INFO",
-        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
-        help="Log level.",
-    )
+def identify_grasped_object_payload(
+    robot_joint_data_path: Path,
+    object_joint_data_path: Path,
+    object_mesh_path: Path,
+    output_param_path: Path | None = None,
+    vel_filter_order: int = 10,
+    vel_cutoff_freq_hz: float = 5.6,
+    acc_filter_order: int = 10,
+    acc_cutoff_freq_hz: float = 4.2,
+    torque_filter_order: int = 10,
+    torque_cutoff_freq_hz: float = 4.0,
+    visualize: bool = False,
+    use_bounding_ellipsoid: bool = False,
+    time_to_cutoff_at_beginning_s: float = 0.0,
+) -> None:
+    """Identifies the inertial parameters of a grasped object and expresses them in the
+    object frame.
 
-    args = parser.parse_args()
-    robot_joint_data_path = args.robot_joint_data_path
-    object_joint_data_path = args.object_joint_data_path
-    object_mesh_path = args.object_mesh_path
-    output_param_path = args.output_param_path
-    pos_filter_order = args.pos_order
-    pos_cutoff_freq_hz = args.pos_cutoff_freq_hz
-    vel_filter_order = args.vel_order
-    vel_cutoff_freq_hz = args.vel_cutoff_freq_hz
-    acc_filter_order = args.acc_order
-    acc_cutoff_freq_hz = args.acc_cutoff_freq_hz
-    torque_filter_order = args.torque_order
-    torque_cutoff_freq_hz = args.torque_cutoff_freq_hz
-    visualize = args.visualize
-    use_bounding_ellipsoid = args.use_bounding_ellipsoid
-    time_to_cutoff_at_beginning_s = args.time_to_cutoff_at_beginning_s
-    logging.basicConfig(level=args.log_level)
+    Args:
+        robot_joint_data_path: Path to directory containing robot joint data at multiple
+            gripper openings. See main file docstring for expected structure.
+        object_joint_data_path: Path to directory containing object joint data. See
+            main file docstring for expected structure.
+        object_mesh_path: Path to the object mesh file. The identified params are
+            expressed in this object's frame.
+        output_param_path: Optional path to save the identified parameters as a .npy
+            file.
+        vel_filter_order: Order of the filter for joint velocities.
+        vel_cutoff_freq_hz: Cutoff frequency for joint velocity filter.
+        acc_filter_order: Order of the filter for joint accelerations.
+        acc_cutoff_freq_hz: Cutoff frequency for joint acceleration filter.
+        torque_filter_order: Order of the filter for joint torques.
+        torque_cutoff_freq_hz: Cutoff frequency for joint torque filter.
+        visualize: Whether to display debug visualizations.
+        use_bounding_ellipsoid: Whether to use a bounding ellipsoid constraint for
+            payload inertia.
+        time_to_cutoff_at_beginning_s: Time to cutoff at the beginning of the data.
+    """
+    # Convert strings to paths if necessary.
+    robot_joint_data_path = Path(robot_joint_data_path)
+    object_joint_data_path = Path(object_joint_data_path)
+    object_mesh_path = Path(object_mesh_path)
 
     # Get the payload/ object frame transform
     manipuland_cloud_link7_frame = np.load(
@@ -434,7 +352,9 @@ def main():
     num_joints = 7
     # NOTE: This model must not have a payload attached. Otherwise, the w0 term will be
     # wrong and include the payload inertia.
-    model_path = "./models/iiwa.dmd.yaml"
+    model_path = str(
+        Path(__file__).resolve().parent.parent / "models" / "iiwa.dmd.yaml"
+    )
     plant = MultibodyPlant(0.0)
     parser = get_parser(plant)
     parser.AddModels(model_path)
@@ -492,8 +412,8 @@ def main():
         num_endpoints_to_remove=0,
         compute_velocities=True,
         filter_positions=False,
-        pos_filter_order=pos_filter_order,
-        pos_cutoff_freq_hz=pos_cutoff_freq_hz,
+        pos_filter_order=0,
+        pos_cutoff_freq_hz=0,
         vel_filter_order=vel_filter_order,
         vel_cutoff_freq_hz=vel_cutoff_freq_hz,
         acc_filter_order=acc_filter_order,
@@ -620,7 +540,7 @@ def main():
         # expressed in the payload frame.
         M_PPayload_Payload = arm_plant_components.plant.CalcSpatialInertia(
             context=plant_context,
-            frame_F=payload_frame,
+            frame_F=plant.GetFrameByName("payload_frame"),
             body_indexes=[last_link.index()],
         )
         # Express inerita about CoM to match SDFormat convention.
@@ -665,6 +585,120 @@ def main():
         logging.warning("Failed to solve inertial parameter SDP!")
         logging.info(f"Solution result:\n{result.get_solution_result()}")
         logging.info(f"Solver details:\n{result.get_solver_details()}")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--robot_joint_data_path",
+        required=True,
+        type=Path,
+        help="See main file docstring.",
+    )
+    parser.add_argument(
+        "--object_joint_data_path",
+        required=True,
+        type=Path,
+        help="See main file docstring.",
+    )
+    parser.add_argument(
+        "--object_mesh_path",
+        required=True,
+        type=Path,
+        help="Path to the object mesh file. The identified params are expressed in the "
+        + "object frame.",
+    )
+    parser.add_argument(
+        "--output_param_path",
+        type=Path,
+        default=None,
+        help="Path to the output parameter `.npy` file. If not provided, the parameters "
+        + "are not saved to disk.",
+    )
+    parser.add_argument(
+        "--vel_order",
+        type=int,
+        default=10,
+        help="The order of the filter for the joint velocities. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--vel_cutoff_freq_hz",
+        type=float,
+        default=5.6,
+        help="The cutoff frequency of the filter for the joint velocities. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--acc_order",
+        type=int,
+        default=10,
+        help="The order of the filter for the joint accelerations. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--acc_cutoff_freq_hz",
+        type=float,
+        default=4.2,
+        help="The cutoff frequency of the filter for the joint accelerations. Only used "
+        + "if `--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--torque_order",
+        type=int,
+        default=10,
+        help="The order of the filter for the joint torques. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--torque_cutoff_freq_hz",
+        type=float,
+        default=4.0,
+        help="The cutoff frequency of the filter for the joint torques. Only used if "
+        + "`--process_joint_data` is set.",
+    )
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="Whether to display debug visualizations.",
+    )
+    parser.add_argument(
+        "--use_bounding_ellipsoid",
+        action="store_true",
+        help="Whether to use a bounding ellipsoid constraint for the payload inertia.",
+    )
+    parser.add_argument(
+        "--time_to_cutoff_at_beginning_s",
+        type=float,
+        default=0.0,
+        help="The time to cutoff at the beginning of the data.",
+    )
+    parser.add_argument(
+        "--log_level",
+        type=str,
+        default="INFO",
+        choices=["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"],
+        help="Log level.",
+    )
+
+    args = parser.parse_args()
+    logging.basicConfig(level=args.log_level)
+
+    identify_grasped_object_payload(
+        robot_joint_data_path=args.robot_joint_data_path,
+        object_joint_data_path=args.object_joint_data_path,
+        object_mesh_path=args.object_mesh_path,
+        output_param_path=args.output_param_path,
+        vel_filter_order=args.vel_order,
+        vel_cutoff_freq_hz=args.vel_cutoff_freq_hz,
+        acc_filter_order=args.acc_order,
+        acc_cutoff_freq_hz=args.acc_cutoff_freq_hz,
+        torque_filter_order=args.torque_order,
+        torque_cutoff_freq_hz=args.torque_cutoff_freq_hz,
+        visualize=args.visualize,
+        use_bounding_ellipsoid=args.use_bounding_ellipsoid,
+        time_to_cutoff_at_beginning_s=args.time_to_cutoff_at_beginning_s,
+    )
 
 
 if __name__ == "__main__":

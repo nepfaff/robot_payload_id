@@ -8,12 +8,15 @@ import trimesh
 from manipulation.utils import ConfigureParser
 from pydrake.all import AffineBall, MathematicalProgram, MultibodyPlant, Parser
 
+from pathlib import Path
+
 
 def get_parser(plant: MultibodyPlant) -> Parser:
     """Creates a parser for a plant and adds package paths to it."""
     parser = Parser(plant)
     ConfigureParser(parser)
-    parser.package_map().AddPackageXml(filename=os.path.abspath("models/package.xml"))
+    package_path = Path(__file__).resolve().parent.parent.parent / "models" / "package.xml"
+    parser.package_map().AddPackageXml(filename=os.path.abspath(package_path))
     return parser
 
 
