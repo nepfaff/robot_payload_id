@@ -1,12 +1,12 @@
 <?xml version="1.0"?>
 <sdf version="1.7">
-  <model name="gripper_payload_box">
-    <link name="gripper_payload_box_link">
+  <model name="workspace_box">
+    <link name="workspace_box_link">
       <visual name="visual">
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <box>
-            <size>.15 .15 .4</size>
+            <size>0.5 0.5 0.07</size>
           </box>
         </geometry>
         <material>
@@ -17,7 +17,7 @@
         <pose>0 0 0 0 0 0</pose>
         <geometry>
           <box>
-            <size>.15 .15 .4</size>
+            <size>0.5 0.5 0.07</size>
           </box>
         </geometry>
       </collision>

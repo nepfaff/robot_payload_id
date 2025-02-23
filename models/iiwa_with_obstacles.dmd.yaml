@@ -18,13 +18,22 @@ directives:
         translation: [0.0, 0.0, -0.05]
 
 - add_model:
+    name: workspace_box
+    file: package://robot_payload_id/workspace_box.sdf
+- add_weld:
+    parent: world
+    child: workspace_box::workspace_box_link
+    X_PC:
+      translation: [0.3, 0.0, 0.035]
+
+- add_model:
     name: left_wall
     file: package://robot_payload_id/wall.sdf
 - add_weld:
     parent: world
     child: left_wall::wall_link
     X_PC:
-      translation: [0.0, -0.94, 0.75]
+      translation: [0.0, -1, 0.75]
 
 - add_model:
     name: right_wall
@@ -33,7 +42,7 @@ directives:
     parent: world
     child: right_wall::wall_link
     X_PC:
-      translation: [0.0, 0.94, 0.75]
+      translation: [0.0, 1, 0.75]
 
 - add_model:
     name: back_wall
@@ -42,7 +51,7 @@ directives:
     parent: world
     child: back_wall::wall_link
     X_PC:
-      translation: [-0.4, 0.0, 0.75]
+      translation: [-0.3, 0.0, 0.75]
       rotation: !Rpy { deg: [0.0, 0.0, 90.0]}
 
 - add_model:
@@ -52,8 +61,18 @@ directives:
     parent: world
     child: front_wall::wall_link
     X_PC:
-      translation: [0.9, 0.0, 0.75]
+      translation: [0.95, 0.0, 0.75]
       rotation: !Rpy { deg: [0.0, 0.0, 90.0]}
+
+- add_model:
+    name: ceiling
+    file: package://robot_payload_id/wall.sdf
+- add_weld:
+    parent: world
+    child: ceiling::wall_link
+    X_PC:
+      translation: [0.0, 0.0, 1.1]
+      rotation: !Rpy { deg: [90.0, 0.0, 0.0]}
 
 - add_model:
     name: back_left_thin_wall
@@ -62,7 +81,7 @@ directives:
     parent: world
     child: back_left_thin_wall::wall_link
     X_PC:
-      translation: [-0.06, 0.80, 0.15]
+      translation: [-0.0, 0.40, 0.15]
       rotation: !Rpy { deg: [0.0, 0.0, 90.0]}
 
 - add_model:
@@ -72,7 +91,7 @@ directives:
     parent: world
     child: back_right_thin_wall::wall_link
     X_PC:
-      translation: [-0.06, -0.80, 0.15]
+      translation: [-0.0, -0.40, 0.15]
       rotation: !Rpy { deg: [0.0, 0.0, 90.0]}
 
 - add_model:
@@ -100,4 +119,4 @@ directives:
     parent: iiwa::iiwa_link_7
     child: gripper_payload_box::gripper_payload_box_link
     X_PC:
-        translation: [0.0, 0.0, 0.18] # box_heigh / 2 + 0.05
+        translation: [0.0, 0.0, 0.25] # box_heigh / 2 + 0.05
