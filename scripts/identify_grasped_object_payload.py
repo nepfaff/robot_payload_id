@@ -384,7 +384,8 @@ def identify_grasped_object_payload(
         for folder in Path(robot_joint_data_path).iterdir()
         if folder.is_dir() and folder.name.startswith("gripper_position_")
     ]
-    mean_gripper_position = np.mean(available_gripper_positions)
+    actual_gripper_positions = np.load(object_joint_data_path / "wsg_positions.npy")
+    mean_gripper_position = np.mean(actual_gripper_positions)
     closest_gripper_position = min(
         available_gripper_positions, key=lambda x: abs(x - mean_gripper_position)
     )
