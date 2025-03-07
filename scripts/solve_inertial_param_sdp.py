@@ -9,6 +9,7 @@ from typing import Dict
 
 import numpy as np
 import sympy
+import wandb
 
 from pydrake.all import (
     DecomposeAffineExpressions,
@@ -19,8 +20,6 @@ from pydrake.all import (
     to_sympy,
 )
 from scipy.linalg import lu
-
-import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,

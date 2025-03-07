@@ -12,12 +12,11 @@ import hydra
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import wandb
 
 from omegaconf import OmegaConf, open_dict
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-
-import wandb
 
 from robot_payload_id.eric_id.drake_torch_dynamics_test import torch_uniform
 from robot_payload_id.eric_id.drake_torch_sys_id import (

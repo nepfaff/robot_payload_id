@@ -40,6 +40,7 @@ from pydrake.all import (
     SpatialInertia,
     UnitInertia,
 )
+
 from robot_payload_id.data import extract_numeric_data_matrix_autodiff
 from robot_payload_id.optimization import solve_inertial_param_sdp
 from robot_payload_id.utils import (

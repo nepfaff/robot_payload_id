@@ -4,10 +4,9 @@ import os
 from pathlib import Path
 
 import numpy as np
+import wandb
 
 from pydrake.all import BsplineBasis, BsplineTrajectory, Simulator
-
-import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,

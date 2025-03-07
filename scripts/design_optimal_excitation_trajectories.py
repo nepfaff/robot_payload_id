@@ -6,9 +6,8 @@ from functools import partial
 from pathlib import Path
 
 import numpy as np
-import yaml
-
 import wandb
+import yaml
 
 from robot_payload_id.environment import create_arm
 from robot_payload_id.optimization import (
