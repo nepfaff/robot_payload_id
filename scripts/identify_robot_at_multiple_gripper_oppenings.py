@@ -152,7 +152,7 @@ def main():
     num_joints = 7
     # NOTE: This model must not have a payload attached. Otherwise, the w0 term will be
     # wrong and include the payload inertia.
-    model_path = "./models/iiwa.dmd.yaml"
+    model_path = str(Path(__file__).resolve().parent.parent / "models" / "iiwa.dmd.yaml")
     arm_components = create_arm(
         arm_file_path=model_path, num_joints=num_joints, time_step=0.0
     )
