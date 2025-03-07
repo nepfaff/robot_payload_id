@@ -40,7 +40,6 @@ from pydrake.all import (
     SpatialInertia,
     UnitInertia,
 )
-
 from robot_payload_id.data import extract_numeric_data_matrix_autodiff
 from robot_payload_id.optimization import solve_inertial_param_sdp
 from robot_payload_id.utils import (
@@ -311,6 +310,7 @@ def identify_grasped_object_payload(
     visualize: bool = False,
     use_bounding_ellipsoid: bool = False,
     time_to_cutoff_at_beginning_s: float = 0.0,
+    json_output_path: Path | None = None,
 ) -> None:
     """Identifies the inertial parameters of a grasped object and expresses them in the
     object frame.
@@ -565,7 +565,9 @@ def identify_grasped_object_payload(
             "center_of_mass": com_PPayload_Payload.tolist(),
             "inertia_matrix": I_PPayloadcom_Payload.tolist(),
         }
-        json_path = object_joint_data_path.parent / "inertial_params.json"
+        json_path = (
+            json_output_path or object_joint_data_path.parent / "inertial_params.json"
+        )
         with open(json_path, "w") as f:
             json.dump(inertial_params, f, indent=2)
         logging.info(f"Saved inertial parameters to {json_path}")
