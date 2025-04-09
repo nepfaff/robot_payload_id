@@ -1,5 +1,18 @@
 # robot_payload_id
-Identifying object inertial properties using a robot arm
+Identifying object inertial properties using a robot arm.
+
+We describe our approach in the following publication:
+```bibtex
+@misc{pfaff2025_scalable_real2sim,
+    author        = {Pfaff, Nicholas and Fu, Evelyn and Binagia, Jeremy and Isola, Phillip and Tedrake, Russ},
+    title         = {Scalable Real2Sim: Physics-Aware Asset Generation Via Robotic Pick-and-Place Setups},
+    year          = {2025},
+    eprint        = {2503.00370},
+    archivePrefix = {arXiv},
+    primaryClass  = {cs.RO},
+    url           = {https://arxiv.org/abs/2503.00370},
+}
+```
 
 ## Installation
 
