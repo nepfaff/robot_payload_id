@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional, Union
 
 import nevergrad as ng
 import numpy as np
+import wandb
 import yaml
 
 from pydrake.all import (
@@ -25,8 +26,6 @@ from pydrake.all import (
     Simulator,
     SnoptSolver,
 )
-
-import wandb
 
 from robot_payload_id.data import (
     compute_autodiff_joint_data_from_fourier_series_traj_params1,

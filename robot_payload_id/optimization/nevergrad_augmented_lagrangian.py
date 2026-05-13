@@ -5,6 +5,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import nevergrad as ng
 import numpy as np
+import wandb
 
 from pydrake.all import (
     AugmentedLagrangianNonsmooth,
@@ -13,8 +14,6 @@ from pydrake.all import (
 )
 from tqdm import tqdm
 from wandb.sdk.wandb_summary import SummarySubDict
-
-import wandb
 
 # Create a cache for multiprocessing
 _MAX_NUM_WORKERS = 64
@@ -250,36 +249,35 @@ class NevergradAugmentedLagrangian:
         constraint_types = [name.split("_")[0] for name in constraint_names]
 
         # Assumes that constraint name has the form "name_..."
-        constraint_type_violations_map = dict(
-            zip(list(set(constraint_types)), [0] * len(constraint_types))
-        )
+        constraint_type_violations_map = {
+            constraint_type: 0 for constraint_type in constraint_types
+        }
 
         # See Drake augmented_lagrangian.cc::EvalAugmentedLagrangian for context
         lag_idx = 0
         is_equality_mask = nonsmooth_al.is_equality()
-        for constraint, constraint_type, is_equality in zip(
-            constraints, constraint_types, is_equality_mask
-        ):
+        for constraint, constraint_type in zip(constraints, constraint_types):
             if isinstance(constraint, BoundingBoxConstraint):
                 # No residuals exist for these bounds
                 continue
 
-            constraint_tol = (
-                self._equality_constraint_tol
-                if is_equality
-                else self._inequality_constraint_tol
-            )
             for i in range(constraint.num_constraints()):
                 lb = constraint.lower_bound()[i]
                 ub = constraint.upper_bound()[i]
                 if lb == ub:
                     # Constraint adds one Lagrange multiplier
+                    constraint_tol = self._equality_constraint_tol
+                    assert is_equality_mask[lag_idx], "Expected equality constraint."
                     if constraint_residue[lag_idx] ** 2 > constraint_tol:
                         constraint_type_violations_map[constraint_type] += 1
                     lag_idx += 1
                 else:
                     # Constraint adds 0 to 2 Lagrange multipliers
+                    constraint_tol = self._inequality_constraint_tol
                     if not np.isinf(lb):
+                        assert not is_equality_mask[
+                            lag_idx
+                        ], "Expected inequality constraint."
                         if (
                             np.maximum(-constraint_residue[lag_idx], 0) ** 2
                             > constraint_tol
@@ -288,6 +286,9 @@ class NevergradAugmentedLagrangian:
                         lag_idx += 1
 
                     if not np.isinf(ub):
+                        assert not is_equality_mask[
+                            lag_idx
+                        ], "Expected inequality constraint."
                         if (
                             np.maximum(-constraint_residue[lag_idx], 0) ** 2
                             > constraint_tol
@@ -299,6 +300,10 @@ class NevergradAugmentedLagrangian:
             logging.warning(
                 "Skipping to log constraint violations for decision variable bounds."
             )
+        else:
+            assert lag_idx == len(
+                is_equality_mask
+            ), "Constraint metadata did not match augmented Lagrangian size."
 
         num_constraint_violations = sum(list(constraint_type_violations_map.values()))
         wandb.log(

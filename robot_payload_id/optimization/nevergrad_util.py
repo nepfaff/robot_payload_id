@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import List, Union
 
 import nevergrad as ng
-
 import wandb
 
 
