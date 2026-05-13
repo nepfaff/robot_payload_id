@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pydrake.symbolic as sym
+import wandb
 
 from pydrake.all import (
     BsplineBasis,
@@ -19,8 +20,6 @@ from pydrake.all import (
     TrajectorySource,
     VectorLogSink,
 )
-
-import wandb
 
 from .inertia import change_inertia_reference_points_with_parallel_axis_theorem
 

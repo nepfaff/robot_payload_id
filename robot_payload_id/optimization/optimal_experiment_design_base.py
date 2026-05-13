@@ -5,11 +5,10 @@ from pathlib import Path
 from typing import Any, Optional, Tuple
 
 import numpy as np
+import wandb
 
 from numpy import ndarray
 from pydrake.all import MakeVectorVariable, ModelInstanceIndex, MultibodyPlant
-
-import wandb
 
 from robot_payload_id.data import (
     extract_symbolic_data_matrix,

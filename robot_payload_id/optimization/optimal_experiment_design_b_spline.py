@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 import numpy as np
+import wandb
 import yaml
 
 from pydrake.all import (
@@ -19,8 +20,6 @@ from pydrake.all import (
     ModelInstanceIndex,
     MultibodyPlant,
 )
-
-import wandb
 
 from robot_payload_id.data import (
     compute_base_param_mapping,
