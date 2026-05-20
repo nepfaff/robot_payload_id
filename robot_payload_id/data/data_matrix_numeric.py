@@ -337,7 +337,7 @@ def compute_base_param_mapping(
         + "large data matrices."
     )
     svd_start = time.time()
-    _, S, VT = np.linalg.svd(W_data)
+    _, S, VT = np.linalg.svd(W_data, full_matrices=False)
     logging.info(f"SVD took {timedelta(seconds=time.time() - svd_start)}")
     V = VT.T
     mask = np.abs(S) > tol
